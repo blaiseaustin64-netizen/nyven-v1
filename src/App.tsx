@@ -11,6 +11,7 @@ import { Projects } from './pages/Projects'
 import { NyvenPlus } from './pages/NyvenPlus'
 import { Settings } from './pages/Settings'
 import { Profile } from './pages/Profile'
+import { Preview } from './pages/Preview'
 
 const INTRO_KEY = 'nyven_intro_seen'
 
@@ -32,13 +33,11 @@ export default function App() {
     localStorage.setItem(INTRO_KEY, '1')
   }
 
-  // Close mobile menu on route change
   useEffect(() => {
     setMobileMenuOpen(false)
   }, [location.pathname])
 
-  // Hide bottom nav on builder for more space
-  const hideBottomNav = location.pathname === '/builder'
+  const hideBottomNav = location.pathname === '/builder' || location.pathname.startsWith('/preview')
 
   if (showIntro) {
     return (
@@ -71,6 +70,7 @@ export default function App() {
             <Route path="/nyven-plus" element={<NyvenPlus />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/preview/:slug" element={<Preview />} />
           </Routes>
         </main>
 
