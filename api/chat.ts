@@ -32,6 +32,18 @@ type ChatMessage = {
   content: string
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function getStatus(err: unknown): number | undefined {
+  if (err && typeof err === 'object' && 'status' in err) {
+    const s = (err as { status?: unknown }).status
+    if (typeof s === 'number') return s
+  }
+  return undefined
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ success: false, error: 'Method not allowed' })
@@ -90,15 +102,46 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       parts: [{ text: message.trim() }],
     })
 
-    const response = await ai.models.generateContent({
-      model: GEMINI_MODEL,
-      contents,
-      config: {
-        systemInstruction: NYVEN_SYSTEM_INSTRUCTION,
-        maxOutputTokens: 2048,
-        temperature: 0.7,
-      },
-    })
+    // Retry on transient Gemini overload (503) — up to 2 retries with short backoff
+    const MAX_ATTEMPTS = 3
+    let lastErr: unknown = null
+    let response: Awaited<ReturnType<typeof ai.models.generateContent>> | null = null
+
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      try {
+        response = await ai.models.generateContent({
+          model: GEMINI_MODEL,
+          contents,
+          config: {
+            systemInstruction: NYVEN_SYSTEM_INSTRUCTION,
+            maxOutputTokens: 2048,
+            temperature: 0.7,
+          },
+        })
+        lastErr = null
+        break
+      } catch (err: unknown) {
+        lastErr = err
+        const status = getStatus(err)
+        const isRetryable = status === 503 || status === 429
+
+        console.error(
+          `NYVEN /api/chat attempt ${attempt}/${MAX_ATTEMPTS} failed`,
+          status ? `status=${status}` : '',
+          err
+        )
+
+        if (!isRetryable || attempt === MAX_ATTEMPTS) {
+          throw err
+        }
+
+        await sleep(attempt * 600) // 600ms, then 1200ms
+      }
+    }
+
+    if (!response) {
+      throw lastErr ?? new Error('No response from Gemini after retries')
+    }
 
     // response.text is the standard property in @google/genai
     const finalText = (response.text || '').trim()
@@ -117,9 +160,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (err: unknown) {
     console.error('NYVEN /api/chat error:', err)
 
+    const status = getStatus(err)
     let userMessage = 'Something went wrong. Please try again.'
 
-    if (err && typeof err === 'object' && 'message' in err) {
+    if (status === 503) {
+      userMessage = 'NYVEN is warming up right now. Please try again in a moment.'
+    } else if (err && typeof err === 'object' && 'message' in err) {
       const msg = String((err as { message: string }).message).toLowerCase()
       if (msg.includes('api key') || msg.includes('invalid') || msg.includes('permission')) {
         userMessage = 'NYVEN is temporarily unavailable. Please try again later.'
@@ -136,4 +182,4 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       error: userMessage,
     })
   }
-        }
+}
