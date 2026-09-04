@@ -4,18 +4,36 @@ import { Plus, Trash2 } from 'lucide-react'
 import { ChatMessage } from '../components/ChatMessage'
 import { MessageComposer } from '../components/MessageComposer'
 import { NIdentity } from '../components/NIdentity'
-import { mockConversations } from '../lib/mockData'
 import type { Message, Conversation } from '../lib/types'
+
+const STORAGE_KEY = 'nyven_chat_history_v1'
+
+function loadConversations(): Conversation[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return []
+    return JSON.parse(raw) as Conversation[]
+  } catch {
+    return []
+  }
+}
+
+function saveConversations(conversations: Conversation[]) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations))
+  } catch {
+    // storage full or unavailable — fail silently
+  }
+}
 
 export function Chat() {
   const location = useLocation()
-  const [conversations, setConversations] = useState<Conversation[]>(mockConversations)
-  const [activeId, setActiveId] = useState<string>(mockConversations[0]?.id || 'new')
-  const [messages, setMessages] = useState<Message[]>(
-    mockConversations[0]?.messages || []
+  const [conversations, setConversations] = useState<Conversation[]>(() =>
+    loadConversations()
   )
+  const [activeId, setActiveId] = useState<string>(() => `c-${Date.now()}`)
+  const [messages, setMessages] = useState<Message[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
-  const [thinkingLabel, setThinkingLabel] = useState('Thinking...')
   const bottomRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef(false)
   const abortControllerRef = useRef<AbortController | null>(null)
@@ -24,9 +42,10 @@ export function Chat() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [])
 
+  // Persist conversations to localStorage whenever they change
   useEffect(() => {
-    scrollToBottom()
-  }, [messages, scrollToBottom])
+    saveConversations(conversations)
+  }, [conversations])
 
   // Handle initial message from Home
   useEffect(() => {
@@ -38,13 +57,14 @@ export function Chat() {
   }, []) // eslint-disable-line
 
   const startNewChat = () => {
-    const id = `c-${Date.now()}`
-    setActiveId(id)
+    setActiveId(`c-${Date.now()}`)
     setMessages([])
-    setConversations((prev) => [
-      { id, title: 'New conversation', messages: [], updatedAt: Date.now() },
-      ...prev,
-    ])
+  }
+
+  const openConversation = (c: Conversation) => {
+    setActiveId(c.id)
+    setMessages(c.messages)
+    setTimeout(scrollToBottom, 50)
   }
 
   const handleSend = async (text: string) => {
@@ -68,9 +88,9 @@ export function Chat() {
 
     setMessages((prev) => [...prev, userMsg, thinkingMsg])
     setIsGenerating(true)
-    setThinkingLabel('Thinking...')
+    scrollToBottom()
 
-    // Keep the existing NYVEN thinking animation alive
+    // Gentle thinking animation — updates text only, no scroll trigger
     const phases = ['Thinking...', 'Thinking through this...']
     let phaseIdx = 0
     const phaseInterval = setInterval(() => {
@@ -79,7 +99,6 @@ export function Chat() {
         return
       }
       phaseIdx = (phaseIdx + 1) % phases.length
-      setThinkingLabel(phases[phaseIdx])
       setMessages((prev) => {
         const next = [...prev]
         const last = next[next.length - 1]
@@ -90,7 +109,6 @@ export function Chat() {
       })
     }, 900)
 
-    // Build conversation history for context (exclude thinking messages)
     const history = messages
       .filter((m) => !m.isThinking)
       .map((m) => ({
@@ -104,13 +122,8 @@ export function Chat() {
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: text,
-          history,
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text, history }),
         signal: controller.signal,
       })
 
@@ -125,19 +138,18 @@ export function Chat() {
       const data = await res.json()
 
       if (!res.ok || !data.success) {
-        const errorText =
-          data?.error || 'Something went wrong. Please try again.'
-
+        const errorText = data?.error || 'Something went wrong. Please try again.'
         const errorMsg: Message = {
           id: `n-${Date.now()}`,
           role: 'nyven',
           content: errorText,
           timestamp: Date.now(),
         }
-
         setMessages((prev) => {
           const withoutThinking = prev.filter((m) => !m.isThinking)
-          return [...withoutThinking, errorMsg]
+          const updated = [...withoutThinking, errorMsg]
+          scrollToBottom()
+          return updated
         })
         setIsGenerating(false)
         return
@@ -152,38 +164,30 @@ export function Chat() {
 
       setMessages((prev) => {
         const withoutThinking = prev.filter((m) => !m.isThinking)
-        return [...withoutThinking, nyvenMsg]
-      })
-      setIsGenerating(false)
+        const updated = [...withoutThinking, nyvenMsg]
 
-      // Update conversation list
-      setConversations((prev) => {
-        const exists = prev.find((c) => c.id === activeId)
-        if (!exists) {
-          return [
-            {
-              id: activeId,
-              title: text.slice(0, 40) + (text.length > 40 ? '…' : ''),
-              messages: [userMsg, nyvenMsg],
-              updatedAt: Date.now(),
-            },
-            ...prev,
-          ]
-        }
-        return prev.map((c) =>
-          c.id === activeId
-            ? {
-                ...c,
-                title:
-                  c.title === 'New conversation'
-                    ? text.slice(0, 40) + (text.length > 40 ? '…' : '')
-                    : c.title,
-                messages: [...c.messages, userMsg, nyvenMsg],
-                updatedAt: Date.now(),
-              }
-            : c
-        )
+        // Save/update this conversation in history
+        setConversations((prevConvos) => {
+          const exists = prevConvos.find((c) => c.id === activeId)
+          const title = text.slice(0, 40) + (text.length > 40 ? '…' : '')
+          if (!exists) {
+            return [
+              { id: activeId, title, messages: updated, updatedAt: Date.now() },
+              ...prevConvos,
+            ]
+          }
+          return prevConvos.map((c) =>
+            c.id === activeId
+              ? { ...c, messages: updated, updatedAt: Date.now() }
+              : c
+          )
+        })
+
+        return updated
       })
+
+      setIsGenerating(false)
+      scrollToBottom()
     } catch (err: unknown) {
       clearInterval(phaseInterval)
 
@@ -199,9 +203,9 @@ export function Chat() {
         content: 'I could not reach the intelligence service. Please try again.',
         timestamp: Date.now(),
       }
-
       setMessages((prev) => {
         const withoutThinking = prev.filter((m) => !m.isThinking)
+        scrollToBottom()
         return [...withoutThinking, errorMsg]
       })
       setIsGenerating(false)
@@ -248,6 +252,11 @@ export function Chat() {
           </button>
         </div>
         <div className="flex-1 overflow-y-auto px-2 space-y-0.5">
+          {conversations.length === 0 && (
+            <p className="text-xs text-nyven-text-secondary/50 text-center mt-6 px-4">
+              Your conversations will appear here.
+            </p>
+          )}
           {conversations.map((c) => (
             <div
               key={c.id}
@@ -256,10 +265,7 @@ export function Chat() {
               }`}
             >
               <button
-                onClick={() => {
-                  setActiveId(c.id)
-                  setMessages(c.messages)
-                }}
+                onClick={() => openConversation(c)}
                 className="flex-1 text-left px-3 py-2.5 text-sm truncate text-nyven-text-secondary hover:text-nyven-text"
               >
                 {c.title}
@@ -278,7 +284,6 @@ export function Chat() {
 
       {/* Main chat area */}
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
-        {/* Messages */}
         <div className="flex-1 overflow-y-auto px-3 sm:px-6 py-6">
           <div className="max-w-3xl mx-auto space-y-6">
             {messages.length === 0 && (
@@ -313,7 +318,6 @@ export function Chat() {
           </div>
         </div>
 
-        {/* Composer */}
         <MessageComposer
           onSend={handleSend}
           isGenerating={isGenerating}
@@ -323,4 +327,4 @@ export function Chat() {
       </div>
     </div>
   )
-        }
+    }
