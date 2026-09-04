@@ -23,6 +23,7 @@ export interface Project {
   lastEdited: string
   preview?: string
   description?: string
+  slug?: string
 }
 
 export type Page =
