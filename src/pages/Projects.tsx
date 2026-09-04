@@ -1,14 +1,32 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { MoreHorizontal, ExternalLink, Pencil, Trash2, FolderOpen } from 'lucide-react'
 import { mockProjects } from '../lib/mockData'
+import { getProjectBySlug, listProjects } from '../lib/projectStore'
 import type { Project } from '../lib/types'
 
 export function Projects() {
   const navigate = useNavigate()
   const [projects, setProjects] = useState<Project[]>(mockProjects)
   const [menuOpen, setMenuOpen] = useState<string | null>(null)
+
+  useEffect(() => {
+    const session = listProjects().map((p) => ({
+      id: p.id,
+      name: p.name,
+      type: p.websiteType,
+      lastEdited: 'Just now',
+      description: p.description,
+      slug: p.slug,
+    }))
+    if (session.length) {
+      setProjects((prev) => {
+        const ids = new Set(session.map((s) => s.id))
+        return [...session, ...prev.filter((p) => !ids.has(p.id))]
+      })
+    }
+  }, [])
 
   const handleDelete = (id: string) => {
     setProjects((prev) => prev.filter((p) => p.id !== id))
@@ -118,11 +136,14 @@ export function Projects() {
 
                   <div className="flex gap-2 mt-4">
                     <button
-                      onClick={() =>
+                      onClick={() => {
+                        const stored = project.slug ? getProjectBySlug(project.slug) : null
                         navigate('/builder', {
-                          state: { description: project.description, type: project.type },
+                          state: stored
+                            ? { project: stored, description: stored.description, type: stored.websiteType }
+                            : { description: project.description, type: project.type },
                         })
-                      }
+                      }}
                       className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-white/[0.05] text-sm font-medium hover:bg-white/[0.08] transition-colors"
                     >
                       <ExternalLink size={14} />
@@ -147,4 +168,4 @@ export function Projects() {
       </div>
     </div>
   )
-                }
+}
