@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { Copy, Check, RotateCcw, Pencil, Trash2 } from 'lucide-react'
-import clsx from 'clsx'
 import { NIdentity } from './NIdentity'
 import type { Message } from '../lib/types'
 
@@ -67,16 +66,11 @@ export function ChatMessage({
           <span className="font-display font-medium text-sm text-nyven-text">
             NYVEN
           </span>
-          {isThinking && (
-            <span className="text-xs text-nyven-cyan/80 animate-pulse">
-              Thinking...
-            </span>
-          )}
         </div>
 
         {isThinking ? (
-          <div className="text-nyven-text-secondary text-[15px] leading-relaxed">
-            {message.content || 'Thinking through this...'}
+          <div className="text-nyven-text-secondary text-[15px] leading-relaxed animate-pulse">
+            {message.content || 'Thinking...'}
           </div>
         ) : (
           <div className="text-[15px] leading-relaxed text-nyven-text whitespace-pre-wrap reveal-text">
@@ -115,4 +109,4 @@ export function ChatMessage({
       </div>
     </div>
   )
-            }
+}
