@@ -54,7 +54,7 @@ export function MessageComposer({
   return (
     <div className="border-t border-white/[0.05] bg-nyven-bg/80 backdrop-blur-md safe-bottom">
       <div className="max-w-3xl mx-auto px-3 sm:px-4 py-3">
-        <div className="relative flex items-end gap-2 bg-nyven-surface border border-white/[0.07] rounded-2xl px-3 py-2.5 focus-within:border-nyven-cyan/30 transition-colors duration-200">
+        <div className="relative flex items-end gap-2 bg-nyven-surface border border-white/[0.07] rounded-2xl px-3 py-2.5 transition-colors duration-200">
           <button
             type="button"
             className="shrink-0 p-2 rounded-xl text-nyven-text-secondary hover:text-nyven-text hover:bg-white/[0.05] transition-colors"
@@ -115,9 +115,9 @@ export function MessageComposer({
           </div>
         </div>
         <p className="text-center text-[11px] text-nyven-text-secondary/50 mt-2">
-          NYVEN V1 · Demo responses · Backend coming soon
+          NYVEN
         </p>
       </div>
     </div>
   )
-                           }
+            }
