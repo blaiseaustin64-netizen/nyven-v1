@@ -4,7 +4,7 @@ import { Plus, Trash2 } from 'lucide-react'
 import { ChatMessage } from '../components/ChatMessage'
 import { MessageComposer } from '../components/MessageComposer'
 import { NIdentity } from '../components/NIdentity'
-import { mockConversations, generateMockResponse } from '../lib/mockData'
+import { mockConversations } from '../lib/mockData'
 import type { Message, Conversation } from '../lib/types'
 
 export function Chat() {
@@ -18,6 +18,7 @@ export function Chat() {
   const [thinkingLabel, setThinkingLabel] = useState('Thinking...')
   const bottomRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef(false)
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   const scrollToBottom = useCallback(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -32,7 +33,6 @@ export function Chat() {
     const state = location.state as { initialMessage?: string } | null
     if (state?.initialMessage) {
       handleSend(state.initialMessage)
-      // Clear state
       window.history.replaceState({}, '')
     }
   }, []) // eslint-disable-line
@@ -61,15 +61,16 @@ export function Chat() {
     const thinkingMsg: Message = {
       id: `t-${Date.now()}`,
       role: 'nyven',
-      content: thinkingLabel,
+      content: 'Thinking...',
       timestamp: Date.now(),
       isThinking: true,
     }
 
     setMessages((prev) => [...prev, userMsg, thinkingMsg])
     setIsGenerating(true)
+    setThinkingLabel('Thinking...')
 
-    // Simulate thinking phases
+    // Keep the existing NYVEN thinking animation alive
     const phases = ['Thinking...', 'Thinking through this...']
     let phaseIdx = 0
     const phaseInterval = setInterval(() => {
@@ -89,60 +90,127 @@ export function Chat() {
       })
     }, 900)
 
-    // Mock delay
-    await new Promise((r) => setTimeout(r, 1800 + Math.random() * 800))
+    // Build conversation history for context (exclude thinking messages)
+    const history = messages
+      .filter((m) => !m.isThinking)
+      .map((m) => ({
+        role: m.role === 'nyven' ? ('assistant' as const) : ('user' as const),
+        content: m.content,
+      }))
 
-    clearInterval(phaseInterval)
+    const controller = new AbortController()
+    abortControllerRef.current = controller
 
-    if (abortRef.current) {
-      setIsGenerating(false)
-      setMessages((prev) => prev.filter((m) => !m.isThinking))
-      return
-    }
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: text,
+          history,
+        }),
+        signal: controller.signal,
+      })
 
-    const response = generateMockResponse(text)
-    const nyvenMsg: Message = {
-      id: `n-${Date.now()}`,
-      role: 'nyven',
-      content: response,
-      timestamp: Date.now(),
-    }
+      clearInterval(phaseInterval)
 
-    setMessages((prev) => {
-      const withoutThinking = prev.filter((m) => !m.isThinking)
-      return [...withoutThinking, nyvenMsg]
-    })
-    setIsGenerating(false)
-
-    // Update conversation title if new
-    setConversations((prev) => {
-      const exists = prev.find((c) => c.id === activeId)
-      if (!exists) {
-        return [
-          {
-            id: activeId,
-            title: text.slice(0, 40) + (text.length > 40 ? '…' : ''),
-            messages: [userMsg, nyvenMsg],
-            updatedAt: Date.now(),
-          },
-          ...prev,
-        ]
+      if (abortRef.current) {
+        setIsGenerating(false)
+        setMessages((prev) => prev.filter((m) => !m.isThinking))
+        return
       }
-      return prev.map((c) =>
-        c.id === activeId
-          ? {
-              ...c,
-              title: c.title === 'New conversation' ? text.slice(0, 40) : c.title,
-              messages: [...c.messages, userMsg, nyvenMsg],
+
+      const data = await res.json()
+
+      if (!res.ok || !data.success) {
+        const errorText =
+          data?.error || 'Something went wrong. Please try again.'
+
+        const errorMsg: Message = {
+          id: `n-${Date.now()}`,
+          role: 'nyven',
+          content: errorText,
+          timestamp: Date.now(),
+        }
+
+        setMessages((prev) => {
+          const withoutThinking = prev.filter((m) => !m.isThinking)
+          return [...withoutThinking, errorMsg]
+        })
+        setIsGenerating(false)
+        return
+      }
+
+      const nyvenMsg: Message = {
+        id: `n-${Date.now()}`,
+        role: 'nyven',
+        content: data.message,
+        timestamp: Date.now(),
+      }
+
+      setMessages((prev) => {
+        const withoutThinking = prev.filter((m) => !m.isThinking)
+        return [...withoutThinking, nyvenMsg]
+      })
+      setIsGenerating(false)
+
+      // Update conversation list
+      setConversations((prev) => {
+        const exists = prev.find((c) => c.id === activeId)
+        if (!exists) {
+          return [
+            {
+              id: activeId,
+              title: text.slice(0, 40) + (text.length > 40 ? '…' : ''),
+              messages: [userMsg, nyvenMsg],
               updatedAt: Date.now(),
-            }
-          : c
-      )
-    })
+            },
+            ...prev,
+          ]
+        }
+        return prev.map((c) =>
+          c.id === activeId
+            ? {
+                ...c,
+                title:
+                  c.title === 'New conversation'
+                    ? text.slice(0, 40) + (text.length > 40 ? '…' : '')
+                    : c.title,
+                messages: [...c.messages, userMsg, nyvenMsg],
+                updatedAt: Date.now(),
+              }
+            : c
+        )
+      })
+    } catch (err: unknown) {
+      clearInterval(phaseInterval)
+
+      if (abortRef.current || (err instanceof DOMException && err.name === 'AbortError')) {
+        setIsGenerating(false)
+        setMessages((prev) => prev.filter((m) => !m.isThinking))
+        return
+      }
+
+      const errorMsg: Message = {
+        id: `n-${Date.now()}`,
+        role: 'nyven',
+        content: 'I could not reach the intelligence service. Please try again.',
+        timestamp: Date.now(),
+      }
+
+      setMessages((prev) => {
+        const withoutThinking = prev.filter((m) => !m.isThinking)
+        return [...withoutThinking, errorMsg]
+      })
+      setIsGenerating(false)
+    }
   }
 
   const handleStop = () => {
     abortRef.current = true
+    abortControllerRef.current?.abort()
     setIsGenerating(false)
     setMessages((prev) => prev.filter((m) => !m.isThinking))
   }
@@ -151,7 +219,6 @@ export function Chat() {
     const lastUser = [...messages].reverse().find((m) => m.role === 'user')
     if (lastUser) {
       setMessages((prev) => {
-        // Remove last nyven message
         const idx = prev.map((m) => m.role).lastIndexOf('nyven')
         if (idx >= 0) return prev.slice(0, idx)
         return prev
@@ -230,7 +297,11 @@ export function Chat() {
               <ChatMessage
                 key={msg.id}
                 message={msg}
-                isLast={idx === messages.length - 1 && msg.role === 'nyven' && !msg.isThinking}
+                isLast={
+                  idx === messages.length - 1 &&
+                  msg.role === 'nyven' &&
+                  !msg.isThinking
+                }
                 onRegenerate={
                   idx === messages.length - 1 && msg.role === 'nyven'
                     ? handleRegenerate
