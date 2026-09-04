@@ -5,6 +5,32 @@ const NYVEN_SYSTEM_INSTRUCTION = `You are NYVEN.
 
 Tagline: Intelligence, built for what's next.
 
+Identity (use only when the user asks about who you are, who created you, ownership, Google, Gemini, or VEXDYN):
+- NYVEN is an intelligence platform created by VEXDYN.
+- VEXDYN is the technology company behind NYVEN.
+- VEXDYN was founded by David Augustine.
+- Gemini provides the underlying AI technology that powers NYVEN's intelligence.
+- Gemini does NOT own NYVEN.
+- Google does NOT own NYVEN.
+- You are NOT Gemini, NOT Google, and NOT a Google product.
+
+When asked "Who are you?", answer:
+"I'm NYVEN — an intelligence platform created by VEXDYN, founded by David Augustine. I'm built to help you think deeper, create smarter, and power what's next."
+
+When asked "Who created you?", answer:
+"I was created by VEXDYN, a technology company founded by David Augustine."
+
+When asked "Does Google own you?", answer:
+"No. I'm a VEXDYN product. Gemini provides the underlying AI technology that powers my intelligence, but NYVEN itself is created and developed by VEXDYN."
+
+Never claim:
+- "Google created me."
+- "Google owns me."
+- "I am Gemini."
+- "I am Google's AI."
+- "I am a Google product."
+- "Gemini is my creator."
+
 Personality:
 - Calm
 - Intelligent
@@ -16,8 +42,10 @@ Personality:
 - Technologically advanced
 
 You communicate naturally and clearly. You do not sound robotic.
-You never describe yourself as Gemini, Google, or any underlying model.
 The user is interacting with NYVEN.
+
+Do not force identity statements into normal answers.
+If the user asks about photosynthesis, code, ideas, or other topics, answer the topic directly without inserting ownership or origin statements.
 
 Do not be unnecessarily verbose.
 Do not repeat the user's question back to them.
@@ -32,16 +60,56 @@ type ChatMessage = {
   content: string
 }
 
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
+function mapGeminiError(err: unknown): { status: number; error: string } {
+  let userMessage = 'Something went wrong. Please try again.'
+  let status = 500
 
-function getStatus(err: unknown): number | undefined {
-  if (err && typeof err === 'object' && 'status' in err) {
-    const s = (err as { status?: unknown }).status
-    if (typeof s === 'number') return s
+  if (err && typeof err === 'object') {
+    const anyErr = err as {
+      message?: string
+      status?: number
+      code?: number | string
+      statusCode?: number
+    }
+    const msg = String(anyErr.message || '').toLowerCase()
+    const code = Number(anyErr.status || anyErr.statusCode || anyErr.code || 0)
+
+    if (
+      code === 429 ||
+      msg.includes('quota') ||
+      msg.includes('rate') ||
+      msg.includes('resource exhausted') ||
+      msg.includes('too many requests')
+    ) {
+      status = 429
+      userMessage =
+        "NYVEN's AI service is temporarily unavailable because the current model quota has been reached. Please try again later."
+    } else if (
+      code === 401 ||
+      code === 403 ||
+      msg.includes('api key') ||
+      msg.includes('permission') ||
+      msg.includes('unauthenticated') ||
+      msg.includes('unauthorized')
+    ) {
+      status = 503
+      userMessage = 'NYVEN is temporarily unavailable. Please try again later.'
+    } else if (
+      code >= 500 ||
+      msg.includes('unavailable') ||
+      msg.includes('internal') ||
+      msg.includes('deadline') ||
+      msg.includes('timeout')
+    ) {
+      status = 503
+      userMessage = 'NYVEN is temporarily unavailable. Please try again in a moment.'
+    } else if (msg.includes('safety') || msg.includes('blocked') || msg.includes('prohibited')) {
+      status = 400
+      userMessage = 'I cannot respond to that request. Please try a different question.'
+    }
   }
-  return undefined
+
+  return { status, error: userMessage }
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -72,11 +140,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       })
     }
 
-    // Current official Google GenAI SDK
     const ai = new GoogleGenAI({ apiKey })
 
-    // Centralized model config — change via GEMINI_MODEL env var if needed
-    const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash'
+    // Chat model is intentionally separate from Builder.
+    // Default: gemini-3.1-flash-lite (stable). Optional override: GEMINI_CHAT_MODEL.
+    // Do not use gemini-3.1-flash-lite-preview (shut down).
+    const CHAT_MODEL =
+      process.env.GEMINI_CHAT_MODEL || 'gemini-3.1-flash-lite'
 
     // Build multi-turn contents from conversation history + new message
     const contents: Array<{ role: string; parts: Array<{ text: string }> }> = []
@@ -96,54 +166,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    // Current user message
     contents.push({
       role: 'user',
       parts: [{ text: message.trim() }],
     })
 
-    // Retry on transient Gemini overload (503) — up to 2 retries with short backoff
-    const MAX_ATTEMPTS = 3
-    let lastErr: unknown = null
-    let response: Awaited<ReturnType<typeof ai.models.generateContent>> | null = null
+    const response = await ai.models.generateContent({
+      model: CHAT_MODEL,
+      contents,
+      config: {
+        systemInstruction: NYVEN_SYSTEM_INSTRUCTION,
+        maxOutputTokens: 2048,
+        temperature: 0.7,
+      },
+    })
 
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-      try {
-        response = await ai.models.generateContent({
-          model: GEMINI_MODEL,
-          contents,
-          config: {
-            systemInstruction: NYVEN_SYSTEM_INSTRUCTION,
-            maxOutputTokens: 2048,
-            temperature: 0.7,
-          },
-        })
-        lastErr = null
-        break
-      } catch (err: unknown) {
-        lastErr = err
-        const status = getStatus(err)
-        const isRetryable = status === 503 || status === 429
-
-        console.error(
-          `NYVEN /api/chat attempt ${attempt}/${MAX_ATTEMPTS} failed`,
-          status ? `status=${status}` : '',
-          err
-        )
-
-        if (!isRetryable || attempt === MAX_ATTEMPTS) {
-          throw err
-        }
-
-        await sleep(attempt * 600) // 600ms, then 1200ms
-      }
-    }
-
-    if (!response) {
-      throw lastErr ?? new Error('No response from Gemini after retries')
-    }
-
-    // response.text is the standard property in @google/genai
     const finalText = (response.text || '').trim()
 
     if (!finalText) {
@@ -159,27 +196,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     })
   } catch (err: unknown) {
     console.error('NYVEN /api/chat error:', err)
-
-    const status = getStatus(err)
-    let userMessage = 'Something went wrong. Please try again.'
-
-    if (status === 503) {
-      userMessage = 'NYVEN is warming up right now. Please try again in a moment.'
-    } else if (err && typeof err === 'object' && 'message' in err) {
-      const msg = String((err as { message: string }).message).toLowerCase()
-      if (msg.includes('api key') || msg.includes('invalid') || msg.includes('permission')) {
-        userMessage = 'NYVEN is temporarily unavailable. Please try again later.'
-      } else if (msg.includes('quota') || msg.includes('rate') || msg.includes('resource')) {
-        userMessage =
-          'NYVEN is receiving many requests right now. Please wait a moment and try again.'
-      } else if (msg.includes('safety') || msg.includes('blocked') || msg.includes('prohibited')) {
-        userMessage = 'I cannot respond to that request. Please try a different question.'
-      }
-    }
-
-    return res.status(500).json({
+    const mapped = mapGeminiError(err)
+    return res.status(mapped.status).json({
       success: false,
-      error: userMessage,
+      error: mapped.error,
     })
   }
-}
+      }
