@@ -299,12 +299,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const ai = new GoogleGenAI({ apiKey })
-    // Builder model is intentionally separate from Chat.
-    // Default: gemini-3.8-flash. Optional override: GEMINI_BUILDER_MODEL or GEMINI_MODEL.
+    // Builder uses the same Free Tier model as Chat by default.
+    // Default: gemini-3.1-flash-lite. Optional override: GEMINI_BUILDER_MODEL or GEMINI_MODEL.
     const GEMINI_MODEL =
       process.env.GEMINI_BUILDER_MODEL ||
       process.env.GEMINI_MODEL ||
-      'gemini-3.8-flash'
+      'gemini-3.1-flash-lite'
 
     const prompt = `Build a complete website from this request.
 
@@ -445,4 +445,4 @@ Return structured JSON for the website specification and complete client-side fi
     }
     return res.status(500).json({ success: false, error: userMessage })
   }
-}
+    }
