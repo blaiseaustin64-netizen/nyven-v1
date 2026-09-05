@@ -42,12 +42,10 @@ export function Chat() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [])
 
-  // Persist conversations to localStorage whenever they change
   useEffect(() => {
     saveConversations(conversations)
   }, [conversations])
 
-  // Handle initial message from Home
   useEffect(() => {
     const state = location.state as { initialMessage?: string } | null
     if (state?.initialMessage) {
@@ -90,7 +88,6 @@ export function Chat() {
     setIsGenerating(true)
     scrollToBottom()
 
-    // Gentle thinking animation — updates text only, no scroll trigger
     const phases = ['Thinking...', 'Thinking through this...']
     let phaseIdx = 0
     const phaseInterval = setInterval(() => {
@@ -166,7 +163,6 @@ export function Chat() {
         const withoutThinking = prev.filter((m) => !m.isThinking)
         const updated = [...withoutThinking, nyvenMsg]
 
-        // Save/update this conversation in history
         setConversations((prevConvos) => {
           const exists = prevConvos.find((c) => c.id === activeId)
           const title = text.slice(0, 40) + (text.length > 40 ? '…' : '')
@@ -240,7 +236,6 @@ export function Chat() {
 
   return (
     <div className="flex h-full min-h-0">
-      {/* Conversation list - desktop */}
       <aside className="hidden md:flex flex-col w-64 border-r border-white/[0.05] bg-nyven-bg-secondary/30">
         <div className="p-3">
           <button
@@ -282,7 +277,6 @@ export function Chat() {
         </div>
       </aside>
 
-      {/* Main chat area */}
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
         <div className="flex-1 overflow-y-auto px-3 sm:px-6 py-6">
           <div className="max-w-3xl mx-auto space-y-6">
@@ -327,4 +321,4 @@ export function Chat() {
       </div>
     </div>
   )
-    }
+                            }
