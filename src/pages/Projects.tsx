@@ -2,13 +2,12 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { MoreHorizontal, ExternalLink, Pencil, Trash2, FolderOpen } from 'lucide-react'
-import { mockProjects } from '../lib/mockData'
 import { getProjectBySlug, listProjects } from '../lib/projectStore'
 import type { Project } from '../lib/types'
 
 export function Projects() {
   const navigate = useNavigate()
-  const [projects, setProjects] = useState<Project[]>(mockProjects)
+  const [projects, setProjects] = useState<Project[]>([])
   const [menuOpen, setMenuOpen] = useState<string | null>(null)
 
   useEffect(() => {
@@ -20,12 +19,7 @@ export function Projects() {
       description: p.description,
       slug: p.slug,
     }))
-    if (session.length) {
-      setProjects((prev) => {
-        const ids = new Set(session.map((s) => s.id))
-        return [...session, ...prev.filter((p) => !ids.has(p.id))]
-      })
-    }
+    setProjects(session)
   }, [])
 
   const handleDelete = (id: string) => {
@@ -64,7 +58,10 @@ export function Projects() {
         {projects.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center">
             <FolderOpen size={40} className="text-nyven-text-secondary mb-4 opacity-50" />
-            <p className="text-nyven-text-secondary mb-4">No projects yet</p>
+            <p className="text-nyven-text-secondary mb-2">No projects yet</p>
+            <p className="text-nyven-text-secondary/60 text-sm mb-4 max-w-sm">
+              Start a new project and tell NYVEN what you want to build. Your creations will appear here.
+            </p>
             <button
               onClick={() => navigate('/build')}
               className="text-nyven-cyan text-sm hover:underline"
@@ -138,11 +135,9 @@ export function Projects() {
                     <button
                       onClick={() => {
                         const stored = project.slug ? getProjectBySlug(project.slug) : null
-                        navigate('/builder', {
-                          state: stored
-                            ? { project: stored, description: stored.description, type: stored.websiteType }
-                            : { description: project.description, type: project.type },
-                        })
+                        if (stored) {
+                          navigate(`/preview/${stored.slug}`)
+                        }
                       }}
                       className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-white/[0.05] text-sm font-medium hover:bg-white/[0.08] transition-colors"
                     >
@@ -150,11 +145,14 @@ export function Projects() {
                       Open
                     </button>
                     <button
-                      onClick={() =>
+                      onClick={() => {
+                        const stored = project.slug ? getProjectBySlug(project.slug) : null
                         navigate('/builder', {
-                          state: { description: project.description, type: project.type },
+                          state: stored
+                            ? { project: stored, description: stored.description, type: stored.websiteType }
+                            : { description: project.description, type: project.type },
                         })
-                      }
+                      }}
                       className="flex-1 py-2 rounded-xl bg-nyven-cyan/15 text-nyven-cyan text-sm font-medium border border-nyven-cyan/20 hover:bg-nyven-cyan/25 transition-colors"
                     >
                       Continue
@@ -168,4 +166,4 @@ export function Projects() {
       </div>
     </div>
   )
-}
+                  }
