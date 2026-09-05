@@ -53,6 +53,11 @@ body {
   outline-offset: 2px;
 }
 
+textarea:focus-visible,
+input:focus-visible {
+  outline: none;
+}
+
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -152,4 +157,4 @@ body {
 
 .safe-top {
   padding-top: env(safe-area-inset-top, 0px);
-                                             }
+    }
