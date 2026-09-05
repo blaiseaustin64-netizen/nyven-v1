@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useLocation } from 'react-router-dom'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2, History, X } from 'lucide-react'
 import { ChatMessage } from '../components/ChatMessage'
 import { MessageComposer } from '../components/MessageComposer'
 import { NIdentity } from '../components/NIdentity'
@@ -34,6 +34,7 @@ export function Chat() {
   const [activeId, setActiveId] = useState<string>(() => `c-${Date.now()}`)
   const [messages, setMessages] = useState<Message[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef(false)
   const abortControllerRef = useRef<AbortController | null>(null)
@@ -57,11 +58,13 @@ export function Chat() {
   const startNewChat = () => {
     setActiveId(`c-${Date.now()}`)
     setMessages([])
+    setHistoryOpen(false)
   }
 
   const openConversation = (c: Conversation) => {
     setActiveId(c.id)
     setMessages(c.messages)
+    setHistoryOpen(false)
     setTimeout(scrollToBottom, 50)
   }
 
@@ -234,50 +237,99 @@ export function Chat() {
     }
   }
 
+  const conversationList = (
+    <>
+      <div className="p-3">
+        <button
+          onClick={startNewChat}
+          className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-nyven-surface border border-white/[0.06] text-sm font-medium hover:border-nyven-cyan/20 transition-colors"
+        >
+          <Plus size={16} className="text-nyven-cyan" />
+          New chat
+        </button>
+      </div>
+      <div className="flex-1 overflow-y-auto px-2 space-y-0.5">
+        {conversations.length === 0 && (
+          <p className="text-xs text-nyven-text-secondary/50 text-center mt-6 px-4">
+            Your conversations will appear here.
+          </p>
+        )}
+        {conversations.map((c) => (
+          <div
+            key={c.id}
+            className={`group flex items-center gap-1 rounded-xl ${
+              activeId === c.id ? 'bg-nyven-surface' : 'hover:bg-white/[0.03]'
+            }`}
+          >
+            <button
+              onClick={() => openConversation(c)}
+              className="flex-1 text-left px-3 py-2.5 text-sm truncate text-nyven-text-secondary hover:text-nyven-text"
+            >
+              {c.title}
+            </button>
+            <button
+              onClick={() => deleteConversation(c.id)}
+              className="p-2 opacity-0 group-hover:opacity-100 text-nyven-text-secondary hover:text-red-400 transition-opacity"
+              aria-label="Delete conversation"
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
+        ))}
+      </div>
+    </>
+  )
+
   return (
     <div className="flex h-full min-h-0">
+      {/* Conversation list - desktop */}
       <aside className="hidden md:flex flex-col w-64 border-r border-white/[0.05] bg-nyven-bg-secondary/30">
-        <div className="p-3">
-          <button
-            onClick={startNewChat}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-nyven-surface border border-white/[0.06] text-sm font-medium hover:border-nyven-cyan/20 transition-colors"
-          >
-            <Plus size={16} className="text-nyven-cyan" />
-            New chat
-          </button>
-        </div>
-        <div className="flex-1 overflow-y-auto px-2 space-y-0.5">
-          {conversations.length === 0 && (
-            <p className="text-xs text-nyven-text-secondary/50 text-center mt-6 px-4">
-              Your conversations will appear here.
-            </p>
-          )}
-          {conversations.map((c) => (
-            <div
-              key={c.id}
-              className={`group flex items-center gap-1 rounded-xl ${
-                activeId === c.id ? 'bg-nyven-surface' : 'hover:bg-white/[0.03]'
-              }`}
-            >
-              <button
-                onClick={() => openConversation(c)}
-                className="flex-1 text-left px-3 py-2.5 text-sm truncate text-nyven-text-secondary hover:text-nyven-text"
-              >
-                {c.title}
-              </button>
-              <button
-                onClick={() => deleteConversation(c.id)}
-                className="p-2 opacity-0 group-hover:opacity-100 text-nyven-text-secondary hover:text-red-400 transition-opacity"
-                aria-label="Delete conversation"
-              >
-                <Trash2 size={14} />
-              </button>
-            </div>
-          ))}
-        </div>
+        {conversationList}
       </aside>
 
+      {/* Mobile history drawer */}
+      {historyOpen && (
+        <div className="fixed inset-0 z-40 md:hidden">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setHistoryOpen(false)}
+          />
+          <div className="absolute left-0 top-0 bottom-0 w-[80vw] max-w-[280px] bg-nyven-bg-secondary flex flex-col">
+            <div className="flex items-center justify-between px-3 pt-4 pb-1">
+              <span className="text-sm font-medium">Chats</span>
+              <button
+                onClick={() => setHistoryOpen(false)}
+                className="p-2 rounded-lg text-nyven-text-secondary hover:text-nyven-text"
+                aria-label="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            {conversationList}
+          </div>
+        </div>
+      )}
+
+      {/* Main chat area */}
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
+        {/* Mobile top bar */}
+        <div className="md:hidden flex items-center justify-between px-3 h-12 border-b border-white/[0.05] shrink-0">
+          <button
+            onClick={() => setHistoryOpen(true)}
+            className="p-2 -ml-2 rounded-lg text-nyven-text-secondary hover:text-nyven-text"
+            aria-label="Chat history"
+          >
+            <History size={20} />
+          </button>
+          <button
+            onClick={startNewChat}
+            className="p-2 -mr-2 rounded-lg text-nyven-text-secondary hover:text-nyven-text"
+            aria-label="New chat"
+          >
+            <Plus size={20} />
+          </button>
+        </div>
+
         <div className="flex-1 overflow-y-auto px-3 sm:px-6 py-6">
           <div className="max-w-3xl mx-auto space-y-6">
             {messages.length === 0 && (
@@ -321,4 +373,4 @@ export function Chat() {
       </div>
     </div>
   )
-                            }
+      }
