@@ -4,7 +4,7 @@ const BUILDER_SYSTEM = `You are NYVEN Builder — the website creation engine of
 
 NYVEN tagline: Intelligence, built for what's next.
 NYVEN is an AI platform created by VEXDYN, founded by David Augustine.
-You are NOT Gemini, Google, DeepSeek, or OpenRouter. The user is using NYVEN.
+You are NOT Gemini, Google, DeepSeek, MiniMax, or OpenRouter. The user is using NYVEN.
 
 ROLE
 You act simultaneously as:
@@ -473,7 +473,6 @@ input:focus,textarea:focus{outline:2px solid color-mix(in srgb,var(--accent) 55%
 
   return { html, css, js }
 }
-
 async function callOpenRouter(params: {
   apiKey: string
   model: string
@@ -532,7 +531,6 @@ async function callOpenRouter(params: {
     clearTimeout(timeout)
   }
 }
-
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ success: false, error: 'Method not allowed' })
@@ -563,7 +561,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const BUILDER_MODEL =
-      process.env.OPENROUTER_BUILDER_MODEL || 'deepseek/deepseek-v4-flash-0731'
+      process.env.OPENROUTER_BUILDER_MODEL || 'minimax/minimax-m3:free'
 
     const prompt = `Build a complete production-quality website from this request.
 
@@ -590,7 +588,6 @@ files must be complete polished client-side website code — not a basic templat
     }
 
     void WEBSITE_JSON_SCHEMA
-
     const projectBlock = (parsed.project || {}) as Record<string, string>
     const designBlock = (parsed.design || {}) as Record<string, string>
     const filesBlock = (parsed.files || {}) as Record<string, string>
@@ -642,9 +639,7 @@ files must be complete polished client-side website code — not a basic templat
         success: false,
         error: 'NYVEN could not produce a safe website for this request. Please try again.',
       })
-    }
-
-    const now = new Date().toISOString()
+        }const now = new Date().toISOString()
     const project = {
       id: `proj_${Date.now().toString(36)}`,
       name,
@@ -698,6 +693,9 @@ files must be complete polished client-side website code — not a basic templat
       const msg = String(anyErr.message || '').toLowerCase()
       if (anyErr.name === 'AbortError' || msg.includes('abort') || msg.includes('timeout')) {
         userMessage = 'NYVEN Builder timed out while generating this website. Please try again.'
+      } else if (anyErr.status === 402 || msg.includes('credit') || msg.includes('payment')) {
+        userMessage = 'NYVEN Builder is temporarily unavailable due to a provider account issue. Please try again later.'
+        status = 402
       } else if (anyErr.status === 401 || anyErr.status === 403 || msg.includes('api key') || msg.includes('auth')) {
         userMessage = 'NYVEN Builder is temporarily unavailable. Please try again later.'
         status = 503
@@ -709,4 +707,4 @@ files must be complete polished client-side website code — not a basic templat
     }
     return res.status(status).json({ success: false, error: userMessage })
   }
-        }
+}
