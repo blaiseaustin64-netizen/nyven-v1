@@ -495,6 +495,7 @@ async function callOpenRouter(params: {
         model: params.model,
         temperature: 0.7,
         max_tokens: 16000,
+        reasoning: { enabled: false },
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: params.system },
