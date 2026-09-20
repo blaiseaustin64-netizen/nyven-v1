@@ -84,4 +84,4 @@ All mock data and response generators are isolated in `src/lib/mockData.ts` so t
 - No Login / Sign Up pages in V1.
 - Respects `prefers-reduced-motion`.
 - Mobile navigation: bottom bar + drawer for secondary items.
-```
+``` 
