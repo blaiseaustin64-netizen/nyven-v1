@@ -32,6 +32,7 @@ export type Page =
   | 'build'
   | 'builder'
   | 'projects'
+  | 'agents'
   | 'nyven-plus'
   | 'settings'
   | 'profile'

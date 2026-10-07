@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NYVEN Widget Test Page</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        background: #f4f5f7;
+        color: #111;
+        margin: 0;
+        padding: 40px 24px;
+        line-height: 1.5;
+      }
+      .card {
+        max-width: 640px;
+        margin: 0 auto;
+        background: #fff;
+        border-radius: 16px;
+        padding: 32px;
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.06);
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 1.5rem;
+      }
+      p {
+        color: #555;
+      }
+      code {
+        background: #f0f1f3;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 0.9em;
+      }
+      .hint {
+        margin-top: 24px;
+        padding: 12px 14px;
+        background: #eef9ff;
+        border-radius: 10px;
+        font-size: 0.9rem;
+        color: #0a4a6e;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>NYVEN Widget Test</h1>
+      <p>
+        This page loads the NYVEN website widget. Replace
+        <code>YOUR_AGENT_ID</code> in the script tag below with a real agent id
+        from NYVEN → Agents → Install (agent must be saved and Active).
+      </p>
+      <p>
+        Open the chat bubble in the bottom-right corner to talk to Nyven Support.
+      </p>
+      <div class="hint">
+        Serve this site from the same origin as your NYVEN deployment so
+        <code>/api/agent/*</code> and <code>/agent.js</code> resolve correctly.
+      </div>
+    </div>
+
+    <!-- Replace YOUR_AGENT_ID after creating an Active agent in NYVEN -->
+    <script src="/agent.js" data-agent="YOUR_AGENT_ID"></script>
+  </body>
+</html>

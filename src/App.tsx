@@ -12,6 +12,8 @@ import { NyvenPlus } from './pages/NyvenPlus'
 import { Settings } from './pages/Settings'
 import { Profile } from './pages/Profile'
 import { Preview } from './pages/Preview'
+import { Agents } from './pages/Agents'
+import { AgentEditor } from './pages/AgentEditor'
 
 const INTRO_KEY = 'nyven_intro_seen'
 
@@ -67,6 +69,9 @@ export default function App() {
             <Route path="/build" element={<Build />} />
             <Route path="/builder" element={<Builder />} />
             <Route path="/projects" element={<Projects />} />
+            <Route path="/agents" element={<Agents />} />
+            <Route path="/agents/create" element={<AgentEditor />} />
+            <Route path="/agents/:id" element={<AgentEditor />} />
             <Route path="/nyven-plus" element={<NyvenPlus />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/profile" element={<Profile />} />

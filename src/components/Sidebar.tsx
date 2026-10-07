@@ -4,6 +4,7 @@ import {
   MessageSquare,
   Hammer,
   FolderOpen,
+  Bot,
   Sparkles,
   Settings,
   User,
@@ -13,13 +14,13 @@ import {
 } from 'lucide-react'
 import clsx from 'clsx'
 import { NIdentity } from './NIdentity'
-import { useState } from 'react'
 
 const mainNav = [
   { to: '/', label: 'Home', icon: Home },
   { to: '/chat', label: 'Chat', icon: MessageSquare },
   { to: '/build', label: 'Build', icon: Hammer },
   { to: '/projects', label: 'Projects', icon: FolderOpen },
+  { to: '/agents', label: 'Agents', icon: Bot },
 ]
 
 const secondaryNav = [
