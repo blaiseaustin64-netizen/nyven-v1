@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import clsx from 'clsx'
 import { NIdentity } from './NIdentity'
+import { useAuth } from '../lib/auth/AuthContext'
 
 const mainNav = [
   { to: '/', label: 'Home', icon: Home },
