@@ -14,6 +14,8 @@ import { Profile } from './pages/Profile'
 import { Preview } from './pages/Preview'
 import { Agents } from './pages/Agents'
 import { AgentEditor } from './pages/AgentEditor'
+import { Auth } from './pages/Auth'
+import { AuthProvider } from './lib/auth/AuthContext'
 
 const INTRO_KEY = 'nyven_intro_seen'
 
@@ -51,6 +53,7 @@ export default function App() {
   }
 
   return (
+    <AuthProvider>
     <div className="h-full flex flex-col lg:flex-row">
       <NyvenBackground />
 
@@ -73,7 +76,8 @@ export default function App() {
             <Route path="/agents/create" element={<AgentEditor />} />
             <Route path="/agents/:id" element={<AgentEditor />} />
             <Route path="/nyven-plus" element={<NyvenPlus />} />
-            <Route path="/settings" element={<Settings />} />
+            <Route path="/auth" element={<Auth />} />
+        <Route path="/settings" element={<Settings />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/preview/:slug" element={<Preview />} />
           </Routes>
@@ -82,5 +86,6 @@ export default function App() {
         {!hideBottomNav && <MobileBottomNav />}
       </div>
     </div>
+    </AuthProvider>
   )
 }

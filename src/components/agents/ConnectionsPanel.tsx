@@ -51,10 +51,9 @@ export function ConnectionsPanel({ agentId, agentType }: Props) {
     setBusy(true)
     setMessage(null)
     try {
-      // Start local pending state; real OAuth tokens stay server-side only
+      // Real OAuth is not user-ready. Only mark connected if server has live tokens.
       beginGmailConnect(agentId)
 
-      // Probe server — if env tokens exist, mark connected (deployment-level)
       const res = await fetch('/api/agent/inbox', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -64,21 +63,21 @@ export function ConnectionsPanel({ agentId, agentType }: Props) {
       if (data?.connected) {
         upsertConnection(agentId, 'gmail', {
           status: 'connected',
-          accountLabel: 'Connected (server OAuth)',
+          accountLabel: data.accountLabel || 'Server-configured Gmail',
           scopes: ['gmail.readonly', 'gmail.compose'],
           connectedAt: new Date().toISOString(),
           lastError: undefined,
         })
-        setMessage('Gmail is connected on the server.')
+        setMessage('Gmail is available on the server for this deployment.')
         setServerGmail(true)
       } else {
         upsertConnection(agentId, 'gmail', {
-          status: 'pending',
+          status: 'disconnected',
           lastError:
-            'Authorize Gmail via OAuth and configure server tokens (GMAIL_ACCESS_TOKEN or refresh flow). No fake mailbox is used.',
+            'Per-user Gmail OAuth is not enabled yet. Configure server tokens or wait for OAuth.',
         })
         setMessage(
-          'Gmail authorization required. Complete Google OAuth for this deployment so the server holds tokens — credentials never enter the browser.'
+          'Gmail OAuth for individual accounts is not ready. Connection stays disconnected — nothing was faked.'
         )
         setServerGmail(false)
       }
@@ -174,7 +173,7 @@ export function ConnectionsPanel({ agentId, agentType }: Props) {
                     onClick={connectGmail}
                     className="px-3 py-1.5 rounded-lg text-xs font-medium bg-nyven-cyan text-nyven-bg disabled:opacity-50"
                   >
-                    {st === 'connected' ? 'Re-check connection' : 'Connect Gmail'}
+                    {st === 'connected' ? 'Re-check connection' : 'Check Gmail status'}
                   </button>
                   {(st === 'connected' || st === 'pending') && (
                     <button

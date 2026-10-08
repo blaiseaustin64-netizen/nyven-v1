@@ -3,16 +3,14 @@
  */
 
 import type { AgentInstance } from './agentTypes'
-import { listKnowledge } from './knowledgeStore'
-import { listKnowledgeGaps } from './knowledgeStore'
+import { listKnowledge, listKnowledgeGaps } from './knowledgeStore'
 import { getAgentAnalytics } from './usageStore'
 import { listDomains } from './domainStore'
-import { getConnection } from './connections'
 
 export interface HealthFactor {
   id: string
   label: string
-  score: number // 0–100 contribution weight applied separately
+  score: number
   weight: number
   detail: string
 }
@@ -23,12 +21,89 @@ export interface AgentHealthResult {
   suggestions: string[]
 }
 
+function safeListKnowledge(agentId: string) {
+  try {
+    return listKnowledge(agentId) || []
+  } catch {
+    return []
+  }
+}
+
+function safeListGaps(agentId: string) {
+  try {
+    return (listKnowledgeGaps(agentId) || []).filter((g) => g && !g.resolved)
+  } catch {
+    return []
+  }
+}
+
+function safeAnalytics(agentId: string) {
+  try {
+    return getAgentAnalytics(agentId)
+  } catch {
+    return {
+      messagesTotal: 0,
+      messagesThisMonth: 0,
+      conversationsApprox: 0,
+      knowledgeHits: 0,
+      knowledgeGaps: 0,
+      rateLimited: 0,
+      domainBlocked: 0,
+      errorsTotal: 0,
+      activityByDay: [] as { date: string; messages: number }[],
+      uniqueSessions: 0,
+    }
+  }
+}
+
+function safeDomains(agentId: string) {
+  try {
+    return listDomains(agentId) || []
+  } catch {
+    return []
+  }
+}
+
+function safeGmailStatus(agentId: string): {
+  score: number
+  detail: string
+} {
+  try {
+    // Dynamic import path avoided — use localStorage status if present
+    const raw = localStorage.getItem('nyven_agent_connections_v1')
+    if (!raw) return { score: 25, detail: 'Gmail is not connected.' }
+    const list = JSON.parse(raw)
+    if (!Array.isArray(list)) return { score: 25, detail: 'Gmail is not connected.' }
+    const gmail = list.find(
+      (c: { agentId?: string; type?: string; status?: string }) =>
+        c.agentId === agentId && c.type === 'gmail'
+    )
+    if (gmail?.status === 'connected') {
+      return { score: 90, detail: 'Gmail connection is active.' }
+    }
+    if (gmail?.status === 'pending') {
+      return { score: 45, detail: 'Gmail connection is pending authorization.' }
+    }
+  } catch {
+    /* ignore */
+  }
+  return { score: 25, detail: 'Gmail is not connected.' }
+}
+
 export function computeAgentHealth(agent: AgentInstance): AgentHealthResult {
-  const knowledge = listKnowledge(agent.id)
+  if (!agent || !agent.id) {
+    return {
+      score: 0,
+      factors: [],
+      suggestions: ['Save the agent to compute health.'],
+    }
+  }
+
+  const knowledge = safeListKnowledge(agent.id)
   const activeKnowledge = knowledge.filter((k) => k.status === 'active')
-  const gaps = listKnowledgeGaps(agent.id).filter((g) => !g.resolved)
-  const analytics = getAgentAnalytics(agent.id)
-  const domains = listDomains(agent.id)
+  const gaps = safeListGaps(agent.id)
+  const analytics = safeAnalytics(agent.id)
+  const domains = safeDomains(agent.id)
 
   const factors: HealthFactor[] = []
 
@@ -59,29 +134,27 @@ export function computeAgentHealth(agent: AgentInstance): AgentHealthResult {
 
   // Knowledge / connection coverage by agent type
   if (agent.agentType === 'inbox') {
-    let connScore = 25
-    let connDetail = 'Gmail is not connected.'
-    try {
-      const gmail = getConnection(agent.id, 'gmail')
-      if (gmail?.status === 'connected') {
-        connScore = 90
-        connDetail = 'Gmail connection is active.'
-      } else if (gmail?.status === 'pending') {
-        connScore = 45
-        connDetail = 'Gmail connection is pending authorization.'
-      }
-    } catch {
-      /* ignore */
-    }
-    const skills = (agent.settings?.skills as { enabled?: boolean }[]) || []
-    const enabledSkills = skills.filter((s) => s.enabled).length
+    const gmail = safeGmailStatus(agent.id)
     factors.push({
       id: 'connection',
       label: 'Gmail connection',
-      score: connScore,
+      score: gmail.score,
       weight: 0.3,
-      detail: connDetail,
+      detail: gmail.detail,
     })
+
+    let enabledSkills = 0
+    try {
+      const skills = agent.settings?.skills
+      if (Array.isArray(skills)) {
+        enabledSkills = skills.filter(
+          (s: { enabled?: boolean }) => s && s.enabled
+        ).length
+      }
+    } catch {
+      enabledSkills = 0
+    }
+
     factors.push({
       id: 'skills',
       label: 'Skill configuration',
@@ -116,8 +189,8 @@ export function computeAgentHealth(agent: AgentInstance): AgentHealthResult {
     })
   }
 
-  // Reliability from usage (only if there is usage)
-  let relScore = 70 // neutral when no data
+  // Reliability
+  let relScore = 70
   let relDetail = 'Not enough usage yet to measure reliability.'
   if (analytics.messagesTotal > 0) {
     const failish =
@@ -134,13 +207,21 @@ export function computeAgentHealth(agent: AgentInstance): AgentHealthResult {
     detail: relDetail,
   })
 
-  // Production readiness (domains + status)
+  // Production readiness
   let prodScore = 40
-  let prodDetail = 'No domains configured yet.'
-  if (domains.length > 0) {
-    const enabled = domains.filter((d) => d.enabled && d.status !== 'blocked' && d.status !== 'disabled')
+  let prodDetail =
+    agent.agentType === 'inbox'
+      ? 'Inbox readiness based on connection and status.'
+      : 'No domains configured yet.'
+  if (agent.agentType !== 'inbox' && domains.length > 0) {
+    const enabled = domains.filter(
+      (d) => d.enabled && d.status !== 'blocked' && d.status !== 'disabled'
+    )
     prodScore = enabled.length > 0 ? 75 : 35
     prodDetail = `${enabled.length} enabled domain(s) of ${domains.length}.`
+  }
+  if (agent.agentType === 'inbox') {
+    prodScore = agent.status === 'active' ? 70 : 40
   }
   if (agent.status === 'active') prodScore = Math.min(100, prodScore + 15)
   factors.push({
@@ -151,21 +232,24 @@ export function computeAgentHealth(agent: AgentInstance): AgentHealthResult {
     detail: prodDetail,
   })
 
+  const weightSum = factors.reduce((s, f) => s + f.weight, 0) || 1
   const score = Math.round(
-    factors.reduce((sum, f) => sum + f.score * f.weight, 0)
+    factors.reduce((sum, f) => sum + f.score * f.weight, 0) / weightSum
   )
 
   const suggestions: string[] = []
   for (const f of factors) {
     if (f.score < 60 && f.detail) suggestions.push(f.detail)
   }
-  if (gaps.length > 0) {
+  if (agent.agentType !== 'inbox' && gaps.length > 0) {
     suggestions.push(
       `Review ${gaps.length} knowledge gap(s) and add missing FAQs.`
     )
   }
-  if (knCount === 0) {
-    suggestions.push('Add information about pricing, policies, or hours to improve answers.')
+  if (agent.agentType !== 'inbox' && activeKnowledge.length === 0) {
+    suggestions.push(
+      'Add information about pricing, policies, or hours to improve answers.'
+    )
   }
 
   return {

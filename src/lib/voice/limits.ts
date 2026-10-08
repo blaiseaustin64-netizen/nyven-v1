@@ -1,0 +1,4 @@
+export const VOICE_LIMITS_CLIENT = {
+  MAX_RECORDING_MS: 90_000,
+  MAX_AUDIO_BYTES: 8 * 1024 * 1024,
+} as const

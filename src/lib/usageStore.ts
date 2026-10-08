@@ -130,13 +130,21 @@ export function recordAgentError(
 }
 
 export function listUsage(agentId: string): UsageEvent[] {
-  const ownerId = getLocalOwnerId()
-  return readUsage().filter((e) => e.agentId === agentId && e.ownerId === ownerId)
+  try {
+    const ownerId = getLocalOwnerId()
+    return readUsage().filter((e) => e && e.agentId === agentId && e.ownerId === ownerId)
+  } catch {
+    return []
+  }
 }
 
 export function listErrors(agentId: string): AgentErrorEvent[] {
-  const ownerId = getLocalOwnerId()
-  return readErrors().filter((e) => e.agentId === agentId && e.ownerId === ownerId)
+  try {
+    const ownerId = getLocalOwnerId()
+    return readErrors().filter((e) => e && e.agentId === agentId && e.ownerId === ownerId)
+  } catch {
+    return []
+  }
 }
 
 function startOfMonthISO(): string {

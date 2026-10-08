@@ -122,6 +122,12 @@ input:focus-visible {
   animation: breathe 2.2s ease-in-out infinite;
 }
 
+/* Generating: slightly stronger cyan pulse while tokens stream */
+.n-generating-glow {
+  filter: drop-shadow(0 0 14px rgba(98, 230, 255, 0.55)) drop-shadow(0 0 28px rgba(98, 230, 255, 0.2));
+  animation: breathe 1.6s ease-in-out infinite;
+}
+
 .n-idle-glow {
   filter: drop-shadow(0 0 8px rgba(98, 230, 255, 0.15));
 }

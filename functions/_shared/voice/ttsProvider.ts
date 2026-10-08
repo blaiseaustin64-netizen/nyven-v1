@@ -1,0 +1,194 @@
+/**
+ * Text-to-speech — OpenRouter primary (FREE Fish Audio S2.1 Pro Free + Sua).
+ *
+ * PRIMARY:
+ *   Provider: OpenRouter
+ *   Endpoint: https://openrouter.ai/api/v1/audio/speech
+ *   Model:    fish-audio/s2.1-pro-free:free  ($0)
+ *   Voice:    de77377323004b48937473a795d86f1f  (Sua on Fish Audio)
+ *   Key:      OPENROUTER_API_KEY (server-side only)
+ *
+ * Optional fallback (not default): OPENAI_API_KEY → openai tts-1
+ *
+ * No laughter injection. No fake audio. Synthesizes response text only.
+ */
+
+import {
+  DEFAULT_TTS_API_BASE,
+  DEFAULT_TTS_MODEL,
+  DEFAULT_TTS_VOICE,
+  VOICE_LIMITS,
+  type TTSOptions,
+  type TTSResult,
+} from './types'
+
+export type TTSEnv = {
+  OPENROUTER_API_KEY?: string
+  OPENROUTER_TTS_MODEL?: string
+  OPENROUTER_TTS_VOICE?: string
+  TTS_API_BASE?: string
+  TTS_MODEL?: string
+  TTS_VOICE?: string
+  OPENAI_API_KEY?: string
+}
+
+function resolveTTS(env: TTSEnv): {
+  url: string
+  apiKey: string
+  model: string
+  voice: string
+  provider: string
+} | null {
+  const voice =
+    env.OPENROUTER_TTS_VOICE ||
+    env.TTS_VOICE ||
+    DEFAULT_TTS_VOICE
+
+  // Primary: OpenRouter free Fish Audio S2.1 Pro Free
+  if (env.OPENROUTER_API_KEY) {
+    return {
+      url: env.TTS_API_BASE || DEFAULT_TTS_API_BASE,
+      apiKey: env.OPENROUTER_API_KEY,
+      model: env.OPENROUTER_TTS_MODEL || env.TTS_MODEL || DEFAULT_TTS_MODEL,
+      voice,
+      provider: 'openrouter',
+    }
+  }
+
+  // Optional fallback only
+  if (env.OPENAI_API_KEY) {
+    return {
+      url: 'https://api.openai.com/v1/audio/speech',
+      apiKey: env.OPENAI_API_KEY,
+      model: env.TTS_MODEL || 'tts-1',
+      voice: env.TTS_VOICE || 'nova',
+      provider: 'openai',
+    }
+  }
+
+  return null
+}
+
+export function ttsAvailable(env: TTSEnv): boolean {
+  return resolveTTS(env) !== null
+}
+
+/** Strip markdown / tool noise — never inject laughter or emotional SFX tags */
+export function prepareSpeakableText(raw: string): string {
+  let t = (raw || '').trim()
+  if (!t) return ''
+  t = t.replace(/```[\s\S]*?```/g, ' (code omitted). ')
+  t = t.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+  t = t.replace(/[*_`#]+/g, '')
+  // Strip Fish-style bracket emotion tags if model would interpret them
+  t = t.replace(/\[(laughing|laughter|giggle|sighs?|whispers?[^\]]*)\]/gi, '')
+  t = t.replace(/\s+/g, ' ').trim()
+  if (t.length > VOICE_LIMITS.MAX_TTS_CHARS) {
+    t = t.slice(0, VOICE_LIMITS.MAX_TTS_CHARS - 1).trim() + '…'
+  }
+  return t
+}
+
+export async function synthesizeSpeech(
+  env: TTSEnv,
+  text: string,
+  options?: TTSOptions,
+  signal?: AbortSignal
+): Promise<{ ok: true; result: TTSResult } | { ok: false; code: string; message: string }> {
+  const speak = prepareSpeakableText(text)
+  if (!speak) {
+    return { ok: false, code: 'EMPTY_TEXT', message: 'Nothing to speak.' }
+  }
+
+  const cfg = resolveTTS(env)
+  if (!cfg) {
+    return {
+      ok: false,
+      code: 'TTS_UNAVAILABLE',
+      message:
+        'Speech output is not configured. Set OPENROUTER_API_KEY on the server for NYVEN voice (Sua / Fish Audio free).',
+    }
+  }
+
+  const voice = options?.voiceId || cfg.voice
+  const body = {
+    model: cfg.model,
+    input: speak,
+    voice,
+    response_format: 'mp3',
+    speed: options?.speed ?? 1.0,
+  }
+
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), VOICE_LIMITS.TTS_TIMEOUT_MS)
+  const onAbort = () => controller.abort()
+  signal?.addEventListener('abort', onAbort)
+
+  try {
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${cfg.apiKey}`,
+      'Content-Type': 'application/json',
+    }
+    if (cfg.provider === 'openrouter') {
+      headers['HTTP-Referer'] = 'https://nyven.vexdyn.com'
+      headers['X-Title'] = 'NYVEN'
+    }
+
+    const res = await fetch(cfg.url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    })
+    clearTimeout(timer)
+    signal?.removeEventListener('abort', onAbort)
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '')
+      console.error(
+        'TTS provider error',
+        cfg.provider,
+        cfg.model,
+        voice,
+        res.status,
+        errText.slice(0, 240)
+      )
+      return {
+        ok: false,
+        code: res.status === 429 ? 'TTS_RATE_LIMITED' : 'TTS_FAILED',
+        message:
+          res.status === 429
+            ? 'Speech output is temporarily rate limited.'
+            : 'Could not generate speech. The text response is still available.',
+      }
+    }
+
+    const audio = await res.arrayBuffer()
+    if (!audio.byteLength) {
+      return {
+        ok: false,
+        code: 'TTS_FAILED',
+        message: 'Could not generate speech. The text response is still available.',
+      }
+    }
+
+    return {
+      ok: true,
+      result: {
+        audio,
+        mimeType: res.headers.get('content-type') || 'audio/mpeg',
+      },
+    }
+  } catch (err: unknown) {
+    clearTimeout(timer)
+    signal?.removeEventListener('abort', onAbort)
+    if (signal?.aborted || (err as { name?: string })?.name === 'AbortError') {
+      return { ok: false, code: 'ABORTED', message: 'Speech cancelled.' }
+    }
+    return {
+      ok: false,
+      code: 'TTS_FAILED',
+      message: 'Could not generate speech. The text response is still available.',
+    }
+  }
+}

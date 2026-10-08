@@ -5,6 +5,7 @@ import type { AgentDomain, DomainStatus } from '../../lib/domainTypes'
 import {
   addDomain,
   listDomains,
+  listActiveAllowlist,
   normalizeDomain,
   removeDomain,
   updateDomain,
@@ -12,7 +13,6 @@ import {
 import { checkDomainCount, getEntitlements } from '../../lib/entitlements'
 import { getAgentInstance, publishAgentConfig } from '../../lib/agentStore'
 import { toPublishedKnowledge } from '../../lib/knowledgeStore'
-import { listActiveAllowlist, listDomains, addDomain, removeDomain, updateDomain } from '../../lib/domainStore'
 
 type Props = { agentId: string }
 
@@ -91,6 +91,21 @@ export function DomainsPanel({ agentId }: Props) {
 
   return (
     <div className="max-w-2xl space-y-6">
+      <div className="mb-5 p-4 rounded-2xl border border-white/[0.06] bg-nyven-bg/50 space-y-2">
+        <p className="text-sm font-medium">Website installation flow</p>
+        <ol className="text-xs text-nyven-text-secondary space-y-1 list-decimal pl-4">
+          <li>Add each website domain (example.com).</li>
+          <li>Status starts as Pending. Set Verified when you control the domain.</li>
+          <li>Keep domains Enabled so they publish into the allowlist.</li>
+          <li>Save the agent as Active and publish from the Deploy tab.</li>
+          <li>Paste the embed snippet. The widget never receives API keys.</li>
+        </ol>
+        <p className="text-xs text-nyven-text-secondary">
+          Automated DNS verification is not implemented yet. Verified is owner-controlled
+          and enforced via the published allowlist after publish.
+        </p>
+      </div>
+
       <div>
         <h2 className="font-display text-lg font-medium">Domains</h2>
         <p className="text-sm text-nyven-text-secondary mt-1 leading-relaxed">

@@ -2,7 +2,6 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import {
   Home,
   MessageSquare,
-  Hammer,
   FolderOpen,
   Bot,
   Sparkles,
@@ -18,7 +17,6 @@ import { NIdentity } from './NIdentity'
 const mainNav = [
   { to: '/', label: 'Home', icon: Home },
   { to: '/chat', label: 'Chat', icon: MessageSquare },
-  { to: '/build', label: 'Build', icon: Hammer },
   { to: '/projects', label: 'Projects', icon: FolderOpen },
   { to: '/agents', label: 'Agents', icon: Bot },
 ]
@@ -36,6 +34,7 @@ interface SidebarProps {
 
 export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const navigate = useNavigate()
+  const { user, configured } = useAuth()
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     clsx(
@@ -97,6 +96,33 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         ))}
       </nav>
 
+      {configured && (
+        <div className="px-3 pb-3">
+          {user ? (
+            <button
+              type="button"
+              onClick={() => {
+                navigate('/settings')
+                onMobileClose?.()
+              }}
+              className="w-full text-left px-3 py-2 rounded-xl text-xs text-nyven-text-secondary hover:text-nyven-text hover:bg-white/[0.03] truncate"
+            >
+              {user.email}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                navigate('/auth')
+                onMobileClose?.()
+              }}
+              className="w-full px-3 py-2 rounded-xl text-xs font-medium text-nyven-cyan hover:bg-nyven-cyan/10"
+            >
+              Sign in
+            </button>
+          )}
+        </div>
+      )}
       {/* Footer subtle */}
       <div className="px-4 py-4 text-[11px] text-nyven-text-secondary/60">
         V1 · Frontend
@@ -159,8 +185,7 @@ export function MobileBottomNav() {
   const items = [
     { to: '/', label: 'Home', icon: Home },
     { to: '/chat', label: 'Chat', icon: MessageSquare },
-    { to: '/build', label: 'Build', icon: Hammer },
-    { to: '/projects', label: 'Projects', icon: FolderOpen },
+      { to: '/projects', label: 'Projects', icon: FolderOpen },
   ]
 
   return (
