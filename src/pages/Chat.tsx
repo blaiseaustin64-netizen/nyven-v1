@@ -6,6 +6,7 @@ import { BugReportModal } from '../components/BugReportModal'
 import { ChatMessage } from '../components/ChatMessage'
 import { MessageComposer, type ComposerSendPayload } from '../components/MessageComposer'
 import { NIdentity } from '../components/NIdentity'
+import { VoiceChatScreen } from '../components/voice/VoiceChatScreen'
 import type { Message, Conversation } from '../lib/types'
 import { streamCoreChat } from '../lib/core/streamClient'
 import type { ActivityState } from '../lib/core/types'
@@ -41,6 +42,12 @@ export function Chat() {
   const [voiceEnergy, setVoiceEnergy] = useState(0)
   const [voiceError, setVoiceError] = useState<string | null>(null)
   const [fromVoice, setFromVoice] = useState(false)
+  const [voiceChatOpen, setVoiceChatOpen] = useState(false)
+  const [voiceMuted, setVoiceMuted] = useState(false)
+  const [lastVoiceTranscript, setLastVoiceTranscript] = useState<string | null>(null)
+  const [lastVoiceReply, setLastVoiceReply] = useState<string | null>(null)
+  const voiceChatOpenRef = useRef(false)
+  const voiceMutedRef = useRef(false)
   const voiceRef = useRef<VoiceController | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
@@ -79,6 +86,7 @@ export function Chat() {
       onSpeakEnergy: (level) => setVoiceEnergy(level),
       onTranscript: (text) => {
         setFromVoice(true)
+        setLastVoiceTranscript(text)
         void handleSend({ text, attachments: [] })
       },
       onError: (message) => {
@@ -394,8 +402,18 @@ export function Chat() {
             setIsGenerating(false)
             streamMsgIdRef.current = null
             const spoken = streamContentRef.current
-            if (fromVoice && getVoicePreferences().autoSpeak && spoken) {
-              void voiceRef.current?.speak(spoken)
+            if (fromVoice && spoken) {
+              setLastVoiceReply(spoken)
+              const prefs = getVoicePreferences()
+              // Voice Chat always speaks; dictation respects autoSpeak preference
+              if (voiceChatOpenRef.current || prefs.autoSpeak) {
+                void voiceRef.current?.speak(spoken).then(() => {
+                  // Continuous conversation in Voice Chat mode
+                  if (voiceChatOpenRef.current && !voiceMutedRef.current) {
+                    void voiceRef.current?.toggleListen()
+                  }
+                })
+              }
             }
             setFromVoice(false)
           },
@@ -669,26 +687,32 @@ export function Chat() {
           </div>
         </div>
 
-        {(voicePhase === 'listening' || voicePhase === 'speaking' || voicePhase === 'transcribing') && (
-          <div className="flex flex-col items-center gap-1 py-2 border-t border-white/[0.04]">
-            <LiquidVoice
-              mode={
-                voicePhase === 'speaking'
-                  ? 'speaking'
-                  : voicePhase === 'listening'
-                    ? 'listening'
-                    : 'idle'
-              }
-              energy={voiceEnergy}
-              size={64}
-            />
-            <span className="text-[11px] text-nyven-text-secondary">
-              {voicePhase === 'listening' && 'Listening — tap mic to send'}
-              {voicePhase === 'transcribing' && 'Transcribing…'}
-              {voicePhase === 'speaking' && 'Speaking'}
-            </span>
-          </div>
-        )}
+        {/* Dictation-only compact indicator (hidden when full Voice Chat is open) */}
+        {!voiceChatOpen &&
+          (voicePhase === 'listening' ||
+            voicePhase === 'speaking' ||
+            voicePhase === 'transcribing') && (
+            <div className="flex flex-col items-center gap-1 py-2 border-t border-white/[0.04]">
+              <LiquidVoice
+                mode={
+                  voicePhase === 'speaking'
+                    ? 'speaking'
+                    : voicePhase === 'listening'
+                      ? 'listening'
+                      : voicePhase === 'transcribing'
+                        ? 'thinking'
+                        : 'idle'
+                }
+                energy={voiceEnergy}
+                size={56}
+              />
+              <span className="text-[11px] text-nyven-text-secondary">
+                {voicePhase === 'listening' && 'Listening — tap mic to send'}
+                {voicePhase === 'transcribing' && 'Transcribing…'}
+                {voicePhase === 'speaking' && 'Speaking'}
+              </span>
+            </div>
+          )}
         {voiceError && (
           <p className="text-center text-xs text-red-300 px-4 py-1">{voiceError}</p>
         )}
@@ -705,10 +729,46 @@ export function Chat() {
               ? 'speaking'
               : voicePhase === 'listening'
                 ? 'listening'
-                : 'idle'
+                : voicePhase === 'transcribing' || isGenerating
+                  ? 'thinking'
+                  : 'idle'
           }
+          onOpenVoiceChat={() => {
+            setVoiceChatOpen(true)
+            voiceChatOpenRef.current = true
+          }}
         />
       </div>
+
+      <VoiceChatScreen
+        open={voiceChatOpen}
+        onClose={() => {
+          setVoiceChatOpen(false)
+          voiceChatOpenRef.current = false
+          voiceRef.current?.stopAll()
+        }}
+        voicePhase={voicePhase}
+        isProcessing={isGenerating || voicePhase === 'transcribing'}
+        isSpeaking={voicePhase === 'speaking'}
+        energy={voiceEnergy}
+        muted={voiceMuted}
+        onToggleMute={() => {
+          setVoiceMuted((m) => {
+            const next = !m
+            voiceMutedRef.current = next
+            if (next) voiceRef.current?.stopAll()
+            return next
+          })
+        }}
+        onToggleListen={() => {
+          if (voiceMuted) return
+          void voiceRef.current?.toggleListen()
+        }}
+        statusHint={voiceError}
+        lastTranscript={lastVoiceTranscript}
+        lastReply={lastVoiceReply}
+      />
+
       <BugReportModal
         open={bugOpen}
         onClose={() => setBugOpen(false)}

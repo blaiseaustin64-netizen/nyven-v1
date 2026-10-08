@@ -1,5 +1,16 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Send, Paperclip, Mic, Square, X, FileText, Image as ImageIcon, Loader2 } from 'lucide-react'
+import {
+  Send,
+  Plus,
+  Mic,
+  Square,
+  X,
+  FileText,
+  Image as ImageIcon,
+  File,
+  Loader2,
+  AudioLines,
+} from 'lucide-react'
 import clsx from 'clsx'
 import { ATTACHMENT_LIMITS, extensionOf, ALLOWED_EXTENSIONS, kindForMime } from '../lib/attachments/limits'
 import type { PendingAttachment, AttachmentPayload } from '../lib/attachments/types'
@@ -15,11 +26,13 @@ interface MessageComposerProps {
   onStop?: () => void
   placeholder?: string
   autoFocus?: boolean
-  /** Voice mic toggle */
+  /** Dictation mic (push-to-talk style in normal chat) */
   onVoiceToggle?: () => void
   voicePhase?: 'idle' | 'requesting_permission' | 'listening' | 'transcribing' | 'speaking' | 'error'
   voiceEnergy?: number
-  liquidMode?: 'idle' | 'listening' | 'speaking'
+  liquidMode?: 'idle' | 'listening' | 'speaking' | 'thinking'
+  /** Open full-screen Voice Chat */
+  onOpenVoiceChat?: () => void
 }
 
 function formatSize(n: number) {
@@ -33,6 +46,15 @@ function isAllowedFile(file: File): boolean {
   return Boolean(ALLOWED_EXTENSIONS[ext])
 }
 
+type MenuKind = 'any' | 'image' | 'document' | 'pdf'
+
+const ACCEPT: Record<MenuKind, string> = {
+  any: '.png,.jpg,.jpeg,.webp,.gif,.pdf,.txt,.md,.markdown,.json,.csv,image/png,image/jpeg,image/webp,image/gif,application/pdf,text/plain,text/markdown,application/json,text/csv',
+  image: '.png,.jpg,.jpeg,.webp,.gif,image/png,image/jpeg,image/webp,image/gif',
+  document: '.txt,.md,.markdown,.json,.csv,text/plain,text/markdown,application/json,text/csv',
+  pdf: '.pdf,application/pdf',
+}
+
 export function MessageComposer({
   onSend,
   isGenerating = false,
@@ -41,22 +63,24 @@ export function MessageComposer({
   autoFocus = false,
   onVoiceToggle,
   voicePhase = 'idle',
-  voiceEnergy = 0,
-  liquidMode = 'idle',
+  onOpenVoiceChat,
 }: MessageComposerProps) {
   const [value, setValue] = useState('')
   const [attachments, setAttachments] = useState<PendingAttachment[]>([])
   const [dragOver, setDragOver] = useState(false)
   const [composerError, setComposerError] = useState<string | null>(null)
+  const [menuOpen, setMenuOpen] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const plusRef = useRef<HTMLButtonElement>(null)
+  const acceptRef = useRef<MenuKind>('any')
   const dropRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (autoFocus && textareaRef.current) textareaRef.current.focus()
   }, [autoFocus])
 
-  // Cleanup object URLs
   useEffect(() => {
     return () => {
       attachments.forEach((a) => {
@@ -66,6 +90,25 @@ export function MessageComposer({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Close attachment menu on outside click / Escape
+  useEffect(() => {
+    if (!menuOpen) return
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as Node
+      if (menuRef.current?.contains(t) || plusRef.current?.contains(t)) return
+      setMenuOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenuOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [menuOpen])
 
   const updateAttachment = useCallback((id: string, patch: Partial<PendingAttachment>) => {
     setAttachments((prev) => prev.map((a) => (a.id === id ? { ...a, ...patch } : a)))
@@ -83,15 +126,12 @@ export function MessageComposer({
   const uploadFile = useCallback(
     async (file: File) => {
       setComposerError(null)
-
       if (!isAllowedFile(file)) {
-        setComposerError('Unsupported file type. Use PNG, JPEG, WEBP, GIF, PDF, TXT, MD, JSON, or CSV.')
+        setComposerError('This file type is not supported.')
         return
       }
       if (file.size > ATTACHMENT_LIMITS.MAX_FILE_SIZE) {
-        setComposerError(
-          `Each file must be under ${Math.round(ATTACHMENT_LIMITS.MAX_FILE_SIZE / (1024 * 1024))} MB.`
-        )
+        setComposerError(`File exceeds the ${formatSize(ATTACHMENT_LIMITS.MAX_FILE_SIZE)} limit.`)
         return
       }
 
@@ -100,56 +140,60 @@ export function MessageComposer({
           setComposerError(`You can attach up to ${ATTACHMENT_LIMITS.MAX_FILES_PER_MESSAGE} files.`)
           return prev
         }
-        const total = prev.reduce((s, a) => s + a.size, 0) + file.size
-        if (total > ATTACHMENT_LIMITS.MAX_TOTAL_UPLOAD_SIZE) {
-          setComposerError('Total attachment size is too large for one message.')
-          return prev
-        }
-
-        const ext = extensionOf(file.name)
-        const mime = ALLOWED_EXTENSIONS[ext] || file.type
-        const id = `local_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`
+        const id = `att-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+        const kind = kindForMime(file.type || ALLOWED_EXTENSIONS[extensionOf(file.name)] || "")
+        const previewUrl = kind === 'image' ? URL.createObjectURL(file) : undefined
         const abortController = new AbortController()
-        const previewUrl = mime.startsWith('image/') ? URL.createObjectURL(file) : undefined
-
         const pending: PendingAttachment = {
           id,
+          file,
           name: file.name,
-          mimeType: mime,
+          mimeType: file.type || 'application/octet-stream',
           size: file.size,
-          kind: kindForMime(mime),
+          kind,
           status: 'uploading',
           previewUrl,
           abortController,
         }
 
-        // Start upload async
-        ;(async () => {
+        void (async () => {
           try {
             updateAttachment(id, { status: 'processing' })
             const form = new FormData()
-            form.append('file', file, file.name)
+            form.append('file', file)
             const res = await fetch('/api/attachments', {
               method: 'POST',
               body: form,
               signal: abortController.signal,
             })
-            const data = await res.json()
-            if (!res.ok || !data.success || !data.attachment) {
+            const data = (await res.json().catch(() => ({}))) as {
+              success?: boolean
+              error?: string
+              attachment?: {
+                extractedText?: string
+                inlineBase64?: string
+                mimeType?: string
+                kind?: PendingAttachment['kind']
+              }
+              extractedText?: string
+              inlineBase64?: string
+              mimeType?: string
+              kind?: PendingAttachment['kind']
+            }
+            if (!res.ok || !data.success) {
               updateAttachment(id, {
                 status: 'error',
-                error: data.error || 'Upload failed.',
+                error: data.error || 'Could not process this file.',
               })
               return
             }
-            const att = data.attachment
+            const att = data.attachment || data
             updateAttachment(id, {
-              id: att.id,
               status: 'ready',
               extractedText: att.extractedText,
               inlineBase64: att.inlineBase64,
-              mimeType: att.mimeType,
-              kind: att.kind,
+              mimeType: att.mimeType || file.type,
+              kind: att.kind || kind,
               error: undefined,
             })
           } catch (err: unknown) {
@@ -172,13 +216,22 @@ export function MessageComposer({
 
   const addFiles = useCallback(
     (files: FileList | File[]) => {
-      const list = Array.from(files)
-      for (const f of list) {
-        void uploadFile(f)
-      }
+      for (const f of Array.from(files)) void uploadFile(f)
     },
     [uploadFile]
   )
+
+  const openPicker = (kind: MenuKind) => {
+    acceptRef.current = kind
+    setMenuOpen(false)
+    // Update accept then open
+    requestAnimationFrame(() => {
+      if (fileInputRef.current) {
+        fileInputRef.current.accept = ACCEPT[kind]
+        fileInputRef.current.click()
+      }
+    })
+  }
 
   const handleSubmit = () => {
     const trimmed = value.trim()
@@ -243,17 +296,14 @@ export function MessageComposer({
 
   const onDragOver = (e: React.DragEvent) => {
     e.preventDefault()
-    e.stopPropagation()
     setDragOver(true)
   }
   const onDragLeave = (e: React.DragEvent) => {
     e.preventDefault()
-    e.stopPropagation()
     setDragOver(false)
   }
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault()
-    e.stopPropagation()
     setDragOver(false)
     if (e.dataTransfer.files?.length) addFiles(e.dataTransfer.files)
   }
@@ -263,93 +313,124 @@ export function MessageComposer({
     (value.trim().length > 0 || attachments.some((a) => a.status === 'ready')) &&
     !attachments.some((a) => a.status === 'uploading' || a.status === 'processing')
 
+  const visibleAttachments = attachments.filter((a) => a.status !== 'cancelled')
+
   return (
-    <div className="border-t border-white/[0.05] bg-nyven-bg/80 backdrop-blur-md safe-bottom">
-      <div className="max-w-3xl mx-auto px-3 sm:px-4 py-3">
-        {composerError && (
-          <p className="text-xs text-red-300 mb-2 px-1">{composerError}</p>
-        )}
+    <div className="w-full max-w-3xl mx-auto px-3 sm:px-4 pb-3 sm:pb-4">
+      {composerError && (
+        <p className="text-xs text-red-300/90 mb-2 px-1" role="alert">
+          {composerError}
+        </p>
+      )}
 
-        {(liquidMode === 'listening' || liquidMode === 'speaking') && (
-          <div className="flex items-center gap-3 mb-2 px-1">
-            {/* LiquidVoice injected from Chat via portal-free sibling — rendered by parent if needed */}
-            <span className="text-[11px] text-nyven-text-secondary tracking-wide">
-              {liquidMode === 'listening' ? 'Listening…' : 'Speaking…'}
-            </span>
-          </div>
-        )}
-
-        {attachments.length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-2">
-            {attachments.map((a) => (
-              <div
-                key={a.id}
-                className="relative flex items-center gap-2 max-w-[220px] rounded-xl border border-white/[0.08] bg-nyven-surface px-2 py-1.5"
-              >
-                {a.kind === 'image' && a.previewUrl ? (
-                  <img
-                    src={a.previewUrl}
-                    alt=""
-                    className="w-10 h-10 rounded-lg object-cover shrink-0"
-                  />
-                ) : a.kind === 'image' ? (
-                  <div className="w-10 h-10 rounded-lg bg-white/[0.06] flex items-center justify-center shrink-0">
-                    <ImageIcon size={16} className="text-nyven-text-secondary" />
-                  </div>
-                ) : (
-                  <div className="w-10 h-10 rounded-lg bg-white/[0.06] flex items-center justify-center shrink-0">
-                    <FileText size={16} className="text-nyven-text-secondary" />
-                  </div>
-                )}
-                <div className="min-w-0 flex-1">
-                  <div className="text-xs font-medium truncate text-nyven-text">{a.name}</div>
-                  <div className="text-[10px] text-nyven-text-secondary flex items-center gap-1">
-                    {(a.status === 'uploading' || a.status === 'processing') && (
-                      <Loader2 size={10} className="animate-spin" />
-                    )}
-                    {a.status === 'ready' && formatSize(a.size)}
-                    {a.status === 'uploading' && 'Uploading…'}
-                    {a.status === 'processing' && 'Processing…'}
-                    {a.status === 'error' && (a.error || 'Failed')}
-                    {a.status === 'cancelled' && 'Cancelled'}
-                    {a.status === 'queued' && 'Queued'}
-                  </div>
+      {visibleAttachments.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-2">
+          {visibleAttachments.map((a) => (
+            <div
+              key={a.id}
+              className="group relative flex items-center gap-2 max-w-[220px] rounded-xl border border-white/[0.08] bg-nyven-surface/80 pl-2 pr-1.5 py-1.5"
+            >
+              {a.kind === 'image' && a.previewUrl ? (
+                <img
+                  src={a.previewUrl}
+                  alt=""
+                  className="h-9 w-9 rounded-lg object-cover shrink-0"
+                />
+              ) : a.name.toLowerCase().endsWith('.pdf') ? (
+                <div className="h-9 w-9 rounded-lg bg-white/[0.04] flex items-center justify-center shrink-0">
+                  <FileText size={16} className="text-nyven-cyan/80" />
                 </div>
-                <button
-                  type="button"
-                  onClick={() => removeAttachment(a.id)}
-                  className="p-1 rounded-lg text-nyven-text-secondary hover:text-nyven-text hover:bg-white/[0.06]"
-                  aria-label="Remove attachment"
-                >
-                  <X size={14} />
-                </button>
+              ) : (
+                <div className="h-9 w-9 rounded-lg bg-white/[0.04] flex items-center justify-center shrink-0">
+                  <File size={16} className="text-nyven-text-secondary" />
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="text-[12px] text-nyven-text truncate leading-tight">{a.name}</p>
+                <p className="text-[10px] text-nyven-text-secondary/70">
+                  {a.status === 'ready'
+                    ? formatSize(a.size)
+                    : a.status === 'error'
+                      ? a.error || 'Error'
+                      : a.status === 'processing' || a.status === 'uploading'
+                        ? 'Processing…'
+                        : formatSize(a.size)}
+                </p>
               </div>
+              {(a.status === 'uploading' || a.status === 'processing') && (
+                <Loader2 size={14} className="animate-spin text-nyven-text-secondary shrink-0" />
+              )}
+              <button
+                type="button"
+                onClick={() => removeAttachment(a.id)}
+                className="p-1 rounded-lg text-nyven-text-secondary hover:text-nyven-text hover:bg-white/[0.06] shrink-0"
+                aria-label={`Remove ${a.name}`}
+              >
+                <X size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div
+        ref={dropRef}
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
+        onDrop={onDrop}
+        className={clsx(
+          'relative rounded-2xl border bg-nyven-surface/90 backdrop-blur-sm transition-colors',
+          dragOver
+            ? 'border-nyven-cyan/40 bg-nyven-cyan/[0.04]'
+            : 'border-white/[0.08] focus-within:border-white/[0.14]'
+        )}
+      >
+        {/* Attachment menu */}
+        {menuOpen && (
+          <div
+            ref={menuRef}
+            className="absolute left-2 bottom-full mb-2 z-30 w-52 origin-bottom-left rounded-xl border border-white/[0.1] bg-[#0c1018]/95 backdrop-blur-md shadow-xl shadow-black/40 p-1.5 animate-in fade-in zoom-in-95"
+            style={{
+              animation: 'nyvenMenuIn 160ms ease-out',
+            }}
+            role="menu"
+            aria-label="Attach"
+          >
+            <style>{`
+              @keyframes nyvenMenuIn {
+                from { opacity: 0; transform: scale(0.96) translateY(4px); }
+                to { opacity: 1; transform: scale(1) translateY(0); }
+              }
+            `}</style>
+            {(
+              [
+                { kind: 'any' as MenuKind, label: 'Upload file', icon: File },
+                { kind: 'image' as MenuKind, label: 'Upload image', icon: ImageIcon },
+                { kind: 'document' as MenuKind, label: 'Document', icon: FileText },
+                { kind: 'pdf' as MenuKind, label: 'PDF', icon: FileText },
+              ] as const
+            ).map((item) => (
+              <button
+                key={item.kind}
+                type="button"
+                role="menuitem"
+                onClick={() => openPicker(item.kind)}
+                className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-nyven-text hover:bg-white/[0.06] transition-colors text-left"
+              >
+                <item.icon size={16} className="text-nyven-text-secondary shrink-0" />
+                {item.label}
+              </button>
             ))}
           </div>
         )}
 
-        <div
-          ref={dropRef}
-          onDragOver={onDragOver}
-          onDragLeave={onDragLeave}
-          onDrop={onDrop}
-          className={clsx(
-            'relative flex items-end gap-2 bg-nyven-surface border rounded-2xl px-3 py-2.5 transition-colors duration-200',
-            dragOver ? 'border-nyven-cyan/50 bg-nyven-cyan/5' : 'border-white/[0.07]'
-          )}
-        >
-          {dragOver && (
-            <div className="pointer-events-none absolute inset-0 rounded-2xl flex items-center justify-center bg-nyven-bg/40 z-10">
-              <span className="text-sm text-nyven-cyan font-medium">Drop files to attach</span>
-            </div>
-          )}
-
+        <div className="flex items-end gap-1 px-2 py-2 sm:px-2.5 sm:py-2.5">
           <input
             ref={fileInputRef}
             type="file"
             className="hidden"
             multiple
-            accept=".png,.jpg,.jpeg,.webp,.gif,.pdf,.txt,.md,.markdown,.json,.csv,image/png,image/jpeg,image/webp,image/gif,application/pdf,text/plain,text/markdown,application/json,text/csv"
+            accept={ACCEPT.any}
             onChange={(e) => {
               if (e.target.files) addFiles(e.target.files)
               e.target.value = ''
@@ -357,14 +438,22 @@ export function MessageComposer({
           />
 
           <button
+            ref={plusRef}
             type="button"
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => setMenuOpen((o) => !o)}
             disabled={isGenerating}
-            className="shrink-0 p-2 rounded-xl text-nyven-text-secondary hover:text-nyven-text hover:bg-white/[0.05] transition-colors disabled:opacity-40"
-            aria-label="Attach file"
-            title="Attach files"
+            className={clsx(
+              'shrink-0 p-2 rounded-xl transition-colors disabled:opacity-40',
+              menuOpen
+                ? 'text-nyven-cyan bg-nyven-cyan/10'
+                : 'text-nyven-text-secondary hover:text-nyven-text hover:bg-white/[0.05]'
+            )}
+            aria-label="Attach"
+            aria-expanded={menuOpen}
+            aria-haspopup="menu"
+            title="Attach"
           >
-            <Paperclip size={18} />
+            <Plus size={18} />
           </button>
 
           <textarea
@@ -381,7 +470,8 @@ export function MessageComposer({
             style={{ minHeight: '24px' }}
           />
 
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-0.5 shrink-0">
+            {/* Dictation mic */}
             <button
               type="button"
               onClick={onVoiceToggle}
@@ -391,7 +481,9 @@ export function MessageComposer({
                 voicePhase === 'listening' && 'text-nyven-cyan bg-nyven-cyan/10',
                 voicePhase === 'speaking' && 'text-nyven-cyan bg-nyven-cyan/10',
                 voicePhase === 'transcribing' && 'text-nyven-text-secondary',
-                (voicePhase === 'idle' || voicePhase === 'error' || voicePhase === 'requesting_permission') &&
+                (voicePhase === 'idle' ||
+                  voicePhase === 'error' ||
+                  voicePhase === 'requesting_permission') &&
                   'text-nyven-text-secondary hover:text-nyven-text hover:bg-white/[0.05]',
                 (!onVoiceToggle || isGenerating) && 'opacity-40 cursor-not-allowed'
               )}
@@ -400,17 +492,32 @@ export function MessageComposer({
                   ? 'Stop listening'
                   : voicePhase === 'speaking'
                     ? 'Stop speaking'
-                    : 'Start voice input'
+                    : 'Dictate'
               }
               title={
                 voicePhase === 'listening'
-                  ? 'Tap to send'
+                  ? 'Tap to send dictation'
                   : voicePhase === 'speaking'
                     ? 'Stop speaking'
-                    : 'Voice input'
+                    : 'Dictate into chat'
               }
             >
               <Mic size={18} />
+            </button>
+
+            {/* Full-screen Voice Chat */}
+            <button
+              type="button"
+              onClick={onOpenVoiceChat}
+              disabled={!onOpenVoiceChat || isGenerating}
+              className={clsx(
+                'p-2 rounded-xl transition-colors text-nyven-text-secondary hover:text-nyven-text hover:bg-white/[0.05]',
+                (!onOpenVoiceChat || isGenerating) && 'opacity-40 cursor-not-allowed'
+              )}
+              aria-label="Open voice chat"
+              title="Voice chat"
+            >
+              <AudioLines size={18} />
             </button>
 
             {isGenerating ? (
@@ -440,8 +547,8 @@ export function MessageComposer({
             )}
           </div>
         </div>
-        <p className="text-center text-[11px] text-nyven-text-secondary/50 mt-2">NYVEN</p>
       </div>
+      <p className="text-center text-[11px] text-nyven-text-secondary/50 mt-2">NYVEN</p>
     </div>
   )
 }
