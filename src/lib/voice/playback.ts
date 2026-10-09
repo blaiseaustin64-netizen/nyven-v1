@@ -1,9 +1,12 @@
 /**
- * Single-voice playback — sound is mandatory; analyser is optional.
+ * Speech playback — prefer decoded AudioBuffer for smooth, natural rate.
  *
- * Rule: once createMediaElementSource() is used, the element MUST stay
- * connected to ctx.destination (context running) or it will be silent.
- * Analyser is a parallel tap only; it is never required for sound.
+ * Why: MediaElementSource + HTMLAudioElement can resample/jitter on some
+ * mobile browsers (choppy or strained delivery). decodeAudioData +
+ * BufferSource plays at the file's native rate through a running AudioContext.
+ *
+ * Analyser remains a parallel tap for the liquid visualizer; sound always
+ * routes source → destination first.
  */
 
 export type PlaybackHandlers = {
@@ -14,16 +17,16 @@ export type PlaybackHandlers = {
 }
 
 export class SpeechPlayback {
-  private audio: HTMLAudioElement | null = null
-  private objectUrl: string | null = null
   private handlers: PlaybackHandlers = {}
   private ctx: AudioContext | null = null
   private analyser: AnalyserNode | null = null
-  private sourceNode: MediaElementAudioSourceNode | null = null
+  private bufferSource: AudioBufferSourceNode | null = null
+  private mediaElement: HTMLAudioElement | null = null
+  private mediaSource: MediaElementAudioSourceNode | null = null
+  private objectUrl: string | null = null
   private raf = 0
   private playGeneration = 0
-  /** True if current element is routed through Web Audio */
-  private usingGraph = false
+  private gain: GainNode | null = null
 
   setHandlers(h: PlaybackHandlers) {
     this.handlers = h
@@ -63,156 +66,10 @@ export class SpeechPlayback {
     }
   }
 
-  /**
-   * Wire MediaElementSource only when context is running.
-   * Always connect source → destination first (sound path).
-   * Analyser is optional parallel tap; failure leaves destination connected.
-   * Returns true if graph routing is active.
-   */
-  private tryWireGraph(audio: HTMLAudioElement): boolean {
-    if (!this.ctx || this.ctx.state !== 'running') return false
-    try {
-      this.sourceNode = this.ctx.createMediaElementSource(audio)
-      // Sound path first — never leave source disconnected
-      this.sourceNode.connect(this.ctx.destination)
-      try {
-        this.analyser = this.ctx.createAnalyser()
-        this.analyser.fftSize = 256
-        // Metering only; does not replace destination connection
-        this.sourceNode.connect(this.analyser)
-        this.startEnergyLoop()
-      } catch {
-        this.analyser = null
-        // Destination connection remains — audio still plays
-      }
-      return true
-    } catch {
-      this.sourceNode = null
-      this.analyser = null
-      return false
-    }
-  }
-
-  async play(blob: Blob): Promise<void> {
-    if (!blob || blob.size === 0) {
-      const err = new Error('TTS returned empty audio.')
-      this.handlers.onError?.(err.message)
-      throw err
-    }
-
-    this.stopPlaybackElements()
-    this.teardownGraphKeepContext()
-    const gen = ++this.playGeneration
-
-    this.objectUrl = URL.createObjectURL(blob)
-    const audio = new Audio()
-    this.audio = audio
-    audio.preload = 'auto'
-    audio.src = this.objectUrl
-
-    const running = await this.ensureContextRunning()
-    this.usingGraph = running ? this.tryWireGraph(audio) : false
-
-    return new Promise<void>((resolve, reject) => {
-      let settled = false
-      const settleOk = () => {
-        if (settled || gen !== this.playGeneration) return
-        settled = true
-        this.stopEnergyLoop()
-        this.teardownGraphKeepContext()
-        this.cleanupUrl()
-        this.audio = null
-        this.usingGraph = false
-        this.handlers.onEnd?.()
-        resolve()
-      }
-      const settleErr = (msg: string) => {
-        if (settled || gen !== this.playGeneration) return
-        settled = true
-        this.stopEnergyLoop()
-        this.teardownGraphKeepContext()
-        this.cleanupUrl()
-        this.audio = null
-        this.usingGraph = false
-        this.handlers.onError?.(msg)
-        this.handlers.onEnd?.()
-        reject(new Error(msg))
-      }
-
-      audio.onended = () => settleOk()
-      audio.onerror = () => settleErr('Playback failed.')
-
-      void (async () => {
-        try {
-          // Re-resume in case iOS suspended between wire and play
-          if (this.usingGraph) {
-            const ok = await this.ensureContextRunning()
-            if (!ok && this.sourceNode && this.ctx) {
-              // Try one more resume; if still not running, audio may be silent
-              try {
-                await this.ctx.resume()
-              } catch {
-                /* ignore */
-              }
-            }
-            // Ensure destination connection still exists after any teardown race
-            if (this.sourceNode && this.ctx && this.ctx.state === 'running') {
-              try {
-                this.sourceNode.connect(this.ctx.destination)
-              } catch {
-                /* already connected */
-              }
-            }
-          }
-
-          if (gen !== this.playGeneration) return
-          await audio.play()
-          if (gen !== this.playGeneration) return
-          this.handlers.onStart?.()
-        } catch {
-          settleErr(
-            'Could not play audio. Tap the mic again or check browser autoplay settings.'
-          )
-        }
-      })()
-    })
-  }
-
-  stop(): void {
-    this.playGeneration++
-    this.stopPlaybackElements()
-    this.stopEnergyLoop()
-    this.teardownGraphKeepContext()
-    this.cleanupUrl()
-    this.usingGraph = false
+  private stopEnergyLoop() {
+    if (this.raf) cancelAnimationFrame(this.raf)
+    this.raf = 0
     this.handlers.onEnergy?.(0)
-  }
-
-  isPlaying(): boolean {
-    return !!this.audio && !this.audio.paused
-  }
-
-  private stopPlaybackElements() {
-    if (this.audio) {
-      this.audio.onended = null
-      this.audio.onerror = null
-      this.audio.onplay = null
-      try {
-        this.audio.pause()
-        this.audio.removeAttribute('src')
-        this.audio.load()
-      } catch {
-        /* ignore */
-      }
-    }
-    this.audio = null
-  }
-
-  private cleanupUrl() {
-    if (this.objectUrl) {
-      URL.revokeObjectURL(this.objectUrl)
-      this.objectUrl = null
-    }
   }
 
   private startEnergyLoop() {
@@ -231,15 +88,19 @@ export class SpeechPlayback {
     this.raf = requestAnimationFrame(tick)
   }
 
-  private stopEnergyLoop() {
-    if (this.raf) cancelAnimationFrame(this.raf)
-    this.raf = 0
-    this.handlers.onEnergy?.(0)
-  }
-
-  private teardownGraphKeepContext() {
+  private teardownNodes() {
     try {
-      this.sourceNode?.disconnect()
+      this.bufferSource?.stop()
+    } catch {
+      /* ignore */
+    }
+    try {
+      this.bufferSource?.disconnect()
+    } catch {
+      /* ignore */
+    }
+    try {
+      this.mediaSource?.disconnect()
     } catch {
       /* ignore */
     }
@@ -248,8 +109,191 @@ export class SpeechPlayback {
     } catch {
       /* ignore */
     }
-    this.sourceNode = null
+    try {
+      this.gain?.disconnect()
+    } catch {
+      /* ignore */
+    }
+    this.bufferSource = null
+    this.mediaSource = null
     this.analyser = null
+    this.gain = null
+    if (this.mediaElement) {
+      try {
+        this.mediaElement.onended = null
+        this.mediaElement.onerror = null
+        this.mediaElement.pause()
+        this.mediaElement.removeAttribute('src')
+        this.mediaElement.load()
+      } catch {
+        /* ignore */
+      }
+      this.mediaElement = null
+    }
+    if (this.objectUrl) {
+      URL.revokeObjectURL(this.objectUrl)
+      this.objectUrl = null
+    }
+  }
+
+  /**
+   * Play TTS audio. Prefer AudioBuffer path (smooth rate). Fallback to HTMLAudioElement.
+   * Always forces a correct audio MIME type so the decoder does not mis-parse.
+   */
+  async play(blob: Blob): Promise<void> {
+    if (!blob || blob.size === 0) {
+      const err = new Error('TTS returned empty audio.')
+      this.handlers.onError?.(err.message)
+      throw err
+    }
+
+    this.playGeneration++
+    const gen = this.playGeneration
+    this.teardownNodes()
+    this.stopEnergyLoop()
+
+    // Normalize MIME — server should send audio/mpeg; some proxies strip type
+    const mime =
+      blob.type && blob.type.startsWith('audio/')
+        ? blob.type
+        : 'audio/mpeg'
+    const typedBlob = blob.type === mime ? blob : new Blob([await blob.arrayBuffer()], { type: mime })
+    const arrayBuffer = await typedBlob.arrayBuffer()
+
+    const running = await this.ensureContextRunning()
+    if (running && this.ctx) {
+      try {
+        // Copy buffer — decodeAudioData may detach the original
+        const copy = arrayBuffer.slice(0)
+        const audioBuffer = await this.ctx.decodeAudioData(copy)
+        if (gen !== this.playGeneration) return
+
+        this.gain = this.ctx.createGain()
+        this.gain.gain.value = 1
+        this.analyser = this.ctx.createAnalyser()
+        this.analyser.fftSize = 256
+
+        this.bufferSource = this.ctx.createBufferSource()
+        this.bufferSource.buffer = audioBuffer
+        this.bufferSource.playbackRate.value = 1
+
+        // Sound path: source → gain → destination
+        this.bufferSource.connect(this.gain)
+        this.gain.connect(this.ctx.destination)
+        // Metering tap
+        this.gain.connect(this.analyser)
+
+        return new Promise<void>((resolve, reject) => {
+          let settled = false
+          const ok = () => {
+            if (settled || gen !== this.playGeneration) return
+            settled = true
+            this.stopEnergyLoop()
+            this.teardownNodes()
+            this.handlers.onEnd?.()
+            resolve()
+          }
+          const fail = (msg: string) => {
+            if (settled || gen !== this.playGeneration) return
+            settled = true
+            this.stopEnergyLoop()
+            this.teardownNodes()
+            this.handlers.onError?.(msg)
+            this.handlers.onEnd?.()
+            reject(new Error(msg))
+          }
+
+          this.bufferSource!.onended = () => ok()
+          try {
+            this.bufferSource!.start(0)
+            this.handlers.onStart?.()
+            this.startEnergyLoop()
+          } catch {
+            fail('Could not play audio.')
+          }
+        })
+      } catch {
+        // Fall through to element path
+      }
+    }
+
+    // Fallback: HTMLAudioElement (native decode)
+    return this.playViaElement(typedBlob, gen)
+  }
+
+  private playViaElement(blob: Blob, gen: number): Promise<void> {
+    this.objectUrl = URL.createObjectURL(blob)
+    const audio = new Audio()
+    this.mediaElement = audio
+    audio.preload = 'auto'
+    audio.playbackRate = 1
+    audio.src = this.objectUrl
+
+    return new Promise<void>((resolve, reject) => {
+      let settled = false
+      const ok = () => {
+        if (settled || gen !== this.playGeneration) return
+        settled = true
+        this.stopEnergyLoop()
+        this.teardownNodes()
+        this.handlers.onEnd?.()
+        resolve()
+      }
+      const fail = (msg: string) => {
+        if (settled || gen !== this.playGeneration) return
+        settled = true
+        this.stopEnergyLoop()
+        this.teardownNodes()
+        this.handlers.onError?.(msg)
+        this.handlers.onEnd?.()
+        reject(new Error(msg))
+      }
+
+      audio.onended = () => ok()
+      audio.onerror = () => fail('Playback failed.')
+
+      void (async () => {
+        const running = await this.ensureContextRunning()
+        if (gen !== this.playGeneration) return
+        if (running && this.ctx) {
+          try {
+            this.mediaSource = this.ctx.createMediaElementSource(audio)
+            this.mediaSource.connect(this.ctx.destination)
+            try {
+              this.analyser = this.ctx.createAnalyser()
+              this.analyser.fftSize = 256
+              this.mediaSource.connect(this.analyser)
+              this.startEnergyLoop()
+            } catch {
+              this.analyser = null
+            }
+          } catch {
+            this.mediaSource = null
+          }
+        }
+        try {
+          await audio.play()
+          if (gen !== this.playGeneration) return
+          this.handlers.onStart?.()
+        } catch {
+          fail(
+            'Could not play audio. Tap the mic again or check browser autoplay settings.'
+          )
+        }
+      })()
+    })
+  }
+
+  stop(): void {
+    this.playGeneration++
+    this.stopEnergyLoop()
+    this.teardownNodes()
+    this.handlers.onEnergy?.(0)
+  }
+
+  isPlaying(): boolean {
+    if (this.bufferSource) return true
+    return !!this.mediaElement && !this.mediaElement.paused
   }
 }
 
@@ -271,11 +315,18 @@ export async function fetchTTS(
       `Could not generate speech (HTTP ${res.status}).`
     throw new Error(msg)
   }
-  const blob = await res.blob()
-  if (!blob.size) {
+  const raw = await res.arrayBuffer()
+  if (!raw.byteLength) {
     throw new Error('TTS returned empty audio.')
   }
-  return blob
+  // Force MPEG type so decodeAudioData / <audio> do not mis-detect
+  const contentType = res.headers.get('content-type') || 'audio/mpeg'
+  const mime = contentType.includes('mpeg') || contentType.includes('mp3')
+    ? 'audio/mpeg'
+    : contentType.startsWith('audio/')
+      ? contentType.split(';')[0].trim()
+      : 'audio/mpeg'
+  return new Blob([raw], { type: mime })
 }
 
 export async function fetchSTT(

@@ -73,18 +73,51 @@ export function ttsAvailable(env: TTSEnv): boolean {
   return resolveTTS(env) !== null
 }
 
-/** Strip markdown / tool noise — never inject laughter or emotional SFX tags */
+/**
+ * Prepare text for natural conversational TTS.
+ * Goal: clean speech input without destroying sentence rhythm.
+ * Never inject laughter/SFX tags.
+ */
 export function prepareSpeakableText(raw: string): string {
   let t = (raw || '').trim()
   if (!t) return ''
-  t = t.replace(/```[\s\S]*?```/g, ' (code omitted). ')
+
+  // Fenced code → short spoken placeholder (avoids reading tokens aloud)
+  t = t.replace(/```[\s\S]*?```/g, ' Code omitted. ')
+  // Inline code: speak the content without backticks
+  t = t.replace(/`([^`]+)`/g, '$1')
+  // Markdown links: speak label only
   t = t.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-  t = t.replace(/[*_`#]+/g, '')
-  // Strip Fish-style bracket emotion tags if model would interpret them
-  t = t.replace(/\[(laughing|laughter|giggle|sighs?|whispers?[^\]]*)\]/gi, '')
-  t = t.replace(/\s+/g, ' ').trim()
+  // Bare URLs → skip (unnatural when read character-by-character)
+  t = t.replace(/https?:\/\/\S+/gi, ' ')
+  // Headings / bold / italic markers without eating apostrophes or hyphens
+  t = t.replace(/^#{1,6}\s+/gm, '')
+  t = t.replace(/(\*\*|__)(.*?)\1/g, '$2')
+  t = t.replace(/(\*|_)(.*?)\1/g, '$2')
+  // Remaining stray markdown symbols (not mid-word)
+  t = t.replace(/[*#`>~]+/g, ' ')
+  // Bullet/list markers → gentle pause via period
+  t = t.replace(/^\s*[-*+]\s+/gm, '')
+  t = t.replace(/^\s*\d+[.)]\s+/gm, '')
+  // Strip Fish bracket emotion/SFX tags the model might dramatize
+  t = t.replace(
+    /\[(laughing|laughter|giggle|sighs?|whispers?|excited|sad|angry|nervously)[^\]]*\]/gi,
+    ''
+  )
+  // Collapse whitespace but keep sentence-ending punctuation
+  t = t.replace(/\r\n/g, '\n')
+  t = t.replace(/\n{2,}/g, '. ')
+  t = t.replace(/\n/g, ' ')
+  t = t.replace(/\s{2,}/g, ' ')
+  t = t.replace(/\s+([,.;:!?])/g, '$1')
+  t = t.replace(/([.!?]){2,}/g, '$1')
+  t = t.trim()
+
   if (t.length > VOICE_LIMITS.MAX_TTS_CHARS) {
-    t = t.slice(0, VOICE_LIMITS.MAX_TTS_CHARS - 1).trim() + '…'
+    // Truncate on a sentence boundary when possible
+    const cut = t.slice(0, VOICE_LIMITS.MAX_TTS_CHARS - 1)
+    const lastStop = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('? '), cut.lastIndexOf('! '))
+    t = (lastStop > 200 ? cut.slice(0, lastStop + 1) : cut).trim()
   }
   return t
 }
@@ -111,12 +144,30 @@ export async function synthesizeSpeech(
   }
 
   const voice = options?.voiceId || cfg.voice
-  const body = {
+  /**
+   * OpenRouter Fish Audio synthesis body.
+   * - response_format: explicit mp3 (OpenRouter defaults to pcm otherwise)
+   * - temperature / top_p / repetition_penalty: Fish-supported top-level fields
+   *   for more stable, less repetitive delivery (docs.fish.audio / OpenRouter)
+   * - speed: only when explicitly requested; default natural rate (1.0)
+   * Model + Sua voice id remain unchanged.
+   */
+  const body: Record<string, unknown> = {
     model: cfg.model,
     input: speak,
     voice,
     response_format: 'mp3',
-    speed: options?.speed ?? 1.0,
+  }
+  if (options?.speed != null && options.speed !== 1) {
+    body.speed = options.speed
+  } else if (cfg.provider !== 'openrouter') {
+    body.speed = 1.0
+  }
+  if (cfg.provider === 'openrouter') {
+    // Stability-oriented defaults recommended for Fish conversational TTS
+    body.temperature = 0.7
+    body.top_p = 0.7
+    body.repetition_penalty = 1.2
   }
 
   const controller = new AbortController()
