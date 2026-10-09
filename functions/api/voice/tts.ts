@@ -5,6 +5,25 @@
 import { synthesizeSpeech, type TTSEnv } from '../../_shared/voice/ttsProvider'
 import { VOICE_LIMITS } from '../../_shared/voice/types'
 
+/** Allowlisted Fish Audio voice IDs (Sarah, ALEX J, Adrian). Reject arbitrary client IDs. */
+const ALLOWED_VOICE_IDS = new Set([
+  '933563129e564b19a115bedd57b7406a', // Sarah
+  '2a9605eeafe84974b5b20628d42c0060', // ALEX J
+  'bf322df2096a46f18c579d0baa36f41d', // Adrian
+  'de77377323004b48937473a795d86f1f', // legacy Sua → treated as Sarah downstream
+])
+
+function resolveVoiceId(raw: string | undefined): string | undefined {
+  if (!raw) return undefined
+  if (ALLOWED_VOICE_IDS.has(raw)) {
+    if (raw === 'de77377323004b48937473a795d86f1f') {
+      return '933563129e564b19a115bedd57b7406a'
+    }
+    return raw
+  }
+  return undefined // fall through to server default
+}
+
 interface Env extends TTSEnv {}
 
 function json(body: unknown, status: number) {
@@ -41,7 +60,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     const result = await synthesizeSpeech(
       context.env,
       text,
-      { voiceId: body.voiceId },
+      { voiceId: resolveVoiceId(body.voiceId) },
       context.request.signal
     )
 

@@ -1,46 +1,36 @@
 /**
- * Voice preference foundation.
- * Default: Sua (Fish Audio model id via OpenRouter free TTS).
+ * Voice preference foundation — Sarah / ALEX J / Adrian via catalog.
  */
+
+import {
+  SARAH_FISH_ID,
+  resolveFishVoiceId,
+  isAllowedFishVoiceId,
+} from './catalog'
 
 export type VoicePreferences = {
   enabled: boolean
-  /** Fish Audio voice model id (or legacy label) */
+  /** Fish Audio voice model id */
   voiceId: string
   autoSpeak: boolean
 }
 
 const KEY = 'nyven_voice_prefs_v1'
 
-/** Verified Sarah voice id: https://fish.audio/m/933563129e564b19a115bedd57b7406a/ */
-const SARAH_VOICE_ID = '933563129e564b19a115bedd57b7406a'
-
 const DEFAULTS: VoicePreferences = {
   enabled: true,
-  voiceId: SARAH_VOICE_ID,
+  voiceId: SARAH_FISH_ID,
   autoSpeak: true,
 }
 
 function migrate(prefs: VoicePreferences): VoicePreferences {
-  const id = (prefs.voiceId || '').toLowerCase()
-  const legacy = new Set([
-    'nova',
-    'eve',
-    'ara',
-    'rex',
-    'sal',
-    'leo',
-    'shimmer',
-    'alloy',
-    'echo',
-    'fable',
-    'onyx',
-    'sua', // label → real id
-  ])
-  if (legacy.has(id) || id === 'sua' || id === 'de77377323004b48937473a795d86f1f') {
-    return { ...prefs, voiceId: SARAH_VOICE_ID }
+  const id = (prefs.voiceId || '').trim()
+  const resolved = resolveFishVoiceId(id)
+  return {
+    enabled: prefs.enabled !== false,
+    autoSpeak: prefs.autoSpeak !== false,
+    voiceId: resolved,
   }
-  return prefs
 }
 
 export function getVoicePreferences(): VoicePreferences {
@@ -64,6 +54,9 @@ export function getVoicePreferences(): VoicePreferences {
 
 export function setVoicePreferences(patch: Partial<VoicePreferences>) {
   const next = migrate({ ...getVoicePreferences(), ...patch })
+  if (patch.voiceId && !isAllowedFishVoiceId(resolveFishVoiceId(patch.voiceId))) {
+    next.voiceId = SARAH_FISH_ID
+  }
   try {
     localStorage.setItem(KEY, JSON.stringify(next))
   } catch {

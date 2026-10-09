@@ -14,7 +14,7 @@ export type AIPreferences = {
 export type VoiceUIPreferences = {
   voiceEnabled: boolean
   autoSpeak: boolean
-  /** Fish Audio Sua model id by default */
+  /** Fish Audio voice id (Sarah / ALEX J / Adrian) */
   voiceId: string
 }
 

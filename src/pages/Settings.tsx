@@ -36,6 +36,8 @@ import type { MemoryRow } from '../lib/supabase/types'
 import type { ConnectionPublicRow } from '../lib/supabase/types'
 import { getSupabase } from '../lib/supabase/client'
 import { setVoicePreferences } from '../lib/voice/preferences'
+import { VoiceSpeechSettings } from '../components/voice/VoiceSpeechSettings'
+import { resolveFishVoiceId } from '../lib/voice/catalog'
 
 type Section =
   | 'account'
@@ -428,49 +430,49 @@ export function Settings() {
             {active === 'voice' && (
               <>
                 <SectionTitle
-                  title="Voice"
-                  desc="Uses OpenRouter Fish Audio S2.1 Pro Free with Sua. Provider keys stay server-side."
+                  title="Voice & Speech"
+                  desc="Choose how NYVEN sounds. Previews use real Fish Audio via OpenRouter; keys stay server-side."
                 />
                 <Card>
-                  <Field label="Voice features">
-                    <Toggle
-                      on={prefs.voice.voiceEnabled}
-                      onChange={(on) =>
-                        void persistPrefs({
-                          ...prefs,
-                          voice: { ...prefs.voice, voiceEnabled: on },
-                        })
-                      }
-                      label={prefs.voice.voiceEnabled ? 'Enabled' : 'Disabled'}
-                    />
-                  </Field>
-                  <Field label="Auto-speak responses">
-                    <Toggle
-                      on={prefs.voice.autoSpeak}
-                      onChange={(on) =>
-                        void persistPrefs({
-                          ...prefs,
-                          voice: { ...prefs.voice, autoSpeak: on },
-                        })
-                      }
-                      label={prefs.voice.autoSpeak ? 'On' : 'Off'}
-                    />
-                  </Field>
-                  <Field label="TTS voice">
-                    <p className="text-sm">
-                      Sua{' '}
-                      <span className="text-xs text-nyven-text-secondary">
-                        (Fish Audio · free via OpenRouter)
-                      </span>
-                    </p>
-                    <p className="text-xs text-nyven-text-secondary mt-1 font-mono break-all">
-                      {prefs.voice.voiceId}
-                    </p>
-                  </Field>
-                  <p className="text-xs text-nyven-text-secondary">
-                    Stop generation cancels in-flight TTS. Microphone requires browser
-                    permission.
-                  </p>
+                  <VoiceSpeechSettings
+                    voiceId={resolveFishVoiceId(prefs.voice.voiceId)}
+                    voiceEnabled={prefs.voice.voiceEnabled}
+                    autoSpeak={prefs.voice.autoSpeak}
+                    onChangeVoiceId={(id) =>
+                      setPrefs((p) => ({
+                        ...p,
+                        voice: { ...p.voice, voiceId: id },
+                      }))
+                    }
+                    onToggleEnabled={(on) =>
+                      void persistPrefs({
+                        ...prefs,
+                        voice: { ...prefs.voice, voiceEnabled: on },
+                      })
+                    }
+                    onToggleAutoSpeak={(on) =>
+                      void persistPrefs({
+                        ...prefs,
+                        voice: { ...prefs.voice, autoSpeak: on },
+                      })
+                    }
+                    onSave={async (fishVoiceId) => {
+                      const id = resolveFishVoiceId(fishVoiceId)
+                      await persistPrefs({
+                        ...prefs,
+                        voice: {
+                          ...prefs.voice,
+                          voiceId: id,
+                        },
+                      })
+                      setVoicePreferences({
+                        voiceId: id,
+                        enabled: prefs.voice.voiceEnabled,
+                        autoSpeak: prefs.voice.autoSpeak,
+                      })
+                    }}
+                    saving={saving}
+                  />
                 </Card>
               </>
             )}
