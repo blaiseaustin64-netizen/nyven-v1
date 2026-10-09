@@ -117,221 +117,219 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
 
   const content = (
     <div className="flex flex-col h-full min-h-0">
-      {/* Brand */}
-      <div className="px-4 pt-[max(1.25rem,env(safe-area-inset-top))] pb-3 flex items-center gap-3 shrink-0">
-        <NIdentity state="white" size={28} />
-        <span className="font-display font-semibold text-lg tracking-tight">NYVEN</span>
-      </div>
-
-      {/* New Chat */}
-      <div className="px-3 mb-3 shrink-0">
-        <button
-          type="button"
-          onClick={handleNewChat}
-          className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-nyven-surface/80 border border-white/[0.06] text-sm font-medium text-nyven-text hover:bg-nyven-surface hover:border-nyven-cyan/20 transition-all duration-200 min-h-[44px]"
-        >
-          <Plus size={16} className="text-nyven-cyan" />
-          New Chat
-        </button>
-      </div>
-
-      {/* Search */}
-      <div className="px-3 mb-2 shrink-0">
-        <div className="relative">
-          <Search
-            size={14}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-nyven-text-secondary pointer-events-none"
-          />
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search conversations"
-            className="w-full pl-9 pr-3 py-2 rounded-xl bg-white/[0.04] border border-white/[0.06] text-sm text-nyven-text placeholder:text-nyven-text-secondary/70 outline-none focus:border-nyven-cyan/30"
-            aria-label="Search conversations"
-          />
+      {/* ══════ TOP: branding, New Chat, navigation, settings ══════ */}
+      <div className="shrink-0">
+        <div className="px-4 pt-[max(1.25rem,env(safe-area-inset-top))] pb-3 flex items-center gap-3">
+          <NIdentity state="white" size={28} />
+          <span className="font-display font-semibold text-lg tracking-tight">NYVEN</span>
         </div>
+
+        <div className="px-3 mb-2">
+          <button
+            type="button"
+            onClick={handleNewChat}
+            className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-nyven-surface/80 border border-white/[0.06] text-sm font-medium text-nyven-text hover:bg-nyven-surface hover:border-nyven-cyan/20 transition-all duration-200 min-h-[44px]"
+          >
+            <Plus size={16} className="text-nyven-cyan" />
+            New Chat
+          </button>
+        </div>
+
+        <nav className="px-3 space-y-0.5 pb-2">
+          {mainNav.map(({ to, label, icon: Icon }) => (
+            <NavLink
+              key={to}
+              to={to}
+              end={to === '/'}
+              className={linkClass}
+              onClick={onMobileClose}
+            >
+              <Icon size={18} strokeWidth={1.75} />
+              {label}
+            </NavLink>
+          ))}
+          <NavLink to="/nyven-plus" className={linkClass} onClick={onMobileClose}>
+            <Sparkles size={18} strokeWidth={1.75} />
+            NYVEN+
+          </NavLink>
+          <NavLink to="/settings" className={linkClass} onClick={onMobileClose}>
+            <Settings size={18} strokeWidth={1.75} />
+            Settings
+          </NavLink>
+          <NavLink to="/profile" className={linkClass} onClick={onMobileClose}>
+            <User size={18} strokeWidth={1.75} />
+            Profile
+          </NavLink>
+          {configured && (
+            <div className="pt-1 px-1">
+              {user ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigate('/settings')
+                    onMobileClose?.()
+                  }}
+                  className="w-full text-left px-2 py-1.5 rounded-lg text-xs text-nyven-text-secondary hover:text-nyven-text truncate"
+                >
+                  {user.email}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigate('/auth')
+                    onMobileClose?.()
+                  }}
+                  className="w-full px-2 py-1.5 rounded-lg text-xs font-medium text-nyven-cyan hover:bg-nyven-cyan/10 text-left"
+                >
+                  Sign in
+                </button>
+              )}
+            </div>
+          )}
+        </nav>
       </div>
 
-      {/* Conversation list — independently scrollable */}
-      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-2 pb-2">
-        {loading && (
-          <p className="text-xs text-nyven-text-secondary px-3 py-3">Loading…</p>
-        )}
-        {!loading && filtered.length === 0 && (
-          <p className="text-xs text-nyven-text-secondary px-3 py-3">
-            {query.trim() ? 'No matching chats' : 'No conversations yet'}
+      {/* ══════ BOTTOM: Chat History (fills remaining space, scrolls alone) ══════ */}
+      <div className="flex-1 min-h-0 flex flex-col border-t border-white/[0.06]">
+        <div className="shrink-0 px-3 pt-3 pb-2">
+          <p className="px-1 text-[11px] font-medium uppercase tracking-wider text-nyven-text-secondary/80 mb-2">
+            Chat History
           </p>
-        )}
-        {groups.map(({ label, items }) => (
-          <div key={label} className="mb-2">
-            <p className="px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-nyven-text-secondary/80">
-              {label}
+          <div className="relative">
+            <Search
+              size={14}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-nyven-text-secondary pointer-events-none"
+            />
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search conversations"
+              className="w-full pl-9 pr-3 py-2 rounded-xl bg-white/[0.04] border border-white/[0.06] text-sm text-nyven-text placeholder:text-nyven-text-secondary/70 outline-none focus:border-nyven-cyan/30"
+              aria-label="Search conversations"
+            />
+          </div>
+        </div>
+
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          {loading && (
+            <p className="text-xs text-nyven-text-secondary px-3 py-3">Loading…</p>
+          )}
+          {!loading && filtered.length === 0 && (
+            <p className="text-xs text-nyven-text-secondary px-3 py-3">
+              {query.trim() ? 'No matching chats' : 'No conversations yet'}
             </p>
-            <div className="space-y-0.5">
-              {items.map((c) => (
-                <div
-                  key={c.id}
-                  className={clsx(
-                    'group relative flex items-center rounded-xl',
-                    onChatRoute && c.id === activeId
-                      ? 'bg-white/[0.08] text-nyven-text'
-                      : 'text-nyven-text-secondary hover:bg-white/[0.04] hover:text-nyven-text'
-                  )}
-                >
-                  {editingId === c.id ? (
-                    <input
-                      autoFocus
-                      value={editTitle}
-                      onChange={(e) => setEditTitle(e.target.value)}
-                      onBlur={commitEdit}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') commitEdit()
-                        if (e.key === 'Escape') setEditingId(null)
-                      }}
-                      className="flex-1 mx-1 my-1 px-2.5 py-2 rounded-lg bg-nyven-bg border border-nyven-cyan/30 text-sm outline-none min-w-0"
-                      aria-label="Rename conversation"
-                    />
-                  ) : (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => handleSelect(c)}
-                        className="flex-1 text-left px-3 py-2.5 text-sm truncate min-w-0 min-h-[40px]"
-                        title={c.title}
-                      >
-                        {c.title || 'Untitled'}
-                      </button>
-                      <div className="relative shrink-0 pr-0.5">
+          )}
+          {groups.map(({ label, items }) => (
+            <div key={label} className="mb-2">
+              <p className="px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-nyven-text-secondary/80">
+                {label}
+              </p>
+              <div className="space-y-0.5">
+                {items.map((c) => (
+                  <div
+                    key={c.id}
+                    className={clsx(
+                      'group relative flex items-center rounded-xl',
+                      onChatRoute && c.id === activeId
+                        ? 'bg-white/[0.08] text-nyven-text'
+                        : 'text-nyven-text-secondary hover:bg-white/[0.04] hover:text-nyven-text'
+                    )}
+                  >
+                    {editingId === c.id ? (
+                      <input
+                        autoFocus
+                        value={editTitle}
+                        onChange={(e) => setEditTitle(e.target.value)}
+                        onBlur={commitEdit}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') commitEdit()
+                          if (e.key === 'Escape') setEditingId(null)
+                        }}
+                        className="flex-1 mx-1 my-1 px-2.5 py-2 rounded-lg bg-nyven-bg border border-nyven-cyan/30 text-sm outline-none min-w-0"
+                        aria-label="Rename conversation"
+                      />
+                    ) : (
+                      <>
                         <button
                           type="button"
-                          aria-label="Conversation actions"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setMenuId((id) => (id === c.id ? null : c.id))
-                          }}
-                          className={clsx(
-                            'p-2 rounded-lg text-nyven-text-secondary hover:bg-white/[0.06] hover:text-nyven-text',
-                            'opacity-100 sm:opacity-0 sm:group-hover:opacity-100',
-                            menuId === c.id && 'opacity-100'
-                          )}
+                          onClick={() => handleSelect(c)}
+                          className="flex-1 text-left px-3 py-2.5 text-sm truncate min-w-0 min-h-[40px]"
+                          title={c.title}
                         >
-                          <MoreHorizontal size={16} />
+                          {c.title || 'Untitled'}
                         </button>
-                        {menuId === c.id && (
-                          <>
-                            <button
-                              type="button"
-                              className="fixed inset-0 z-40"
-                              aria-label="Close menu"
-                              onClick={() => setMenuId(null)}
-                            />
-                            <div className="absolute right-0 top-full z-50 mt-1 w-36 rounded-xl border border-white/[0.08] bg-nyven-surface shadow-xl py-1">
+                        <div className="relative shrink-0 pr-0.5">
+                          <button
+                            type="button"
+                            aria-label="Conversation actions"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setMenuId((id) => (id === c.id ? null : c.id))
+                            }}
+                            className={clsx(
+                              'p-2 rounded-lg text-nyven-text-secondary hover:bg-white/[0.06] hover:text-nyven-text',
+                              'opacity-100 sm:opacity-0 sm:group-hover:opacity-100',
+                              menuId === c.id && 'opacity-100'
+                            )}
+                          >
+                            <MoreHorizontal size={16} />
+                          </button>
+                          {menuId === c.id && (
+                            <>
                               <button
                                 type="button"
-                                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-nyven-text hover:bg-white/[0.05]"
-                                onClick={() => {
-                                  setEditingId(c.id)
-                                  setEditTitle(c.title || '')
-                                  setMenuId(null)
-                                }}
-                              >
-                                <Pencil size={14} />
-                                Rename
-                              </button>
-                              <button
-                                type="button"
-                                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-300 hover:bg-white/[0.05]"
-                                onClick={() => {
-                                  deleteConversation(c.id)
-                                  setMenuId(null)
-                                }}
-                              >
-                                <Trash2 size={14} />
-                                Delete
-                              </button>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    </>
-                  )}
-                </div>
-              ))}
+                                className="fixed inset-0 z-40"
+                                aria-label="Close menu"
+                                onClick={() => setMenuId(null)}
+                              />
+                              <div className="absolute right-0 top-full z-50 mt-1 w-36 rounded-xl border border-white/[0.08] bg-nyven-surface shadow-xl py-1">
+                                <button
+                                  type="button"
+                                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-nyven-text hover:bg-white/[0.05]"
+                                  onClick={() => {
+                                    setEditingId(c.id)
+                                    setEditTitle(c.title || '')
+                                    setMenuId(null)
+                                  }}
+                                >
+                                  <Pencil size={14} />
+                                  Rename
+                                </button>
+                                <button
+                                  type="button"
+                                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-300 hover:bg-white/[0.05]"
+                                  onClick={() => {
+                                    deleteConversation(c.id)
+                                    setMenuId(null)
+                                  }}
+                                >
+                                  <Trash2 size={14} />
+                                  Delete
+                                </button>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Compact nav links */}
-      <nav className="shrink-0 px-3 pt-2 border-t border-white/[0.06] space-y-0.5">
-        {mainNav.map(({ to, label, icon: Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={to === '/'}
-            className={linkClass}
-            onClick={onMobileClose}
-          >
-            <Icon size={18} strokeWidth={1.75} />
-            {label}
-          </NavLink>
-        ))}
-        <NavLink to="/nyven-plus" className={linkClass} onClick={onMobileClose}>
-          <Sparkles size={18} strokeWidth={1.75} />
-          NYVEN+
-        </NavLink>
-      </nav>
-
-      {/* Account / Settings footer */}
-      <div className="shrink-0 px-3 py-3 border-t border-white/[0.06] space-y-0.5 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-        <NavLink to="/settings" className={linkClass} onClick={onMobileClose}>
-          <Settings size={18} strokeWidth={1.75} />
-          Settings
-        </NavLink>
-        <NavLink to="/profile" className={linkClass} onClick={onMobileClose}>
-          <User size={18} strokeWidth={1.75} />
-          Profile
-        </NavLink>
-        {configured && (
-          <div className="pt-1">
-            {user ? (
-              <button
-                type="button"
-                onClick={() => {
-                  navigate('/settings')
-                  onMobileClose?.()
-                }}
-                className="w-full text-left px-3 py-2 rounded-xl text-xs text-nyven-text-secondary hover:text-nyven-text hover:bg-white/[0.03] truncate"
-              >
-                {user.email}
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => {
-                  navigate('/auth')
-                  onMobileClose?.()
-                }}
-                className="w-full px-3 py-2 rounded-xl text-xs font-medium text-nyven-cyan hover:bg-nyven-cyan/10"
-              >
-                Sign in
-              </button>
-            )}
-          </div>
-        )}
+          ))}
+        </div>
       </div>
     </div>
   )
 
   return (
     <>
-      {/* Desktop sidebar */}
       <aside className="hidden lg:flex flex-col w-[260px] xl:w-[280px] shrink-0 border-r border-white/[0.05] bg-nyven-bg-secondary/40 h-full min-h-0">
         {content}
       </aside>
 
-      {/* Mobile drawer */}
       {mobileOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">
           <button

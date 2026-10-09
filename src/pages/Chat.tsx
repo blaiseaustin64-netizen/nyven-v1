@@ -60,6 +60,7 @@ export function Chat() {
   messagesRef.current = messages
   const activeIdRef = useRef(activeId)
   activeIdRef.current = activeId
+  const skipNextActiveLoadRef = useRef(false)
   const isGeneratingRef = useRef(isGenerating)
   isGeneratingRef.current = isGenerating
   /** Voice-originated turn — ref so stream onDone sees the real flag */
@@ -113,16 +114,30 @@ export function Chat() {
     }
   }, [])
 
+  // Home / quick-action handoff: submit via latest handleSendRef (never a stale closure).
+  // Runs once on mount; must NOT race with the activeId loader clearing messages.
   useEffect(() => {
-    const state = location.state as { initialMessage?: string } | null
-    if (state?.initialMessage) {
-      void handleSend(state.initialMessage)
-      window.history.replaceState({}, '')
-    }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    const state = location.state as { initialMessage?: string; newChat?: boolean } | null
+    const msg = state?.initialMessage?.trim()
+    if (!msg) return
+    window.history.replaceState({}, '')
+    // Fresh conversation for Home; set activeIdRef immediately so handleSend uses it
+    skipNextActiveLoadRef.current = true
+    const newId = contextNewChat()
+    activeIdRef.current = newId
+    setMessages([])
+    void handleSendRef.current(msg)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-  // Sync messages when sidebar changes active conversation
+  // Sync messages when the user selects a conversation in the sidebar.
+  // Do NOT clear messages for brand-new conversation ids (Home initialMessage / New Chat).
+  // Clearing here previously raced Home submit and wiped the in-flight user+assistant rows.
   useEffect(() => {
+    if (skipNextActiveLoadRef.current) {
+      skipNextActiveLoadRef.current = false
+      return
+    }
     let cancelled = false
     void (async () => {
       const fromList = conversations.find((c) => c.id === activeId)
@@ -130,9 +145,8 @@ export function Chat() {
         if (!cancelled) setMessages(fromList.messages)
         return
       }
-      // Empty new chat id not in list yet
       if (!fromList) {
-        if (!cancelled) setMessages([])
+        // New id not persisted yet — leave current messages alone
         return
       }
       const msgs = await loadConversationMessages(userId, activeId)
@@ -145,7 +159,9 @@ export function Chat() {
   }, [activeId, userId])
 
   const startNewChat = () => {
-    contextNewChat()
+    skipNextActiveLoadRef.current = true
+    const newId = contextNewChat()
+    activeIdRef.current = newId
     setMessages([])
   }
 

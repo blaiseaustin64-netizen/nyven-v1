@@ -27,7 +27,7 @@ type Ctx = {
   activeId: string
   setActiveId: (id: string) => void
   refresh: () => Promise<void>
-  startNewChat: () => void
+  startNewChat: () => string
   openConversation: (c: Conversation) => void
   deleteConversation: (id: string) => void
   renameConversation: (id: string, title: string) => void
@@ -61,8 +61,10 @@ export function ConversationHistoryProvider({ children }: { children: ReactNode 
   }, [refresh])
 
   const startNewChat = useCallback(() => {
-    setActiveId(newConversationId())
+    const id = newConversationId()
+    setActiveId(id)
     navigate('/chat')
+    return id
   }, [navigate])
 
   const openConversation = useCallback(
