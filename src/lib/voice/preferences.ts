@@ -12,12 +12,12 @@ export type VoicePreferences = {
 
 const KEY = 'nyven_voice_prefs_v1'
 
-/** Verified Sua model id: https://fish.audio/m/de77377323004b48937473a795d86f1f/ */
-const SUA_VOICE_ID = 'de77377323004b48937473a795d86f1f'
+/** Verified Sarah voice id: https://fish.audio/m/933563129e564b19a115bedd57b7406a/ */
+const SARAH_VOICE_ID = '933563129e564b19a115bedd57b7406a'
 
 const DEFAULTS: VoicePreferences = {
   enabled: true,
-  voiceId: SUA_VOICE_ID,
+  voiceId: SARAH_VOICE_ID,
   autoSpeak: true,
 }
 
@@ -37,8 +37,8 @@ function migrate(prefs: VoicePreferences): VoicePreferences {
     'onyx',
     'sua', // label → real id
   ])
-  if (legacy.has(id) || id === 'sua') {
-    return { ...prefs, voiceId: SUA_VOICE_ID }
+  if (legacy.has(id) || id === 'sua' || id === 'de77377323004b48937473a795d86f1f') {
+    return { ...prefs, voiceId: SARAH_VOICE_ID }
   }
   return prefs
 }

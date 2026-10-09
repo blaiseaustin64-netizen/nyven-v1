@@ -35,7 +35,7 @@ export const DEFAULT_PREFERENCES: NyvenPreferences = {
   voice: {
     voiceEnabled: true,
     autoSpeak: true,
-    voiceId: 'de77377323004b48937473a795d86f1f',
+    voiceId: '933563129e564b19a115bedd57b7406a',
   },
   privacy: {
     shareUsageAnalytics: true,

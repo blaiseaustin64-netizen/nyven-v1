@@ -5,7 +5,7 @@
  *   Provider: OpenRouter
  *   Endpoint: https://openrouter.ai/api/v1/audio/speech
  *   Model:    fish-audio/s2.1-pro-free:free  ($0)
- *   Voice:    de77377323004b48937473a795d86f1f  (Sua on Fish Audio)
+ *   Voice:    933563129e564b19a115bedd57b7406a  (Sarah on Fish Audio)
  *   Key:      OPENROUTER_API_KEY (server-side only)
  *
  * Optional fallback (not default): OPENAI_API_KEY → openai tts-1
@@ -94,14 +94,11 @@ export function prepareSpeakableText(raw: string): string {
   t = t.replace(/^#{1,6}\s+/gm, '')
   t = t.replace(/(\*\*|__)(.*?)\1/g, '$2')
   t = t.replace(/(\*|_)(.*?)\1/g, '$2')
-  // Bullet/numbered list items: drop the marker, and end the item with a period
-  // unless it already ends in punctuation, so items stay separate spoken phrases.
-  // (Runs before stray-symbol cleanup so "* item" bullets are still recognised.)
-  t = t.replace(/^[ \t]*(?:[-*+]|\d+[.)])[ \t]+(.*?)[ \t]*$/gm, (_m, item: string) =>
-    !item || /[.!?…:;,]$/.test(item) ? item : item + '.'
-  )
   // Remaining stray markdown symbols (not mid-word)
   t = t.replace(/[*#`>~]+/g, ' ')
+  // Bullet/list markers → gentle pause via period
+  t = t.replace(/^\s*[-*+]\s+/gm, '')
+  t = t.replace(/^\s*\d+[.)]\s+/gm, '')
   // Strip Fish bracket emotion/SFX tags the model might dramatize
   t = t.replace(
     /\[(laughing|laughter|giggle|sighs?|whispers?|excited|sad|angry|nervously)[^\]]*\]/gi,
@@ -109,15 +106,11 @@ export function prepareSpeakableText(raw: string): string {
   )
   // Collapse whitespace but keep sentence-ending punctuation
   t = t.replace(/\r\n/g, '\n')
-  // Paragraph break: add a pause only if the paragraph doesn't already end in
-  // punctuation — never turn ? or ! (or an ellipsis) into a period.
-  t = t.replace(/([.!?…:;,]["'”’)\]]*)[ \t]*\n{2,}/g, '$1 ')
   t = t.replace(/\n{2,}/g, '. ')
   t = t.replace(/\n/g, ' ')
   t = t.replace(/\s{2,}/g, ' ')
   t = t.replace(/\s+([,.;:!?])/g, '$1')
-  // Collapse only an accidental doubled period; keep "...", "?!", "!!" intact
-  t = t.replace(/(?<!\.)\.\.(?!\.)/g, '.')
+  t = t.replace(/([.!?]){2,}/g, '$1')
   t = t.trim()
 
   if (t.length > VOICE_LIMITS.MAX_TTS_CHARS) {
@@ -174,7 +167,7 @@ export async function synthesizeSpeech(
     // Stability-oriented defaults recommended for Fish conversational TTS
     body.temperature = 0.7
     body.top_p = 0.7
-    body.repetition_penalty = 1.2
+    body.repetition_penalty = 1.1
   }
 
   const controller = new AbortController()

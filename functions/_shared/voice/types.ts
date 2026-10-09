@@ -33,14 +33,14 @@ export const VOICE_LIMITS = {
 /**
  * NYVEN primary TTS — OpenRouter free Fish Audio S2.1 Pro Free.
  * Model: fish-audio/s2.1-pro-free:free ($0)
- * Voice: Sua — Fish Audio public model ID from
- *   https://fish.audio/m/de77377323004b48937473a795d86f1f/
+ * Voice: Sarah — Fish Audio public model ID from
+ *   https://fish.audio/m/933563129e564b19a115bedd57b7406a/
  * OpenRouter maps this ID via the `voice` field (same as Fish reference_id).
  */
-export const DEFAULT_TTS_VOICE = 'de77377323004b48937473a795d86f1f'
+export const DEFAULT_TTS_VOICE = '933563129e564b19a115bedd57b7406a'
 
 /** Display name for prefs / UI */
-export const DEFAULT_TTS_VOICE_LABEL = 'sua'
+export const DEFAULT_TTS_VOICE_LABEL = 'sarah'
 
 export const DEFAULT_TTS_MODEL = 'fish-audio/s2.1-pro-free:free'
 
