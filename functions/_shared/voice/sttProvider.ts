@@ -1,12 +1,11 @@
 /**
- * Speech-to-text — server-side only.
+ * Speech-to-text — server-side only via OpenRouter.
  *
- * NYVEN uses the existing OpenRouter server key for STT.
- * No separate STT provider, endpoint, or API key is required.
+ * Endpoint: POST https://openrouter.ai/api/v1/audio/transcriptions
+ * Model:    openai/whisper-large-v3
+ * Auth:     OPENROUTER_API_KEY (server only)
  *
- * Flow:
- *   MediaRecorder audio blob → /api/voice/stt → OpenRouter transcription API
- *   → openai/whisper-large-v3 → transcript
+ * No Groq/OpenAI requirement. No fake transcripts.
  */
 
 import { VOICE_LIMITS, type STTOptions, type STTResult } from './types'
@@ -18,8 +17,22 @@ export type STTEnv = {
   OPENROUTER_API_KEY?: string
 }
 
+export type STTFailure = {
+  ok: false
+  code: string
+  message: string
+  /** Upstream HTTP status from OpenRouter when available (safe to expose) */
+  providerStatus?: number
+  /** Short sanitized upstream message — never includes API keys */
+  providerDetail?: string
+}
+
+export type STTOutcome =
+  | { ok: true; result: STTResult }
+  | STTFailure
+
 export function sttAvailable(env: STTEnv): boolean {
-  return Boolean(env.OPENROUTER_API_KEY)
+  return Boolean(env.OPENROUTER_API_KEY?.trim())
 }
 
 export function sttCapabilityMessage(env: STTEnv): string {
@@ -55,13 +68,33 @@ function extensionForMimeType(mimeType: string): string {
   }
 }
 
+/** Extract a short safe detail from OpenRouter error JSON; strip secrets. */
+function sanitizeProviderDetail(raw: string): string | undefined {
+  if (!raw) return undefined
+  let text = raw.slice(0, 400)
+  try {
+    const j = JSON.parse(raw) as {
+      error?: { message?: string; code?: string | number }
+      message?: string
+    }
+    text = String(j?.error?.message || j?.message || raw).slice(0, 200)
+  } catch {
+    text = raw.slice(0, 200)
+  }
+  // Never surface key-like material
+  text = text.replace(/sk-[a-zA-Z0-9_-]+/g, '[redacted]')
+  text = text.replace(/Bearer\s+\S+/gi, 'Bearer [redacted]')
+  text = text.replace(/[a-f0-9]{32,}/gi, '[redacted]')
+  return text.trim() || undefined
+}
+
 export async function transcribeAudio(
   env: STTEnv,
   audio: ArrayBuffer,
   filename: string,
   options?: STTOptions,
   signal?: AbortSignal
-): Promise<{ ok: true; result: STTResult } | { ok: false; code: string; message: string }> {
+): Promise<STTOutcome> {
   if (!audio || audio.byteLength === 0) {
     return { ok: false, code: 'EMPTY_AUDIO', message: 'No audio was captured.' }
   }
@@ -113,21 +146,33 @@ export async function transcribeAudio(
 
     if (!res.ok) {
       const errText = await res.text().catch(() => '')
+      const providerDetail = sanitizeProviderDetail(errText)
       console.error(
         'OpenRouter STT error',
         DEFAULT_STT_MODEL,
         res.status,
         errText.slice(0, 300)
       )
+      const code =
+        res.status === 401 || res.status === 403
+          ? 'STT_AUTH_ERROR'
+          : res.status === 429
+            ? 'STT_RATE_LIMITED'
+            : 'STT_PROVIDER_ERROR'
+      const message =
+        res.status === 401 || res.status === 403
+          ? 'Speech recognition credentials were rejected by OpenRouter.'
+          : res.status === 429
+            ? 'Speech recognition is temporarily rate limited. Please try again.'
+            : providerDetail
+              ? `Speech recognition failed (${res.status}): ${providerDetail}`
+              : `Speech recognition failed (provider HTTP ${res.status}). Please try again or type your message.`
       return {
         ok: false,
-        code: res.status === 401 || res.status === 403 ? 'STT_AUTH_ERROR' : 'STT_PROVIDER_ERROR',
-        message:
-          res.status === 401 || res.status === 403
-            ? 'Speech recognition credentials were rejected by OpenRouter.'
-            : res.status === 429
-              ? 'Speech recognition is temporarily rate limited. Please try again.'
-              : 'Speech recognition failed. Please try again or type your message.',
+        code,
+        message,
+        providerStatus: res.status,
+        providerDetail,
       }
     }
 

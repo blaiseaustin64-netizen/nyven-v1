@@ -1,5 +1,5 @@
 /**
- * POST /api/voice/stt — multipart audio → transcript (server-side STT).
+ * POST /api/voice/stt — multipart audio → transcript (OpenRouter Whisper).
  */
 
 import { transcribeAudio, type STTEnv } from '../../_shared/voice/sttProvider'
@@ -25,13 +25,19 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   try {
     const ct = context.request.headers.get('content-type') || ''
     if (!ct.includes('multipart/form-data')) {
-      return json({ success: false, code: 'INVALID_REQUEST', error: 'Expected multipart audio.' }, 400)
+      return json(
+        { success: false, code: 'INVALID_REQUEST', error: 'Expected multipart audio.' },
+        400
+      )
     }
 
     const form = await context.request.formData()
     const file = form.get('audio')
     if (!file || typeof file === 'string') {
-      return json({ success: false, code: 'INVALID_REQUEST', error: 'No audio provided.' }, 400)
+      return json(
+        { success: false, code: 'INVALID_REQUEST', error: 'No audio provided.' },
+        400
+      )
     }
 
     const blob = file as File
@@ -56,13 +62,30 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     )
 
     if (!result.ok) {
+      const status =
+        result.code === 'STT_UNAVAILABLE'
+          ? 503
+          : result.code === 'STT_AUTH_ERROR'
+            ? 401
+            : result.code === 'STT_RATE_LIMITED'
+              ? 429
+              : 400
       return json(
-        { success: false, code: result.code, error: result.message },
-        result.code === 'STT_UNAVAILABLE' ? 503 : 400
+        {
+          success: false,
+          code: result.code,
+          error: result.message,
+          providerStatus: result.providerStatus,
+          providerDetail: result.providerDetail,
+        },
+        status
       )
     }
 
-    return json({ success: true, text: result.result.text, language: result.result.language }, 200)
+    return json(
+      { success: true, text: result.result.text, language: result.result.language },
+      200
+    )
   } catch (e) {
     console.error('STT endpoint error', e)
     return json(

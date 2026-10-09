@@ -150,18 +150,31 @@ export async function fetchSTT(
 ): Promise<string> {
   const form = new FormData()
   const extension = blob.type.split('/')[1]?.split(';')[0] || 'webm'
-  const normalizedExtension = extension === 'x-m4a' ? 'mp4' : extension === 'mpeg' ? 'mp3' : extension
+  const normalizedExtension =
+    extension === 'x-m4a' ? 'mp4' : extension === 'mpeg' ? 'mp3' : extension
   form.append('audio', blob, `recording.${normalizedExtension}`)
   const res = await fetch('/api/voice/stt', {
     method: 'POST',
     body: form,
     signal,
   })
-  const data = await res.json().catch(() => ({}))
-  if (!res.ok || !(data as { success?: boolean }).success) {
-    throw new Error(
-      (data as { error?: string }).error || 'Speech recognition failed.'
-    )
+  const data = (await res.json().catch(() => ({}))) as {
+    success?: boolean
+    error?: string
+    text?: string
+    providerStatus?: number
+    providerDetail?: string
+    code?: string
   }
-  return String((data as { text?: string }).text || '').trim()
+  if (!res.ok || !data.success) {
+    const base = data.error || 'Speech recognition failed.'
+    const extra =
+      data.providerStatus != null
+        ? ` [provider ${data.providerStatus}${data.providerDetail ? `: ${data.providerDetail}` : ''}]`
+        : data.code
+          ? ` [${data.code}]`
+          : ''
+    throw new Error(base + extra)
+  }
+  return String(data.text || '').trim()
 }
