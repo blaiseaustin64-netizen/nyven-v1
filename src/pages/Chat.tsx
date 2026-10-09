@@ -44,11 +44,22 @@ export function Chat() {
   const [voiceChatOpen, setVoiceChatOpen] = useState(false)
   const [voiceMuted, setVoiceMuted] = useState(false)
   const [lastVoiceTranscript, setLastVoiceTranscript] = useState<string | null>(null)
-  const [voiceDraft, setVoiceDraft] = useState<{ id: number; text: string } | null>(null)
   const [lastVoiceReply, setLastVoiceReply] = useState<string | null>(null)
   const voiceChatOpenRef = useRef(false)
   const voiceMutedRef = useRef(false)
   const voiceRef = useRef<VoiceController | null>(null)
+  /** Always-current send for async voice callbacks (avoids stale closures) */
+  const handleSendRef = useRef<
+    (payload: ComposerSendPayload | string, opts?: { fromVoice?: boolean }) => Promise<void>
+  >(async () => {})
+  const messagesRef = useRef(messages)
+  messagesRef.current = messages
+  const activeIdRef = useRef(activeId)
+  activeIdRef.current = activeId
+  const isGeneratingRef = useRef(isGenerating)
+  isGeneratingRef.current = isGenerating
+  /** Voice-originated turn — ref so stream onDone sees the real flag */
+  const fromVoiceRef = useRef(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
   const streamMsgIdRef = useRef<string | null>(null)
@@ -85,11 +96,16 @@ export function Chat() {
       onListenLevel: (level) => setVoiceEnergy(level),
       onSpeakEnergy: (level) => setVoiceEnergy(level),
       onTranscript: (text) => {
+        // Mark voice origin via ref BEFORE send so stream onDone sees it
+        fromVoiceRef.current = true
         setFromVoice(true)
         setLastVoiceTranscript(text)
-        setVoiceDraft({ id: Date.now(), text })
+        // Always call the latest handleSend (never a mount-time stale closure)
+        void handleSendRef.current({ text, attachments: [] }, { fromVoice: true })
       },
       onError: (message) => {
+        fromVoiceRef.current = false
+        setFromVoice(false)
         setVoiceError(message)
         setTimeout(() => setVoiceError(null), 5000)
       },
@@ -98,7 +114,7 @@ export function Chat() {
       vc.stopAll()
       voiceRef.current = null
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     const state = location.state as { initialMessage?: string } | null
@@ -235,13 +251,31 @@ export function Chat() {
       )
     }
     setIsGenerating(false)
+    isGeneratingRef.current = false
+    fromVoiceRef.current = false
+    setFromVoice(false)
   }
 
-  const handleSend = async (payload: ComposerSendPayload | string) => {
-    if (isGenerating) return
+  const handleSend = async (
+    payload: ComposerSendPayload | string,
+    opts?: { fromVoice?: boolean }
+  ) => {
+    if (isGeneratingRef.current) return
 
     const text = typeof payload === 'string' ? payload : payload.text
     const filePayloads = typeof payload === 'string' ? [] : payload.attachments || []
+
+    // Capture voice-origin at call time (ref + explicit opt). Do not rely on React state timing.
+    const voiceOrigin = Boolean(opts?.fromVoice) || fromVoiceRef.current
+    if (opts?.fromVoice) fromVoiceRef.current = true
+
+    const convId = activeIdRef.current
+    const historySnapshot = messagesRef.current
+      .filter((m) => !m.isThinking && !m.isStreaming && m.content)
+      .map((m) => ({
+        role: (m.role === 'nyven' ? 'assistant' : 'user') as 'user' | 'assistant',
+        content: m.content,
+      }))
 
     const userMsg: Message = {
       id: `u-${Date.now()}`,
@@ -273,19 +307,15 @@ export function Chat() {
       activityDetail: 'Understanding your message',
     }
 
-    const history = messages
-      .filter((m) => !m.isThinking && !m.isStreaming && m.content)
-      .map((m) => ({
-        role: (m.role === 'nyven' ? 'assistant' : 'user') as 'user' | 'assistant',
-        content: m.content,
-      }))
+    const history = historySnapshot
 
     setMessages((prev) => [...prev, userMsg, streamMsg])
     setIsGenerating(true)
+    isGeneratingRef.current = true
     scrollToBottom()
     void recordUsage(userId, 'message')
-    void ensureConversation(userId, activeId, text.slice(0, 40) || 'Chat')
-    void persistMessage(userId, activeId, userMsg, text.slice(0, 40))
+    void ensureConversation(userId, convId, text.slice(0, 40) || 'Chat')
+    void persistMessage(userId, convId, userMsg, text.slice(0, 40))
 
     const controller = new AbortController()
     abortControllerRef.current = controller
@@ -400,25 +430,30 @@ export function Chat() {
               return updated
             })
             setIsGenerating(false)
+            isGeneratingRef.current = false
             streamMsgIdRef.current = null
             const spoken = streamContentRef.current
-            if (fromVoice && spoken) {
+            // Voice-originated turns always speak via Sua (force), independent of typed-chat autoSpeak
+            if (voiceOrigin && spoken) {
               setLastVoiceReply(spoken)
-              const prefs = getVoicePreferences()
-              // Voice Chat always speaks; dictation respects autoSpeak preference
-              if (voiceChatOpenRef.current || prefs.autoSpeak) {
-                void voiceRef.current?.speak(spoken).then(() => {
-                  // Continuous conversation in Voice Chat mode
+              void voiceRef.current
+                ?.speak(spoken, { force: true })
+                .then(() => {
                   if (voiceChatOpenRef.current && !voiceMutedRef.current) {
                     void voiceRef.current?.toggleListen()
                   }
                 })
-              }
+                .catch(() => {
+                  /* playback errors already surfaced via controller onError */
+                })
             }
+            fromVoiceRef.current = false
             setFromVoice(false)
           },
           onError: (_code, message) => {
             sawError = true
+            fromVoiceRef.current = false
+            setFromVoice(false)
             if (flushTimerRef.current) {
               clearTimeout(flushTimerRef.current)
               flushTimerRef.current = null
@@ -441,6 +476,7 @@ export function Chat() {
               return updated
             })
             setIsGenerating(false)
+            isGeneratingRef.current = false
             streamMsgIdRef.current = null
           },
         }
@@ -468,6 +504,7 @@ export function Chat() {
           return updated
         })
         setIsGenerating(false)
+        isGeneratingRef.current = false
         streamMsgIdRef.current = null
       } else if (!sawError) {
         // Ensure UI finalized if done event was missed
@@ -490,6 +527,7 @@ export function Chat() {
           return prev
         })
         setIsGenerating(false)
+        isGeneratingRef.current = false
         streamMsgIdRef.current = null
       }
     } catch (err: unknown) {
@@ -513,9 +551,14 @@ export function Chat() {
         return updated
       })
       setIsGenerating(false)
+      isGeneratingRef.current = false
       streamMsgIdRef.current = null
+      fromVoiceRef.current = false
+      setFromVoice(false)
     }
   }
+
+  handleSendRef.current = handleSend
 
   const handleRegenerate = () => {
     const lastUser = [...messages].reverse().find((m) => m.role === 'user')
@@ -699,7 +742,6 @@ export function Chat() {
           onVoiceToggle={() => void voiceRef.current?.toggleListen()}
           voicePhase={voicePhase}
           voiceEnergy={voiceEnergy}
-          voiceDraft={voiceDraft}
           liquidMode={
             voicePhase === 'speaking'
               ? 'speaking'

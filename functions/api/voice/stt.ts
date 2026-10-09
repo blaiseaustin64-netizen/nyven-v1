@@ -1,5 +1,5 @@
 /**
- * POST /api/voice/stt — multipart audio → transcript (OpenRouter Whisper).
+ * POST /api/voice/stt — multipart audio → transcript (Workers AI Whisper, optional Groq).
  */
 
 import { transcribeAudio, type STTEnv } from '../../_shared/voice/sttProvider'

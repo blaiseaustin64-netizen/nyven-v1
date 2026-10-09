@@ -32,8 +32,6 @@ interface MessageComposerProps {
   voicePhase?: 'idle' | 'requesting_permission' | 'listening' | 'transcribing' | 'speaking' | 'error'
   voiceEnergy?: number
   liquidMode?: 'idle' | 'listening' | 'speaking' | 'thinking'
-  /** Insert a dictation transcript into the normal composer. */
-  voiceDraft?: { id: number; text: string } | null
   /** Open full-screen Voice Chat */
   onOpenVoiceChat?: () => void
 }
@@ -67,7 +65,6 @@ export function MessageComposer({
   onVoiceToggle,
   voicePhase = 'idle',
   voiceEnergy = 0,
-  voiceDraft = null,
   onOpenVoiceChat,
 }: MessageComposerProps) {
   const [value, setValue] = useState('')
@@ -85,12 +82,6 @@ export function MessageComposer({
   useEffect(() => {
     if (autoFocus && textareaRef.current) textareaRef.current.focus()
   }, [autoFocus])
-
-  useEffect(() => {
-    if (!voiceDraft) return
-    setValue(voiceDraft.text)
-    requestAnimationFrame(() => textareaRef.current?.focus())
-  }, [voiceDraft])
 
   useEffect(() => {
     return () => {

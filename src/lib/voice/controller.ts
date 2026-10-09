@@ -1,6 +1,6 @@
 /**
- * Voice Controller — mic → STT → (caller runs Core) → TTS → playback.
- * Does not duplicate Core intelligence.
+ * Voice session controller — listen (STT) + speak (TTS).
+ * Phases reflect real recorder / network / playback state only.
  */
 
 import { MicRecorder } from './recorder'
@@ -15,34 +15,33 @@ export type VoicePhase =
   | 'speaking'
   | 'error'
 
-export type VoiceControllerHandlers = {
+export type VoiceHandlers = {
   onPhase?: (phase: VoicePhase, detail?: string) => void
-  /** Real mic level 0–1 while listening */
+  onTranscript?: (text: string) => void
+  onError?: (message: string) => void
   onListenLevel?: (level: number) => void
   /** Real playback energy 0–1 while speaking */
   onSpeakEnergy?: (level: number) => void
-  onTranscript?: (text: string) => void
-  onError?: (message: string) => void
 }
 
 export class VoiceController {
   private recorder = new MicRecorder()
   private playback = new SpeechPlayback()
-  private handlers: VoiceControllerHandlers = {}
+  private handlers: VoiceHandlers = {}
+  private phase: VoicePhase = 'idle'
   private sttAbort: AbortController | null = null
   private ttsAbort: AbortController | null = null
-  private phase: VoicePhase = 'idle'
+  /** True while user intentionally started a listen session */
   private listenMode = false
 
-  setHandlers(h: VoiceControllerHandlers) {
-    this.handlers = h
+  constructor() {
     this.recorder.setHandlers({
       onStart: () => this.setPhase('listening'),
       onStop: (blob) => {
         void this.afterRecord(blob)
       },
       onError: (_code, message) => {
-        this.setPhase('error', message)
+        this.listenMode = false
         this.handlers.onError?.(message)
         this.setPhase('idle')
       },
@@ -51,14 +50,18 @@ export class VoiceController {
     this.playback.setHandlers({
       onStart: () => this.setPhase('speaking'),
       onEnd: () => {
-        this.setPhase('idle')
+        if (this.phase === 'speaking') this.setPhase('idle')
       },
       onError: (message) => {
         this.handlers.onError?.(message)
-        this.setPhase('idle')
+        if (this.phase === 'speaking') this.setPhase('idle')
       },
-      onEnergy: (e) => this.handlers.onSpeakEnergy?.(e),
+      onEnergy: (level) => this.handlers.onSpeakEnergy?.(level),
     })
+  }
+
+  setHandlers(h: VoiceHandlers) {
+    this.handlers = h
   }
 
   getPhase(): VoicePhase {
@@ -68,6 +71,14 @@ export class VoiceController {
   private setPhase(phase: VoicePhase, detail?: string) {
     this.phase = phase
     this.handlers.onPhase?.(phase, detail)
+  }
+
+  /**
+   * Call on user gesture (mic tap) to unlock audio playback on mobile.
+   * Safe no-op if already ready.
+   */
+  prepareAudio(): void {
+    void this.playback.unlock()
   }
 
   /** Toggle: start listening or stop & transcribe */
@@ -86,6 +97,9 @@ export class VoiceController {
       this.handlers.onError?.('Voice input is not supported in this browser.')
       return
     }
+
+    // Unlock TTS playback from the same user gesture as mic start
+    this.prepareAudio()
 
     this.listenMode = true
     this.setPhase('requesting_permission')
@@ -115,7 +129,6 @@ export class VoiceController {
         return
       }
       this.handlers.onTranscript?.(text)
-      // Phase returns to idle; Core activity takes over in Chat
       this.setPhase('idle')
     } catch (err: unknown) {
       if ((err as { name?: string })?.name === 'AbortError') {
@@ -131,10 +144,14 @@ export class VoiceController {
     }
   }
 
-  /** Speak final assistant text (not tool status lines) */
-  async speak(text: string): Promise<void> {
+  /**
+   * Speak final assistant text via existing OpenRouter Sua TTS.
+   * @param opts.force — voice-originated turns: speak even if autoSpeak is off for typed chat
+   */
+  async speak(text: string, opts?: { force?: boolean }): Promise<void> {
     const prefs = getVoicePreferences()
-    if (!prefs.enabled || !prefs.autoSpeak) return
+    if (!prefs.enabled) return
+    if (!opts?.force && !prefs.autoSpeak) return
     if (!text.trim()) return
 
     this.stopSpeaking()
@@ -144,7 +161,6 @@ export class VoiceController {
       await this.playback.play(blob)
     } catch (err: unknown) {
       if ((err as { name?: string })?.name === 'AbortError') return
-      // Text remains visible — do not lose the response
       this.handlers.onError?.(
         err instanceof Error
           ? err.message

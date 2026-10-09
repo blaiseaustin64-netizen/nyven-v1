@@ -13,7 +13,6 @@ import { VOICE_LIMITS, type STTOptions, type STTResult } from './types'
 
 const GROQ_STT_URL = 'https://api.groq.com/openai/v1/audio/transcriptions'
 const DEFAULT_STT_MODEL = 'whisper-large-v3-turbo'
-
 const CF_STT_MODEL = '@cf/openai/whisper-large-v3-turbo'
 
 type CFAi = {
@@ -40,15 +39,13 @@ export type STTFailure = {
   ok: false
   code: string
   message: string
-  /** Upstream HTTP status from OpenRouter when available (safe to expose) */
+  /** Upstream HTTP status when available (safe to expose) */
   providerStatus?: number
   /** Short sanitized upstream message — never includes API keys */
   providerDetail?: string
 }
 
-export type STTOutcome =
-  | { ok: true; result: STTResult }
-  | STTFailure
+export type STTOutcome = { ok: true; result: STTResult } | STTFailure
 
 export function sttAvailable(env: STTEnv): boolean {
   return Boolean(env.AI || env.GROQ_API_KEY?.trim())
@@ -56,7 +53,10 @@ export function sttAvailable(env: STTEnv): boolean {
 
 export function sttCapabilityMessage(env: STTEnv): string {
   if (sttAvailable(env)) return 'Speech recognition is available.'
-  return 'Speech recognition is not configured on the server. Add a Workers AI binding named AI (or set GROQ_API_KEY) for NYVEN voice.'
+  return (
+    'Speech recognition is not configured on the server. ' +
+    'Add a Workers AI binding named AI (or set GROQ_API_KEY) for NYVEN voice.'
+  )
 }
 
 function normalizeMimeType(mimeType: string | undefined): string {
@@ -87,7 +87,7 @@ function extensionForMimeType(mimeType: string): string {
   }
 }
 
-/** Extract a short safe detail from OpenRouter error JSON; strip secrets. */
+/** Extract a short safe detail from provider error JSON; strip secrets. */
 function sanitizeProviderDetail(raw: string): string | undefined {
   if (!raw) return undefined
   let text = raw.slice(0, 400)
@@ -100,7 +100,6 @@ function sanitizeProviderDetail(raw: string): string | undefined {
   } catch {
     text = raw.slice(0, 200)
   }
-  // Never surface key-like material
   text = text.replace(/sk-[a-zA-Z0-9_-]+/g, '[redacted]')
   text = text.replace(/Bearer\s+\S+/gi, 'Bearer [redacted]')
   text = text.replace(/[a-f0-9]{32,}/gi, '[redacted]')
@@ -195,12 +194,7 @@ export async function transcribeAudio(
     if (!res.ok) {
       const errText = await res.text().catch(() => '')
       const providerDetail = sanitizeProviderDetail(errText)
-      console.error(
-        'Groq STT error',
-        model,
-        res.status,
-        errText.slice(0, 300)
-      )
+      console.error('Groq STT error', model, res.status, errText.slice(0, 300))
       const code =
         res.status === 401 || res.status === 403
           ? 'STT_AUTH_ERROR'
@@ -236,7 +230,6 @@ export async function transcribeAudio(
         message: 'Could not understand the audio. Please try again.',
       }
     }
-
     return {
       ok: true,
       result: { text, language: data.language },

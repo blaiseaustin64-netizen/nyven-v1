@@ -24,6 +24,31 @@ export class SpeechPlayback {
     this.handlers = h
   }
 
+  /**
+   * Resume/create a silent AudioContext on a user gesture so later TTS
+   * playback is less likely to be blocked by autoplay policies (mobile).
+   */
+  async unlock(): Promise<void> {
+    try {
+      if (!this.ctx) {
+        this.ctx = new AudioContext()
+      }
+      if (this.ctx.state === 'suspended') {
+        await this.ctx.resume()
+      }
+      // Brief silent buffer helps some mobile browsers unlock the audio pipeline
+      const osc = this.ctx.createOscillator()
+      const gain = this.ctx.createGain()
+      gain.gain.value = 0
+      osc.connect(gain)
+      gain.connect(this.ctx.destination)
+      osc.start()
+      osc.stop(this.ctx.currentTime + 0.01)
+    } catch {
+      /* ignore — unlock is best-effort */
+    }
+  }
+
   async play(blob: Blob): Promise<void> {
     this.stop()
     this.objectUrl = URL.createObjectURL(blob)
