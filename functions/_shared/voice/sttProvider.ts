@@ -1,20 +1,39 @@
 /**
- * Speech-to-text — server-side only via OpenRouter.
+ * Speech-to-text — server-side only, free providers.
  *
- * Endpoint: POST https://openrouter.ai/api/v1/audio/transcriptions
- * Model:    openai/whisper-large-v3
- * Auth:     OPENROUTER_API_KEY (server only)
+ * 1) Cloudflare Workers AI (no API key): @cf/openai/whisper-large-v3-turbo
+ *    Needs a Workers AI binding named `AI` on the Pages project.
+ * 2) Groq Whisper (optional fallback): needs GROQ_API_KEY.
  *
- * No Groq/OpenAI requirement. No fake transcripts.
+ * Switched from OpenRouter because OpenRouter's Whisper is paid (402).
+ * No fake transcripts.
  */
 
 import { VOICE_LIMITS, type STTOptions, type STTResult } from './types'
 
-const OPENROUTER_STT_URL = 'https://openrouter.ai/api/v1/audio/transcriptions'
-const DEFAULT_STT_MODEL = 'openai/whisper-large-v3'
+const GROQ_STT_URL = 'https://api.groq.com/openai/v1/audio/transcriptions'
+const DEFAULT_STT_MODEL = 'whisper-large-v3-turbo'
+
+const CF_STT_MODEL = '@cf/openai/whisper-large-v3-turbo'
+
+type CFAi = {
+  run: (model: string, input: Record<string, unknown>) => Promise<unknown>
+}
+
+function toBase64(buf: ArrayBuffer): string {
+  const bytes = new Uint8Array(buf)
+  let bin = ''
+  const chunk = 0x8000
+  for (let i = 0; i < bytes.length; i += chunk) {
+    bin += String.fromCharCode(...bytes.subarray(i, i + chunk))
+  }
+  return btoa(bin)
+}
 
 export type STTEnv = {
-  OPENROUTER_API_KEY?: string
+  AI?: CFAi
+  GROQ_API_KEY?: string
+  STT_MODEL?: string
 }
 
 export type STTFailure = {
@@ -32,12 +51,12 @@ export type STTOutcome =
   | STTFailure
 
 export function sttAvailable(env: STTEnv): boolean {
-  return Boolean(env.OPENROUTER_API_KEY?.trim())
+  return Boolean(env.AI || env.GROQ_API_KEY?.trim())
 }
 
 export function sttCapabilityMessage(env: STTEnv): string {
   if (sttAvailable(env)) return 'Speech recognition is available.'
-  return 'Speech recognition is not configured on the server. Set OPENROUTER_API_KEY for NYVEN voice.'
+  return 'Speech recognition is not configured on the server. Add a Workers AI binding named AI (or set GROQ_API_KEY) for NYVEN voice.'
 }
 
 function normalizeMimeType(mimeType: string | undefined): string {
@@ -106,7 +125,37 @@ export async function transcribeAudio(
     }
   }
 
-  const apiKey = env.OPENROUTER_API_KEY?.trim()
+  // 1) Cloudflare Workers AI (free daily allowance, no key)
+  if (env.AI) {
+    try {
+      const out = (await env.AI.run(CF_STT_MODEL, {
+        audio: toBase64(audio),
+        ...(options?.language ? { language: options.language } : {}),
+      })) as { text?: string }
+      const cfText = String(out?.text || '').trim()
+      if (cfText) return { ok: true, result: { text: cfText } }
+      if (!env.GROQ_API_KEY?.trim()) {
+        return {
+          ok: false,
+          code: 'EMPTY_TRANSCRIPT',
+          message: 'Could not understand the audio. Please try again.',
+        }
+      }
+    } catch (e) {
+      console.error('Cloudflare STT failed', e)
+      if (!env.GROQ_API_KEY?.trim()) {
+        return {
+          ok: false,
+          code: 'STT_FAILED',
+          message: 'Speech recognition failed. Please try again or type your message.',
+        }
+      }
+    }
+  }
+
+  // 2) Groq fallback
+  const apiKey = env.GROQ_API_KEY?.trim()
+  const model = env.STT_MODEL?.trim() || DEFAULT_STT_MODEL
   if (!apiKey) {
     return {
       ok: false,
@@ -124,7 +173,8 @@ export async function transcribeAudio(
     new Blob([audio], { type: mimeType }),
     safeFilename.includes('.') ? safeFilename : `recording.${extension}`
   )
-  form.append('model', DEFAULT_STT_MODEL)
+  form.append('model', model)
+  form.append('response_format', 'json')
   if (options?.language) form.append('language', options.language)
 
   const controller = new AbortController()
@@ -133,12 +183,10 @@ export async function transcribeAudio(
   signal?.addEventListener('abort', onAbort)
 
   try {
-    const res = await fetch(OPENROUTER_STT_URL, {
+    const res = await fetch(GROQ_STT_URL, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
-        'HTTP-Referer': 'https://nyven.vexdyn.com',
-        'X-Title': 'NYVEN',
       },
       body: form,
       signal: controller.signal,
@@ -148,8 +196,8 @@ export async function transcribeAudio(
       const errText = await res.text().catch(() => '')
       const providerDetail = sanitizeProviderDetail(errText)
       console.error(
-        'OpenRouter STT error',
-        DEFAULT_STT_MODEL,
+        'Groq STT error',
+        model,
         res.status,
         errText.slice(0, 300)
       )
@@ -161,7 +209,7 @@ export async function transcribeAudio(
             : 'STT_PROVIDER_ERROR'
       const message =
         res.status === 401 || res.status === 403
-          ? 'Speech recognition credentials were rejected by OpenRouter.'
+          ? 'Speech recognition credentials were rejected by Groq.'
           : res.status === 429
             ? 'Speech recognition is temporarily rate limited. Please try again.'
             : providerDetail
@@ -197,7 +245,7 @@ export async function transcribeAudio(
     if ((e as { name?: string })?.name === 'AbortError') {
       return { ok: false, code: 'STT_TIMEOUT', message: 'Speech recognition timed out.' }
     }
-    console.error('OpenRouter STT request failed', e)
+    console.error('Groq STT request failed', e)
     return {
       ok: false,
       code: 'STT_FAILED',
