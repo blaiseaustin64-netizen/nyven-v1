@@ -44,6 +44,7 @@ export function Chat() {
   const [voiceChatOpen, setVoiceChatOpen] = useState(false)
   const [voiceMuted, setVoiceMuted] = useState(false)
   const [lastVoiceTranscript, setLastVoiceTranscript] = useState<string | null>(null)
+  const [voiceDraft, setVoiceDraft] = useState<{ id: number; text: string } | null>(null)
   const [lastVoiceReply, setLastVoiceReply] = useState<string | null>(null)
   const voiceChatOpenRef = useRef(false)
   const voiceMutedRef = useRef(false)
@@ -86,7 +87,7 @@ export function Chat() {
       onTranscript: (text) => {
         setFromVoice(true)
         setLastVoiceTranscript(text)
-        void handleSend({ text, attachments: [] })
+        setVoiceDraft({ id: Date.now(), text })
       },
       onError: (message) => {
         setVoiceError(message)
@@ -698,6 +699,7 @@ export function Chat() {
           onVoiceToggle={() => void voiceRef.current?.toggleListen()}
           voicePhase={voicePhase}
           voiceEnergy={voiceEnergy}
+          voiceDraft={voiceDraft}
           liquidMode={
             voicePhase === 'speaking'
               ? 'speaking'

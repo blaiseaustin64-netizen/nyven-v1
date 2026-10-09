@@ -149,7 +149,9 @@ export async function fetchSTT(
   signal?: AbortSignal
 ): Promise<string> {
   const form = new FormData()
-  form.append('audio', blob, 'recording.webm')
+  const extension = blob.type.split('/')[1]?.split(';')[0] || 'webm'
+  const normalizedExtension = extension === 'x-m4a' ? 'mp4' : extension === 'mpeg' ? 'mp3' : extension
+  form.append('audio', blob, `recording.${normalizedExtension}`)
   const res = await fetch('/api/voice/stt', {
     method: 'POST',
     body: form,
