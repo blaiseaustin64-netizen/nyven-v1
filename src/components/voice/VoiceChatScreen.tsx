@@ -57,8 +57,8 @@ export function VoiceChatScreen({
   onToggleMute,
   onToggleListen,
   statusHint,
-  lastTranscript,
-  lastReply,
+  lastTranscript: _lastTranscript,
+  lastReply: _lastReply,
 }: Props) {
   const mode = mapMode(voicePhase, isProcessing, isSpeaking)
   const status = statusText(voicePhase, isProcessing, isSpeaking)
@@ -140,26 +140,7 @@ export function VoiceChatScreen({
             {statusHint}
           </p>
         )}
-        {!focused && (lastTranscript || lastReply) && (
-          <div className="pointer-events-auto w-full max-w-md space-y-2 mt-4 text-sm">
-            {lastTranscript && (
-              <div className="rounded-2xl bg-white/[0.06] backdrop-blur-md px-4 py-3">
-                <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: '#7d869c' }}>
-                  You
-                </p>
-                <p className="leading-relaxed line-clamp-3">{lastTranscript}</p>
-              </div>
-            )}
-            {lastReply && (
-              <div className="rounded-2xl bg-white/[0.06] backdrop-blur-md px-4 py-3">
-                <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: '#7d869c' }}>
-                  NYVEN
-                </p>
-                <p className="leading-relaxed line-clamp-4">{lastReply}</p>
-              </div>
-            )}
-          </div>
-        )}
+
       </div>
 
       {/* Bottom mic */}

@@ -60,6 +60,7 @@ export function Chat() {
   isGeneratingRef.current = isGenerating
   /** Voice-originated turn — ref so stream onDone sees the real flag */
   const fromVoiceRef = useRef(false)
+  const voiceSubmitInFlightRef = useRef(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
   const streamMsgIdRef = useRef<string | null>(null)
@@ -96,11 +97,16 @@ export function Chat() {
       onListenLevel: (level) => setVoiceEnergy(level),
       onSpeakEnergy: (level) => setVoiceEnergy(level),
       onTranscript: (text) => {
-        // Mark voice origin via ref BEFORE send so stream onDone sees it
+        if (!text.trim()) return
+        // One accepted transcript → one Core submission
+        if (voiceSubmitInFlightRef.current || isGeneratingRef.current) {
+          console.warn('[nyven-voice] skipped duplicate/overlapping transcript submit')
+          return
+        }
         fromVoiceRef.current = true
+        voiceSubmitInFlightRef.current = true
         setFromVoice(true)
         setLastVoiceTranscript(text)
-        // Always call the latest handleSend (never a mount-time stale closure)
         void handleSendRef.current({ text, attachments: [] }, { fromVoice: true })
       },
       onError: (message) => {
@@ -253,6 +259,7 @@ export function Chat() {
     setIsGenerating(false)
     isGeneratingRef.current = false
     fromVoiceRef.current = false
+    voiceSubmitInFlightRef.current = false
     setFromVoice(false)
   }
 
@@ -436,23 +443,26 @@ export function Chat() {
             // Voice-originated turns always speak via Sua (force), independent of typed-chat autoSpeak
             if (voiceOrigin && spoken) {
               setLastVoiceReply(spoken)
-              void voiceRef.current
-                ?.speak(spoken, { force: true })
-                .then(() => {
+              void (async () => {
+                try {
+                  await voiceRef.current?.speak(spoken, { force: true })
+                  // Only auto-reopen mic after playback fully ends
                   if (voiceChatOpenRef.current && !voiceMutedRef.current) {
                     void voiceRef.current?.toggleListen()
                   }
-                })
-                .catch(() => {
-                  /* playback errors already surfaced via controller onError */
-                })
+                } catch {
+                  /* TTS/playback error already reported via controller; do not reopen mic */
+                }
+              })()
             }
             fromVoiceRef.current = false
+            voiceSubmitInFlightRef.current = false
             setFromVoice(false)
           },
           onError: (_code, message) => {
             sawError = true
             fromVoiceRef.current = false
+            voiceSubmitInFlightRef.current = false
             setFromVoice(false)
             if (flushTimerRef.current) {
               clearTimeout(flushTimerRef.current)

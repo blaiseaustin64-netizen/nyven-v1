@@ -20,7 +20,6 @@ export type VoiceHandlers = {
   onTranscript?: (text: string) => void
   onError?: (message: string) => void
   onListenLevel?: (level: number) => void
-  /** Real playback energy 0–1 while speaking */
   onSpeakEnergy?: (level: number) => void
 }
 
@@ -31,8 +30,9 @@ export class VoiceController {
   private phase: VoicePhase = 'idle'
   private sttAbort: AbortController | null = null
   private ttsAbort: AbortController | null = null
-  /** True while user intentionally started a listen session */
   private listenMode = false
+  private sttInFlight = false
+  private lastTranscriptAt = 0
 
   constructor() {
     this.recorder.setHandlers({
@@ -73,15 +73,10 @@ export class VoiceController {
     this.handlers.onPhase?.(phase, detail)
   }
 
-  /**
-   * Call on user gesture (mic tap) to unlock audio playback on mobile.
-   * Safe no-op if already ready.
-   */
   prepareAudio(): void {
     void this.playback.unlock()
   }
 
-  /** Toggle: start listening or stop & transcribe */
   async toggleListen(): Promise<void> {
     if (this.phase === 'listening') {
       await this.recorder.stop()
@@ -98,9 +93,7 @@ export class VoiceController {
       return
     }
 
-    // Unlock TTS playback from the same user gesture as mic start
     this.prepareAudio()
-
     this.listenMode = true
     this.setPhase('requesting_permission')
     try {
@@ -119,15 +112,30 @@ export class VoiceController {
       this.setPhase('idle')
       return
     }
+    if (this.sttInFlight) {
+      console.warn('[nyven-stt] ignored overlapping STT request')
+      return
+    }
+    this.sttInFlight = true
     this.setPhase('transcribing')
     this.sttAbort = new AbortController()
     try {
+      if (import.meta.env.DEV) {
+        console.info('[nyven-stt] request', { bytes: blob.size, mime: blob.type })
+      }
       const text = await fetchSTT(blob, this.sttAbort.signal)
       if (!text) {
         this.handlers.onError?.('Could not understand the audio. Please try again.')
         this.setPhase('idle')
         return
       }
+      const now = Date.now()
+      if (now - this.lastTranscriptAt < 400) {
+        console.warn('[nyven-stt] suppressed duplicate transcript within 400ms')
+        this.setPhase('idle')
+        return
+      }
+      this.lastTranscriptAt = now
       this.handlers.onTranscript?.(text)
       this.setPhase('idle')
     } catch (err: unknown) {
@@ -140,18 +148,22 @@ export class VoiceController {
       )
       this.setPhase('idle')
     } finally {
+      this.sttInFlight = false
       this.sttAbort = null
     }
   }
 
   /**
-   * Speak final assistant text via existing OpenRouter Sua TTS.
-   * @param opts.force — voice-originated turns: speak even if autoSpeak is off for typed chat
+   * Speak via existing OpenRouter Sua TTS.
+   * Resolves only after successful playback ends.
+   * Rejects on TTS/playback failure so callers (Chat) do not reopen the mic.
+   * @param opts.force — voice conversation: ignore typed-chat autoSpeak/enabled prefs
    */
   async speak(text: string, opts?: { force?: boolean }): Promise<void> {
     const prefs = getVoicePreferences()
-    if (!prefs.enabled) return
-    if (!opts?.force && !prefs.autoSpeak) return
+    if (!opts?.force) {
+      if (!prefs.enabled || !prefs.autoSpeak) return
+    }
     if (!text.trim()) return
 
     this.stopSpeaking()
@@ -159,14 +171,21 @@ export class VoiceController {
     try {
       const blob = await fetchTTS(text, prefs.voiceId, this.ttsAbort.signal)
       await this.playback.play(blob)
+      // play() resolved ⇒ audio actually finished
     } catch (err: unknown) {
-      if ((err as { name?: string })?.name === 'AbortError') return
-      this.handlers.onError?.(
+      if ((err as { name?: string })?.name === 'AbortError') {
+        this.setPhase('idle')
+        // Propagate abort so Chat does not treat it as successful speech
+        throw err
+      }
+      const message =
         err instanceof Error
           ? err.message
           : 'Could not play speech. The text response is still available.'
-      )
+      this.handlers.onError?.(message)
       this.setPhase('idle')
+      // Re-throw so Chat only reopens the mic after real success
+      throw err instanceof Error ? err : new Error(message)
     } finally {
       this.ttsAbort = null
     }
@@ -179,7 +198,6 @@ export class VoiceController {
     if (this.phase === 'speaking') this.setPhase('idle')
   }
 
-  /** Full stop: mic + STT + TTS */
   stopAll(): void {
     this.listenMode = false
     this.sttAbort?.abort()
