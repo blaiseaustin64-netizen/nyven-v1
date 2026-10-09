@@ -16,6 +16,7 @@ import { Agents } from './pages/Agents'
 import { AgentEditor } from './pages/AgentEditor'
 import { Auth } from './pages/Auth'
 import { AuthProvider } from './lib/auth/AuthContext'
+import { ConversationHistoryProvider } from './lib/chat/ConversationHistoryContext'
 
 const INTRO_KEY = 'nyven_intro_seen'
 
@@ -54,6 +55,7 @@ export default function App() {
 
   return (
     <AuthProvider>
+    <ConversationHistoryProvider>
     <div className="h-full flex flex-col lg:flex-row">
       <NyvenBackground />
 
@@ -86,6 +88,7 @@ export default function App() {
         {!hideBottomNav && <MobileBottomNav />}
       </div>
     </div>
+    </ConversationHistoryProvider>
     </AuthProvider>
   )
 }

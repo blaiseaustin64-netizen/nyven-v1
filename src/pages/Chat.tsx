@@ -1,7 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useLocation } from 'react-router-dom'
-import { Plus, History } from 'lucide-react'
-import { ChatHistoryPanel } from '../components/ChatHistoryPanel'
 import { ChatMessage } from '../components/ChatMessage'
 import { MessageComposer, type ComposerSendPayload } from '../components/MessageComposer'
 import { NIdentity } from '../components/NIdentity'
@@ -11,15 +9,13 @@ import { streamCoreChat } from '../lib/core/streamClient'
 import type { ActivityState } from '../lib/core/types'
 import { VoiceController, type VoicePhase } from '../lib/voice/controller'
 import { getVoicePreferences } from '../lib/voice/preferences'
+import { useConversationHistory } from '../lib/chat/ConversationHistoryContext'
 import { useAuth } from '../lib/auth/AuthContext'
 import { getSupabase } from '../lib/supabase/client'
 import {
-  listConversations,
   loadConversationMessages,
   ensureConversation,
   persistMessage,
-  deleteConversation as deleteConversationRemote,
-  newConversationId,
 } from '../lib/chatPersistence'
 import { buildMemoryContext } from '../lib/memoryStore'
 import { recordUsage } from '../lib/usageTracking'
@@ -29,12 +25,20 @@ export function Chat() {
   const location = useLocation()
   const { user } = useAuth()
   const userId = user?.id ?? null
-  const [conversations, setConversations] = useState<Conversation[]>([])
-  const [activeId, setActiveId] = useState<string>(() => newConversationId())
-  const [historyLoading, setHistoryLoading] = useState(false)
+  const {
+    conversations,
+    activeId,
+    setActiveId,
+    startNewChat: contextNewChat,
+    openConversation: contextOpenConversation,
+    deleteConversation: contextDeleteConversation,
+    renameConversation: contextRenameConversation,
+    upsertConversationMeta,
+    refresh: refreshConversations,
+  } = useConversationHistory()
+
   const [messages, setMessages] = useState<Message[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
-  const [historyOpen, setHistoryOpen] = useState(false)
   const [readingMessageId, setReadingMessageId] = useState<string | null>(null)
   const [readAloudLoading, setReadAloudLoading] = useState(false)
   const [voicePhase, setVoicePhase] = useState<VoicePhase>('idle')
@@ -72,19 +76,6 @@ export function Chat() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [])
 
-  useEffect(() => {
-    let cancelled = false
-    setHistoryLoading(true)
-    void listConversations(userId).then((list) => {
-      if (!cancelled) {
-        setConversations(list)
-        setHistoryLoading(false)
-      }
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [userId])
 
   useEffect(() => {
     const vc = new VoiceController()
@@ -130,15 +121,37 @@ export function Chat() {
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Sync messages when sidebar changes active conversation
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      const fromList = conversations.find((c) => c.id === activeId)
+      if (fromList?.messages?.length) {
+        if (!cancelled) setMessages(fromList.messages)
+        return
+      }
+      // Empty new chat id not in list yet
+      if (!fromList) {
+        if (!cancelled) setMessages([])
+        return
+      }
+      const msgs = await loadConversationMessages(userId, activeId)
+      if (!cancelled) setMessages(msgs)
+    })()
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeId, userId])
+
   const startNewChat = () => {
-    setActiveId(newConversationId())
+    contextNewChat()
     setMessages([])
-    setHistoryOpen(false)
   }
 
+
   const openConversation = async (c: Conversation) => {
-    setActiveId(c.id)
-    setHistoryOpen(false)
+    contextOpenConversation(c)
     if (c.messages?.length) {
       setMessages(c.messages)
     } else {
@@ -148,6 +161,7 @@ export function Chat() {
     setTimeout(scrollToBottom, 50)
   }
 
+
   const persistMessages = useCallback(
     (updated: Message[], titleSource?: string) => {
       const titleBase =
@@ -155,24 +169,10 @@ export function Chat() {
       const title =
         titleBase.slice(0, 40) + (titleBase.length > 40 ? '…' : '')
 
-      setConversations((prevConvos) => {
-        const exists = prevConvos.find((c) => c.id === activeId)
-        if (!exists) {
-          return [
-            {
-              id: activeId,
-              title: title || 'Chat',
-              messages: updated,
-              updatedAt: Date.now(),
-            },
-            ...prevConvos,
-          ]
-        }
-        return prevConvos.map((c) =>
-          c.id === activeId
-            ? { ...c, title: title || c.title, messages: updated, updatedAt: Date.now() }
-            : c
-        )
+      upsertConversationMeta(activeId, {
+        title: title || 'Chat',
+        messages: updated,
+        updatedAt: Date.now(),
       })
 
       // Durable write (non-blocking). Streaming UI is already updated.
@@ -583,23 +583,6 @@ export function Chat() {
     void handleSend(lastUser.content)
   }
 
-  const deleteConversation = (id: string) => {
-    void deleteConversationRemote(userId, id)
-    setConversations((prev) => prev.filter((c) => c.id !== id))
-    if (activeId === id) startNewChat()
-  }
-
-  const renameConversation = (id: string, title: string) => {
-    setConversations((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, title, updatedAt: Date.now() } : c))
-    )
-    void (async () => {
-      if (!userId) return
-      const sb = getSupabase()
-      if (!sb) return
-      await sb.from('conversations').update({ title }).eq('id', id).eq('user_id', userId)
-    })()
-  }
 
 
   const stopReadAloud = () => {
@@ -659,68 +642,9 @@ export function Chat() {
 
   return (
     <div className="h-full flex">
-      {/* Desktop history */}
-      <aside className="hidden md:flex shrink-0 h-full">
-        <ChatHistoryPanel
-          variant="desktop"
-          conversations={conversations}
-          activeId={activeId}
-          loading={historyLoading}
-          onNew={startNewChat}
-          onSelect={(c) => void openConversation(c)}
-          onDelete={deleteConversation}
-          onRename={renameConversation}
-        />
-      </aside>
-
-      {/* Mobile history drawer */}
-      {historyOpen && (
-        <div className="md:hidden fixed inset-0 z-40 flex justify-start">
-          <div className="relative h-full z-10">
-            <ChatHistoryPanel
-              variant="mobile"
-              conversations={conversations}
-              activeId={activeId}
-              loading={historyLoading}
-              onNew={startNewChat}
-              onSelect={(c) => void openConversation(c)}
-              onDelete={deleteConversation}
-              onRename={renameConversation}
-              onClose={() => setHistoryOpen(false)}
-            />
-          </div>
-          <button
-            type="button"
-            className="flex-1 bg-black/60 backdrop-blur-sm"
-            aria-label="Close history"
-            onClick={() => setHistoryOpen(false)}
-          />
-        </div>
-      )}
 
       {/* Main chat area */}
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
-        <div className="md:hidden flex items-center justify-between px-3 h-12 border-b border-white/[0.05] shrink-0">
-          <button
-            type="button"
-            onClick={() => setHistoryOpen(true)}
-            className="p-2 -ml-2 rounded-lg text-nyven-text-secondary hover:text-nyven-text min-h-[44px] min-w-[44px] flex items-center justify-center"
-            aria-label="Chat history"
-          >
-            <History size={20} />
-          </button>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={startNewChat}
-              className="p-2 -mr-2 rounded-lg text-nyven-text-secondary hover:text-nyven-text min-h-[44px] min-w-[44px] flex items-center justify-center"
-              aria-label="New chat"
-            >
-              <Plus size={20} />
-            </button>
-          </div>
-        </div>
-
         <div className="flex-1 overflow-y-auto px-3 sm:px-6 py-6">
           <div className="max-w-3xl mx-auto space-y-6">
             {messages.length === 0 && (
