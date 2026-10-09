@@ -1,22 +1,17 @@
 /**
- * Full-screen Voice Chat mode.
- * Reuses VoiceController + existing Core stream path via callbacks.
- * Cleanup on close/unmount: mic, STT, TTS, animation (via LiquidVoice).
+ * Full-screen Voice Chat — focus on liquid visualization + real state.
+ * Minimal chrome while processing/speaking.
  */
 import { useEffect, useCallback } from 'react'
-import { X, Mic, MicOff, Volume2 } from 'lucide-react'
+import { X, Mic, MicOff } from 'lucide-react'
 import clsx from 'clsx'
 import { LiquidVoice, type LiquidMode } from '../LiquidVoice'
 import type { VoicePhase } from '../../lib/voice/controller'
-import { NIdentity } from '../NIdentity'
-
-export type VoiceChatStatus = 'idle' | 'listening' | 'thinking' | 'speaking' | 'error'
 
 type Props = {
   open: boolean
   onClose: () => void
   voicePhase: VoicePhase
-  /** Core stream activity while processing a voice turn */
   isProcessing: boolean
   isSpeaking: boolean
   energy: number
@@ -39,24 +34,16 @@ function mapMode(
   return 'idle'
 }
 
-function statusLabel(
+function statusText(
   phase: VoicePhase,
   isProcessing: boolean,
   isSpeaking: boolean
-): VoiceChatStatus {
-  if (isSpeaking || phase === 'speaking') return 'speaking'
-  if (isProcessing || phase === 'transcribing') return 'thinking'
-  if (phase === 'listening' || phase === 'requesting_permission') return 'listening'
-  if (phase === 'error') return 'error'
-  return 'idle'
-}
-
-const STATUS_TEXT: Record<VoiceChatStatus, string> = {
-  idle: 'Idle',
-  listening: 'Listening',
-  thinking: 'Thinking',
-  speaking: 'Speaking',
-  error: 'Something went wrong',
+): string {
+  if (isSpeaking || phase === 'speaking') return 'Speaking'
+  if (isProcessing || phase === 'transcribing') return 'Thinking'
+  if (phase === 'listening' || phase === 'requesting_permission') return 'Listening'
+  if (phase === 'error') return 'Something went wrong'
+  return 'Idle'
 }
 
 export function VoiceChatScreen({
@@ -74,7 +61,8 @@ export function VoiceChatScreen({
   lastReply,
 }: Props) {
   const mode = mapMode(voicePhase, isProcessing, isSpeaking)
-  const status = statusLabel(voicePhase, isProcessing, isSpeaking)
+  const status = statusText(voicePhase, isProcessing, isSpeaking)
+  const focused = isSpeaking || isProcessing || voicePhase === 'transcribing'
 
   const onKey = useCallback(
     (e: KeyboardEvent) => {
@@ -98,127 +86,100 @@ export function VoiceChatScreen({
 
   return (
     <div
-      className="fixed inset-0 z-[80] flex flex-col bg-[#07090D]"
+      className="fixed inset-0 z-[80] flex flex-col"
+      style={{ background: '#07080d', color: '#e8ecf5' }}
       role="dialog"
       aria-modal="true"
       aria-label="Voice chat"
     >
-      {/* Depth gradient */}
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-            'radial-gradient(ellipse 80% 60% at 50% 40%, rgba(28,34,48,0.9) 0%, rgba(7,9,13,1) 70%)',
-        }}
-      />
-      <div
-        className="pointer-events-none absolute inset-0 opacity-40"
-        style={{
-          background:
-            'radial-gradient(circle at 50% 55%, rgba(98,230,255,0.06) 0%, transparent 45%)',
-        }}
-      />
+      {/* Full-bleed WebGL liquid */}
+      <div className="absolute inset-0">
+        <LiquidVoice
+          mode={mode}
+          energy={muted ? 0 : energy}
+          fill
+        />
+      </div>
 
-      {/* Top bar */}
-      <header className="relative z-10 flex items-center justify-between px-4 sm:px-6 pt-4 sm:pt-5 pb-2">
-        <div className="flex items-center gap-2.5">
-          <NIdentity state="white" size={28} />
-          <span className="font-display text-sm font-medium tracking-wide text-nyven-text">
-            NYVEN Voice
-          </span>
-        </div>
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={onToggleMute}
-            className={clsx(
-              'p-2.5 rounded-xl transition-colors',
-              muted
-                ? 'text-amber-300/90 bg-amber-400/10'
-                : 'text-nyven-text-secondary hover:text-nyven-text hover:bg-white/[0.05]'
-            )}
-            aria-label={muted ? 'Unmute microphone' : 'Mute microphone'}
-            title={muted ? 'Unmute' : 'Mute'}
-          >
-            {muted ? <MicOff size={18} /> : <Mic size={18} />}
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-2.5 rounded-xl text-nyven-text-secondary hover:text-nyven-text hover:bg-white/[0.05] transition-colors"
-            aria-label="Close voice chat"
-          >
-            <X size={18} />
-          </button>
-        </div>
+      {/* Top controls only — no large branding while answering */}
+      <header className="relative z-10 flex items-center justify-end gap-1 px-4 sm:px-5 pt-4 sm:pt-5">
+        <button
+          type="button"
+          onClick={onToggleMute}
+          className={clsx(
+            'p-2.5 rounded-full transition-colors',
+            muted
+              ? 'text-amber-200/90 bg-white/10'
+              : 'text-[#7d869c] hover:text-[#e8ecf5] hover:bg-white/[0.08]'
+          )}
+          aria-label={muted ? 'Unmute' : 'Mute'}
+        >
+          {muted ? <MicOff size={18} /> : <Mic size={18} />}
+        </button>
+        <button
+          type="button"
+          onClick={onClose}
+          className="p-2.5 rounded-full text-[#7d869c] hover:text-[#e8ecf5] hover:bg-white/[0.08] transition-colors"
+          aria-label="Close voice chat"
+        >
+          <X size={18} />
+        </button>
       </header>
 
-      {/* Center visual */}
-      <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 min-h-0">
-        <LiquidVoice mode={mode} energy={muted ? 0 : energy} size={240} className="mb-8" />
-
+      {/* Center: status only */}
+      <div className="relative z-10 flex-1 flex flex-col items-center justify-end pb-4 px-6 pointer-events-none">
         <p
-          className={clsx(
-            'font-display text-lg sm:text-xl tracking-wide mb-2',
-            status === 'listening' && 'text-nyven-cyan',
-            status === 'thinking' && 'text-nyven-text',
-            status === 'speaking' && 'text-nyven-cyan',
-            status === 'idle' && 'text-nyven-text-secondary',
-            status === 'error' && 'text-red-300'
-          )}
+          className="text-[15px] tracking-wide mb-2"
+          style={{ color: focused ? '#e8ecf5' : '#7d869c' }}
           aria-live="polite"
         >
-          {STATUS_TEXT[status]}
+          {status}
         </p>
         {statusHint && (
-          <p className="text-xs text-nyven-text-secondary/80 text-center max-w-sm">{statusHint}</p>
-        )}
-        {!statusHint && status === 'idle' && (
-          <p className="text-xs text-nyven-text-secondary/70 text-center max-w-sm">
-            Tap the mic below to speak. NYVEN will listen, think, and reply aloud.
+          <p className="text-xs text-center max-w-sm mb-2" style={{ color: '#7d869c' }}>
+            {statusHint}
           </p>
         )}
-
-        {(lastTranscript || lastReply) && (
-          <div className="mt-8 w-full max-w-md space-y-3 text-sm">
+        {!focused && (lastTranscript || lastReply) && (
+          <div className="pointer-events-auto w-full max-w-md space-y-2 mt-4 text-sm">
             {lastTranscript && (
-              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] px-4 py-3 text-nyven-text-secondary">
-                <span className="text-[10px] uppercase tracking-wider text-nyven-text-secondary/60">
+              <div className="rounded-2xl bg-white/[0.06] backdrop-blur-md px-4 py-3">
+                <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: '#7d869c' }}>
                   You
-                </span>
-                <p className="mt-1 text-nyven-text leading-relaxed">{lastTranscript}</p>
+                </p>
+                <p className="leading-relaxed line-clamp-3">{lastTranscript}</p>
               </div>
             )}
             {lastReply && (
-              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] px-4 py-3 text-nyven-text-secondary">
-                <span className="text-[10px] uppercase tracking-wider text-nyven-text-secondary/60 inline-flex items-center gap-1">
-                  <Volume2 size={10} /> NYVEN
-                </span>
-                <p className="mt-1 text-nyven-text leading-relaxed line-clamp-6">{lastReply}</p>
+              <div className="rounded-2xl bg-white/[0.06] backdrop-blur-md px-4 py-3">
+                <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: '#7d869c' }}>
+                  NYVEN
+                </p>
+                <p className="leading-relaxed line-clamp-4">{lastReply}</p>
               </div>
             )}
           </div>
         )}
       </div>
 
-      {/* Bottom control */}
-      <div className="relative z-10 flex flex-col items-center pb-10 pt-4 px-6">
+      {/* Bottom mic */}
+      <div className="relative z-10 flex flex-col items-center pb-10 pt-2 px-6">
         <button
           type="button"
           onClick={onToggleListen}
           disabled={muted || isProcessing || isSpeaking}
           className={clsx(
-            'h-16 w-16 rounded-full flex items-center justify-center transition-all duration-200',
+            'h-14 w-14 rounded-full flex items-center justify-center transition-all duration-200',
             voicePhase === 'listening'
-              ? 'bg-nyven-cyan text-nyven-bg shadow-[0_0_32px_rgba(98,230,255,0.25)]'
-              : 'bg-white/[0.06] text-nyven-text border border-white/[0.08] hover:bg-white/[0.1]',
+              ? 'bg-white/20 text-[#e8ecf5]'
+              : 'bg-white/[0.08] text-[#7d869c] hover:text-[#e8ecf5] hover:bg-white/[0.12]',
             (muted || isProcessing || isSpeaking) && 'opacity-40 cursor-not-allowed'
           )}
           aria-label={voicePhase === 'listening' ? 'Stop listening' : 'Start listening'}
         >
-          <Mic size={24} />
+          <Mic size={22} />
         </button>
-        <p className="mt-3 text-[11px] text-nyven-text-secondary/60">
+        <p className="mt-3 text-[12px]" style={{ color: '#7d869c' }}>
           {voicePhase === 'listening' ? 'Tap to finish' : 'Tap to speak'}
         </p>
       </div>

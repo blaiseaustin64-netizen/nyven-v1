@@ -50,6 +50,7 @@ import {
 import { KnowledgePanel } from '../components/agents/KnowledgePanel'
 import { ConversationsPanel } from '../components/agents/ConversationsPanel'
 import { DomainsPanel } from '../components/agents/DomainsPanel'
+import { AgentInstallWizard } from '../components/agents/AgentInstallWizard'
 import { AnalyticsPanel } from '../components/agents/AnalyticsPanel'
 import { SkillsGuardrailsPanel } from '../components/agents/SkillsGuardrailsPanel'
 import { ConnectionsPanel } from '../components/agents/ConnectionsPanel'
@@ -1197,74 +1198,34 @@ export function AgentEditor() {
             <div>
               <h2 className="font-display text-lg font-medium">Install on your website</h2>
               <p className="text-sm text-nyven-text-secondary mt-1 leading-relaxed">
-                Add this script to any page. Only the public agent id is exposed — never API
-                keys. Save the agent as Active so the widget can load its configuration.
+                Guided setup for this agent. Manual script install is available under Advanced
+                when you need it.
               </p>
             </div>
 
             {!savedInstance ? (
               <div className="p-5 rounded-2xl border border-dashed border-white/[0.1] text-center text-sm text-nyven-text-secondary">
-                Create and save the agent first to get an install snippet.
+                Create and save the agent first to install it on a website.
               </div>
             ) : (
-              <>
-                <Section title="Installation snippet">
-                  <pre className="text-xs sm:text-sm bg-nyven-bg border border-white/[0.08] rounded-xl p-4 overflow-x-auto text-nyven-text-secondary leading-relaxed whitespace-pre-wrap">
-                    {embedCode}
-                  </pre>
-                  <button
-                    type="button"
-                    onClick={copyEmbed}
-                    className="mt-3 inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-nyven-cyan text-nyven-bg text-sm font-medium hover:bg-nyven-cyan/90"
-                  >
-                    {copied ? <Check size={14} /> : <Copy size={14} />}
-                    {copied ? 'Copied' : 'Copy code'}
-                  </button>
-                  <p className="text-xs text-nyven-text-secondary mt-3">
-                    Agent id: <code className="text-nyven-cyan/80">{savedInstance.id}</code>
-                    {form.status !== 'active' && (
-                      <span className="block mt-1 text-amber-400/90">
-                        Status is {form.status}. Set to Active and Save so the live widget can
-                        accept messages.
-                      </span>
-                    )}
-                  </p>
-                </Section>
-
-                <Section title="Where to paste it">
-                  <ul className="space-y-3 text-sm text-nyven-text-secondary">
-                    <li>
-                      <strong className="text-nyven-text">HTML</strong> — before{' '}
-                      <code className="text-xs">&lt;/body&gt;</code> on pages that should show
-                      the chat bubble.
-                    </li>
-                    <li>
-                      <strong className="text-nyven-text">React / Vite</strong> — add the
-                      script in <code className="text-xs">index.html</code>, or inject once in
-                      a layout effect.
-                    </li>
-                    <li>
-                      <strong className="text-nyven-text">WordPress / builders</strong> — use a
-                      custom HTML / footer script block with the same snippet.
-                    </li>
-                  </ul>
-                  <p className="text-xs text-nyven-text-secondary/70 mt-4">
-                    Copying the code does not mean the agent is deployed. Visitors only get
-                    responses after the agent is saved, published, and Active.
-                  </p>
-                </Section>
-
-                <Section title="Security notes">
-                  <ul className="text-sm text-nyven-text-secondary space-y-2 list-disc pl-4">
-                    <li>The widget never receives Google or OpenRouter keys.</li>
-                    <li>All model calls go through the NYVEN backend.</li>
-                    <li>
-                      Domain allowlists and plan-based rate limits tighten in a later phase;
-                      basic per-session limits already apply.
-                    </li>
-                  </ul>
-                </Section>
-              </>
+              <AgentInstallWizard
+                agent={savedInstance}
+                widgetOrigin={widgetOrigin}
+                embedCode={embedCode}
+                onCopyEmbed={copyEmbed}
+                copied={copied}
+                onPublish={async () => {
+                  const { listActiveAllowlist } = await import('../lib/domainStore')
+                  const { publishAgentConfig } = await import('../lib/agentStore')
+                  const { toPublishedKnowledge } = await import('../lib/knowledgeStore')
+                  const res = await publishAgentConfig(
+                    savedInstance,
+                    toPublishedKnowledge(savedInstance.id),
+                    { allowedDomains: listActiveAllowlist(savedInstance.id) }
+                  )
+                  return res.success
+                }}
+              />
             )}
           </div>
         )}

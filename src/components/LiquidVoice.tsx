@@ -1,7 +1,7 @@
 /**
- * NYVEN Liquid Voice — signature canvas visualization.
- * Real energy from mic/TTS analysers when available; procedural idle/thinking otherwise.
- * States: idle | listening | thinking | speaking
+ * NYVEN Liquid Voice — WebGL fragment-shader waves.
+ * Visual source of truth: the confirmed working prototype (palette + math preserved).
+ * React lifecycle: resize, rAF, mic analyser optional (external energy), full cleanup.
  */
 import { useEffect, useRef } from 'react'
 import clsx from 'clsx'
@@ -10,32 +10,91 @@ export type LiquidMode = 'idle' | 'listening' | 'thinking' | 'speaking'
 
 type Props = {
   mode: LiquidMode
-  /** 0–1 from analyser; ignored for pure procedural modes */
+  /** 0–1 from mic/TTS analyser when available */
   energy?: number
   className?: string
-  /** CSS pixel size (canvas is DPR-scaled) */
+  /** When true, canvas fills parent (Voice Chat). When false, uses size. */
+  fill?: boolean
   size?: number
-  /** Prefer reduced motion */
   reducedMotion?: boolean
 }
 
-function lerp(a: number, b: number, t: number) {
-  return a + (b - a) * t
+const VS = 'attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}'
+
+const FS = `precision highp float;
+uniform vec2 R;uniform float T,L,K;uniform vec3 A,B;
+float wv(float x,float t,float s){
+ return sin(x*s+t*1.1)*.5+sin(x*1.7*s-t*.8+1.7)*.3+sin(x*2.9*s+t*1.5+4.)*.2;
+}
+void main(){
+ vec2 uv=gl_FragCoord.xy/R;
+ float x=(uv.x-.5)*3.2;
+ vec3 col=mix(vec3(.015,.02,.04),vec3(.045,.05,.1),uv.y);
+ float e=1.5/R.y;
+ float env=.55+.45*cos((uv.x-.5)*3.1416);
+ for(int i=0;i<5;i++){
+  float fi=float(i);
+  float amp=(.018+.15*L)*(1.-fi*.12)*env;
+  float spd=T*(.7+.25*K+fi*.1)+fi*1.9;
+  float y=.5+L*.06-fi*.012+wv(x,spd,1.6+fi*.22)*amp;
+  float m=smoothstep(y+e,y-e,uv.y);
+  vec3 c=mix(A,B,clamp(fi/4.+x*.18+.1,0.,1.));
+  c*=mix(1.,.35,clamp((y-uv.y)*1.7,0.,1.));
+  float crest=exp(-abs(uv.y-y)*70.);
+  col=mix(col,c,m*.78);
+  col+=min(c*1.4,1.)*crest*.35;
+ }
+ gl_FragColor=vec4(col,1.);
+}`
+
+/** Prototype palettes — do not remap to UI cyan for consistency */
+const PALETTES: Record<'idle' | 'speak' | 'listen', [[number, number, number], [number, number, number]]> = {
+  idle: [
+    [0.08, 0.35, 1.0],
+    [0.7, 0.12, 0.95],
+  ],
+  speak: [
+    [0.0, 0.85, 0.9],
+    [0.85, 0.15, 1.0],
+  ],
+  listen: [
+    [1.0, 0.2, 0.4],
+    [1.0, 0.7, 0.05],
+  ],
+}
+
+function modeKey(mode: LiquidMode): 'idle' | 'speak' | 'listen' {
+  if (mode === 'listening') return 'listen'
+  if (mode === 'speaking') return 'speak'
+  // thinking uses speak palette with lower energy (handled in loop)
+  if (mode === 'thinking') return 'speak'
+  return 'idle'
+}
+
+function compile(gl: WebGLRenderingContext, type: number, src: string) {
+  const s = gl.createShader(type)
+  if (!s) return null
+  gl.shaderSource(s, src)
+  gl.compileShader(s)
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+    console.warn('LiquidVoice shader', gl.getShaderInfoLog(s))
+    gl.deleteShader(s)
+    return null
+  }
+  return s
 }
 
 export function LiquidVoice({
   mode,
   energy = 0,
   className,
+  fill = false,
   size = 220,
   reducedMotion = false,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const modeRef = useRef(mode)
   const energyRef = useRef(energy)
-  const smoothE = useRef(0.06)
-  const targetE = useRef(0.06)
-  const phase = useRef(0)
   const reducedRef = useRef(reducedMotion)
 
   modeRef.current = mode
@@ -58,142 +117,136 @@ export function LiquidVoice({
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
-    const ctx = canvas.getContext('2d', { alpha: true })
-    if (!ctx) return
+    const gl = canvas.getContext('webgl', {
+      alpha: false,
+      antialias: false,
+      powerPreference: 'high-performance',
+    })
+    if (!gl) {
+      console.warn('LiquidVoice: WebGL unavailable')
+      return
+    }
 
-    const dpr = Math.min(typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1, 2)
-    let cssSize = size
+    const vs = compile(gl, gl.VERTEX_SHADER, VS)
+    const fs = compile(gl, gl.FRAGMENT_SHADER, FS)
+    if (!vs || !fs) return
+
+    const prog = gl.createProgram()
+    if (!prog) return
+    gl.attachShader(prog, vs)
+    gl.attachShader(prog, fs)
+    gl.linkProgram(prog)
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+      console.warn('LiquidVoice link', gl.getProgramInfoLog(prog))
+      return
+    }
+    gl.useProgram(prog)
+
+    const buf = gl.createBuffer()
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf)
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW)
+    const loc = gl.getAttribLocation(prog, 'p')
+    gl.enableVertexAttribArray(loc)
+    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0)
+
+    const U = (n: string) => gl.getUniformLocation(prog, n)
+    const uR = U('R')
+    const uT = U('T')
+    const uL = U('L')
+    const uK = U('K')
+    const uA = U('A')
+    const uB = U('B')
+
+    let level = 0
+    let target = 0
+    let kick = 0
+    const cA = [...PALETTES.idle[0]]
+    const cB = [...PALETTES.idle[1]]
+    const t0 = performance.now()
+    let raf = 0
+    let alive = true
+
     const resize = () => {
-      cssSize = size
-      canvas.width = Math.floor(cssSize * dpr)
-      canvas.height = Math.floor(cssSize * dpr)
-      canvas.style.width = `${cssSize}px`
-      canvas.style.height = `${cssSize}px`
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+      const dpr = Math.min(window.devicePixelRatio || 1, 2)
+      let w: number
+      let h: number
+      if (fill) {
+        const parent = canvas.parentElement
+        w = parent?.clientWidth || window.innerWidth
+        h = parent?.clientHeight || window.innerHeight
+      } else {
+        w = size
+        h = size
+      }
+      canvas.width = Math.max(1, Math.floor(w * dpr))
+      canvas.height = Math.max(1, Math.floor(h * dpr))
+      canvas.style.width = `${w}px`
+      canvas.style.height = `${h}px`
+      gl.viewport(0, 0, canvas.width, canvas.height)
     }
     resize()
+    window.addEventListener('resize', resize)
 
-    let raf = 0
-    let last = performance.now()
-
-    const drawBlob = (
-      cx: number,
-      cy: number,
-      baseR: number,
-      layers: number,
-      e: number,
-      t: number,
-      swirl: number
-    ) => {
-      for (let L = 0; L < layers; L++) {
-        const depth = L / Math.max(1, layers - 1)
-        const radius = baseR * (0.55 + depth * 0.5) * (0.92 + e * 0.28)
-        const wobble = baseR * (0.03 + e * 0.14) * (1 - depth * 0.35)
-        const steps = reducedRef.current ? 36 : 64
-        ctx.beginPath()
-        for (let i = 0; i <= steps; i++) {
-          const ang = (i / steps) * Math.PI * 2
-          const n1 = Math.sin(ang * 3 + t * (0.7 + L * 0.15) + swirl)
-          const n2 = Math.sin(ang * 5 - t * 1.1 + L * 1.7 + swirl * 0.5)
-          const n3 = Math.cos(ang * 2 + t * 0.4 + depth * 2)
-          const deform = n1 * 0.55 + n2 * 0.3 + n3 * 0.2
-          const r = radius + deform * wobble
-          const x = cx + Math.cos(ang) * r
-          const y = cy + Math.sin(ang) * r
-          if (i === 0) ctx.moveTo(x, y)
-          else ctx.lineTo(x, y)
-        }
-        ctx.closePath()
-
-        // Graphite → cyan/violet by depth & energy
-        const alpha = 0.12 + (1 - depth) * 0.22 + e * 0.12
-        if (L === layers - 1) {
-          const g = ctx.createRadialGradient(cx, cy, radius * 0.1, cx, cy, radius * 1.15)
-          g.addColorStop(0, `rgba(98, 230, 255, ${0.18 + e * 0.25})`)
-          g.addColorStop(0.45, `rgba(139, 124, 255, ${0.1 + e * 0.12})`)
-          g.addColorStop(1, `rgba(17, 23, 34, 0)`)
-          ctx.fillStyle = g
-        } else {
-          ctx.fillStyle = `rgba(${28 + depth * 12}, ${34 + depth * 10}, ${48 + depth * 8}, ${alpha})`
-        }
-        ctx.fill()
-
-        // Soft stroke on outer layer
-        if (L === layers - 1) {
-          ctx.strokeStyle = `rgba(98, 230, 255, ${0.15 + e * 0.35})`
-          ctx.lineWidth = 1.25
-          ctx.stroke()
-        }
-      }
+    /** Procedural speaking envelope when no analyser energy */
+    const simVoice = (t: number) => {
+      const syl = Math.max(0, Math.sin(t * 5.3) * Math.sin(t * 1.7 + 1)) * 0.8
+      const word = 0.5 + 0.5 * Math.sin(t * 0.9)
+      return Math.min(1, syl * word + 0.12 * Math.sin(t * 13) * word)
     }
 
     const frame = (now: number) => {
-      const dt = Math.min(0.05, (now - last) / 1000)
-      last = now
-      phase.current += dt
-
+      if (!alive) return
+      const t = (now - t0) / 1000
       const m = modeRef.current
       const raw = Math.max(0, Math.min(1, energyRef.current))
-      if (m === 'idle') targetE.current = 0.05 + Math.sin(phase.current * 0.6) * 0.015
-      else if (m === 'thinking') targetE.current = 0.14 + Math.sin(phase.current * 1.1) * 0.04
-      else if (m === 'listening') targetE.current = 0.12 + raw * 0.55
-      else targetE.current = 0.18 + raw * 0.7 // speaking
+      const reduce = reducedRef.current
 
-      const ease = reducedRef.current ? 0.2 : 0.1
-      smoothE.current = lerp(smoothE.current, targetE.current, 1 - Math.pow(1 - ease, dt * 60))
-      const e = smoothE.current
-      const t = phase.current
+      if (m === 'idle') target = 0.06 + 0.04 * Math.sin(t * 1.1)
+      else if (m === 'thinking') target = 0.1 + 0.05 * Math.sin(t * 0.9)
+      else if (m === 'speaking') target = raw > 0.02 ? raw : simVoice(t)
+      else target = raw > 0.02 ? raw : simVoice(t) * 0.8 // listening fallback
 
-      ctx.clearRect(0, 0, cssSize, cssSize)
-      const cx = cssSize / 2
-      const cy = cssSize / 2
+      if (reduce) target *= 0.4
 
-      // Ambient glow disc
-      const glow = ctx.createRadialGradient(cx, cy, cssSize * 0.05, cx, cy, cssSize * 0.48)
-      glow.addColorStop(0, `rgba(28, 34, 48, ${0.85 + e * 0.1})`)
-      glow.addColorStop(0.55, `rgba(12, 16, 24, 0.75)`)
-      glow.addColorStop(1, 'rgba(7, 9, 13, 0)')
-      ctx.fillStyle = glow
-      ctx.beginPath()
-      ctx.arc(cx, cy, cssSize * 0.48, 0, Math.PI * 2)
-      ctx.fill()
+      const rate = target > level ? 0.22 : 0.07
+      level += (target - level) * rate
+      kick += ((m === 'idle' ? 0 : 1) - kick) * 0.04
 
-      const swirl =
-        m === 'thinking'
-          ? t * 0.55
-          : m === 'speaking'
-            ? t * 0.9
-            : m === 'listening'
-              ? t * 0.35
-              : t * 0.12
+      const p = PALETTES[modeKey(m)]
+      for (let i = 0; i < 3; i++) {
+        cA[i] += (p[0][i] - cA[i]) * 0.05
+        cB[i] += (p[1][i] - cB[i]) * 0.05
+      }
 
-      const layers = reducedRef.current ? 3 : 5
-      drawBlob(cx, cy, cssSize * 0.32, layers, e, t, swirl)
-
-      // Inner core
-      const coreR = cssSize * (0.06 + e * 0.05)
-      const core = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR * 2)
-      core.addColorStop(0, `rgba(98, 230, 255, ${0.35 + e * 0.4})`)
-      core.addColorStop(0.6, `rgba(139, 124, 255, ${0.12 + e * 0.15})`)
-      core.addColorStop(1, 'rgba(7, 9, 13, 0)')
-      ctx.fillStyle = core
-      ctx.beginPath()
-      ctx.arc(cx, cy, coreR * 2, 0, Math.PI * 2)
-      ctx.fill()
+      gl.uniform2f(uR, canvas.width, canvas.height)
+      gl.uniform1f(uT, t * (reduce ? 0.3 : 1))
+      gl.uniform1f(uL, level)
+      gl.uniform1f(uK, kick)
+      gl.uniform3f(uA, cA[0], cA[1], cA[2])
+      gl.uniform3f(uB, cB[0], cB[1], cB[2])
+      gl.drawArrays(gl.TRIANGLES, 0, 3)
 
       raf = requestAnimationFrame(frame)
     }
-
     raf = requestAnimationFrame(frame)
-    return () => cancelAnimationFrame(raf)
-  }, [size])
+
+    return () => {
+      alive = false
+      cancelAnimationFrame(raf)
+      window.removeEventListener('resize', resize)
+      gl.deleteBuffer(buf)
+      gl.deleteShader(vs)
+      gl.deleteShader(fs)
+      gl.deleteProgram(prog)
+      const ext = gl.getExtension('WEBGL_lose_context')
+      ext?.loseContext()
+    }
+  }, [fill, size])
 
   return (
     <canvas
       ref={canvasRef}
-      className={clsx('block', className)}
-      width={size}
-      height={size}
+      className={clsx(fill ? 'absolute inset-0 w-full h-full' : 'block', className)}
       aria-hidden
     />
   )
