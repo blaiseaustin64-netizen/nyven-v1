@@ -11,7 +11,6 @@ import type { Message, Conversation } from '../lib/types'
 import { streamCoreChat } from '../lib/core/streamClient'
 import type { ActivityState } from '../lib/core/types'
 import { VoiceController, type VoicePhase } from '../lib/voice/controller'
-import { LiquidVoice } from '../components/LiquidVoice'
 import { getVoicePreferences } from '../lib/voice/preferences'
 import { useAuth } from '../lib/auth/AuthContext'
 import { getSupabase } from '../lib/supabase/client'
@@ -687,34 +686,9 @@ export function Chat() {
           </div>
         </div>
 
-        {/* Dictation-only compact indicator (hidden when full Voice Chat is open) */}
-        {!voiceChatOpen &&
-          (voicePhase === 'listening' ||
-            voicePhase === 'speaking' ||
-            voicePhase === 'transcribing') && (
-            <div className="flex flex-col items-center gap-1 py-2 border-t border-white/[0.04]">
-              <LiquidVoice
-                mode={
-                  voicePhase === 'speaking'
-                    ? 'speaking'
-                    : voicePhase === 'listening'
-                      ? 'listening'
-                      : voicePhase === 'transcribing'
-                        ? 'thinking'
-                        : 'idle'
-                }
-                energy={voiceEnergy}
-                size={56}
-              />
-              <span className="text-[11px] text-nyven-text-secondary">
-                {voicePhase === 'listening' && 'Listening — tap mic to send'}
-                {voicePhase === 'transcribing' && 'Transcribing…'}
-                {voicePhase === 'speaking' && 'Speaking'}
-              </span>
-            </div>
-          )}
-        {voiceError && (
-          <p className="text-center text-xs text-red-300 px-4 py-1">{voiceError}</p>
+        {/* Dictation wave lives on the composer mic (MicWaveCircle). Full Liquid Voice is Voice Chat only. */}
+        {voiceError && !voiceChatOpen && (
+          <p className="text-center text-xs text-red-300 px-4 py-1 max-w-xl mx-auto">{voiceError}</p>
         )}
         <MessageComposer
           onSend={handleSend}

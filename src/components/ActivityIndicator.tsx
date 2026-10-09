@@ -1,9 +1,7 @@
 /**
- * Single premium activity indicator for in-flight NYVEN responses.
- * Driven only by real ActivityState from the stream — no fake timers.
- * Exactly one instance should render per streaming message.
+ * Claude-style shimmer activity label — driven by real ActivityState only.
+ * Exactly one instance per in-flight response; no fake timers.
  */
-import { useEffect, useState } from 'react'
 import clsx from 'clsx'
 import type { ActivityState } from '../lib/core/types'
 
@@ -25,52 +23,43 @@ type Props = {
 }
 
 export function ActivityIndicator({ state, detail, className }: Props) {
-  const [pulse, setPulse] = useState(0)
-
-  useEffect(() => {
-    if (!state || state === 'completed' || state === 'error' || state === 'idle') return
-    let raf = 0
-    let t0 = performance.now()
-    const loop = (t: number) => {
-      setPulse(((t - t0) / 1000) % 1)
-      raf = requestAnimationFrame(loop)
-    }
-    raf = requestAnimationFrame(loop)
-    return () => cancelAnimationFrame(raf)
-  }, [state])
-
   if (!state || state === 'completed' || state === 'error' || state === 'idle') return null
 
   const label = detail?.trim() || LABELS[state] || 'Working'
 
   return (
     <div
-      className={clsx(
-        'inline-flex items-center gap-2.5 text-[14px] text-nyven-text-secondary select-none',
-        className
-      )}
+      className={clsx('select-none', className)}
       role="status"
       aria-live="polite"
       aria-label={label}
     >
-      <span className="relative flex h-4 w-4 items-center justify-center" aria-hidden>
-        {[0, 1, 2].map((i) => {
-          const phase = (pulse + i * 0.22) % 1
-          const opacity = 0.25 + 0.55 * Math.sin(phase * Math.PI)
-          const scale = 0.55 + 0.45 * Math.sin(phase * Math.PI)
-          return (
-            <span
-              key={i}
-              className="absolute h-1.5 w-1.5 rounded-full bg-nyven-cyan"
-              style={{
-                transform: `translateX(${(i - 1) * 5}px) scale(${scale})`,
-                opacity,
-              }}
-            />
-          )
-        })}
-      </span>
-      <span className="tracking-wide">{label}</span>
+      <style>{`
+        @keyframes nyven-shimmer-sweep {
+          from { background-position: 120% 0; }
+          to { background-position: -100% 0; }
+        }
+        .nyven-shimmer {
+          background: linear-gradient(90deg, #5d667d 0%, #e8ecf5 45%, #5d667d 90%);
+          background-size: 220% 100%;
+          -webkit-background-clip: text;
+          background-clip: text;
+          color: transparent;
+          animation: nyven-shimmer-sweep 1.8s linear infinite;
+          font-size: 15px;
+          letter-spacing: 0.01em;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .nyven-shimmer {
+            animation: none;
+            color: #7d869c;
+            background: none;
+            -webkit-background-clip: unset;
+            background-clip: unset;
+          }
+        }
+      `}</style>
+      <span className="nyven-shimmer">{label}</span>
     </div>
   )
 }

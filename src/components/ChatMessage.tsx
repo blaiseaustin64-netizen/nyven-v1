@@ -10,8 +10,8 @@ import {
   FileText,
   Image as ImageIcon,
 } from 'lucide-react'
-import { NIdentity, type NState } from './NIdentity'
 import { ActivityIndicator } from './ActivityIndicator'
+import { StreamingRevealText } from './StreamingRevealText'
 import type { Message } from '../lib/types'
 import type { ActivityState } from '../lib/core/types'
 
@@ -29,33 +29,7 @@ interface ChatMessageProps {
   ) => void
 }
 
-function nStateFor(message: Message): NState {
-  if (message.activityState) {
-    const s = message.activityState as ActivityState
-    if (
-      s === 'thinking' ||
-      s === 'generating' ||
-      s === 'planning' ||
-      s === 'searching' ||
-      s === 'reading' ||
-      s === 'analyzing' ||
-      s === 'executing' ||
-      s === 'speaking' ||
-      s === 'listening' ||
-      s === 'waiting_for_approval' ||
-      s === 'completed' ||
-      s === 'error' ||
-      s === 'idle'
-    ) {
-      return s
-    }
-  }
-  if (message.isThinking || message.isStreaming)
-    return message.isStreaming ? 'generating' : 'thinking'
-  return 'white'
-}
-
-/** Single activity line — only when no content yet */
+/** Single activity line — only when no content yet (no logo / N branding) */
 function shouldShowActivity(message: Message): boolean {
   if (message.content) return false
   if (!message.isThinking && !message.isStreaming) return false
@@ -75,10 +49,8 @@ export function ChatMessage({
 }: ChatMessageProps) {
   const [copied, setCopied] = useState(false)
   const [feedback, setFeedback] = useState<'positive' | 'negative' | null>(null)
-  const [feedbackNote, setFeedbackNote] = useState<string | null>(null)
   const isUser = message.role === 'user'
   const active = Boolean(message.isThinking || message.isStreaming)
-  const nState = nStateFor(message)
   const showActivity = shouldShowActivity(message)
 
   const handleCopy = async () => {
@@ -128,40 +100,26 @@ export function ChatMessage({
     )
   }
 
+  // Assistant — no N logo / NYVEN heading during thinking
   return (
-    <div className="flex gap-3 sm:gap-4 group">
-      <div className="shrink-0 mt-0.5">
-        <NIdentity
-          state={nState}
-          size={32}
-          animated={active || nState === 'thinking' || nState === 'generating'}
-        />
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1.5">
-          <span className="font-display font-medium text-sm text-nyven-text">NYVEN</span>
-          {message.isStreaming && message.content && (
-            <span
-              className="inline-block w-1.5 h-1.5 rounded-full bg-nyven-cyan animate-pulse"
-              aria-hidden
-            />
-          )}
-        </div>
-
-        {/* Exactly one activity indicator — only before first token */}
+    <div className="group pl-0.5">
+      <div className="min-w-0 max-w-3xl">
         {showActivity ? (
           <ActivityIndicator
             state={message.activityState as ActivityState}
-            detail={message.toolSummary || message.activityDetail}
+            detail={
+              // Prefer short label over long tool dumps for shimmer
+              message.activityDetail && message.activityDetail.length < 48
+                ? message.activityDetail
+                : undefined
+            }
           />
-        ) : (
-          <div className="text-[15px] leading-relaxed text-nyven-text whitespace-pre-wrap">
-            {message.content}
-            {message.isStreaming && (
-              <span className="inline-block w-[2px] h-[1em] ml-0.5 align-text-bottom bg-nyven-cyan/80 animate-pulse" />
-            )}
-          </div>
-        )}
+        ) : message.content ? (
+          <StreamingRevealText
+            content={message.content}
+            isStreaming={Boolean(message.isStreaming)}
+          />
+        ) : null}
 
         {!active && message.content && (
           <div className="flex flex-wrap items-center gap-0.5 mt-2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
@@ -199,7 +157,6 @@ export function ChatMessage({
                   type="button"
                   onClick={() => {
                     setFeedback('positive')
-                    setFeedbackNote(null)
                     onFeedback(message.id, 'positive')
                   }}
                   className={`p-1.5 rounded-lg hover:bg-white/[0.05] ${
@@ -222,9 +179,6 @@ export function ChatMessage({
                 >
                   <ThumbsDown size={14} />
                 </button>
-                {feedbackNote && (
-                  <span className="text-[11px] text-nyven-text-secondary ml-1">{feedbackNote}</span>
-                )}
               </>
             )}
           </div>

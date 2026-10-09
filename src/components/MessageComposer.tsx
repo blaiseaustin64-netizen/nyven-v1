@@ -11,6 +11,7 @@ import {
   Loader2,
   AudioLines,
 } from 'lucide-react'
+import { MicWaveCircle } from './MicWaveCircle'
 import clsx from 'clsx'
 import { ATTACHMENT_LIMITS, extensionOf, ALLOWED_EXTENSIONS, kindForMime } from '../lib/attachments/limits'
 import type { PendingAttachment, AttachmentPayload } from '../lib/attachments/types'
@@ -63,6 +64,7 @@ export function MessageComposer({
   autoFocus = false,
   onVoiceToggle,
   voicePhase = 'idle',
+  voiceEnergy = 0,
   onOpenVoiceChat,
 }: MessageComposerProps) {
   const [value, setValue] = useState('')
@@ -471,39 +473,52 @@ export function MessageComposer({
           />
 
           <div className="flex items-center gap-0.5 shrink-0">
-            {/* Dictation mic */}
-            <button
-              type="button"
-              onClick={onVoiceToggle}
-              disabled={!onVoiceToggle || isGenerating}
-              className={clsx(
-                'p-2 rounded-xl transition-colors',
-                voicePhase === 'listening' && 'text-nyven-cyan bg-nyven-cyan/10',
-                voicePhase === 'speaking' && 'text-nyven-cyan bg-nyven-cyan/10',
-                voicePhase === 'transcribing' && 'text-nyven-text-secondary',
-                (voicePhase === 'idle' ||
-                  voicePhase === 'error' ||
-                  voicePhase === 'requesting_permission') &&
-                  'text-nyven-text-secondary hover:text-nyven-text hover:bg-white/[0.05]',
-                (!onVoiceToggle || isGenerating) && 'opacity-40 cursor-not-allowed'
-              )}
-              aria-label={
-                voicePhase === 'listening'
-                  ? 'Stop listening'
-                  : voicePhase === 'speaking'
+            {/* Dictation mic — circular wave when listening (not full Liquid Voice) */}
+            {voicePhase === 'listening' ? (
+              <MicWaveCircle
+                active
+                energy={voiceEnergy}
+                size={40}
+                onClick={onVoiceToggle}
+                label="Stop listening"
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={onVoiceToggle}
+                disabled={!onVoiceToggle || isGenerating}
+                className={clsx(
+                  'p-2 rounded-xl transition-colors',
+                  voicePhase === 'speaking' && 'text-nyven-cyan bg-nyven-cyan/10',
+                  voicePhase === 'transcribing' && 'text-nyven-text-secondary',
+                  (voicePhase === 'idle' ||
+                    voicePhase === 'error' ||
+                    voicePhase === 'requesting_permission') &&
+                    'text-nyven-text-secondary hover:text-nyven-text hover:bg-white/[0.05]',
+                  (!onVoiceToggle || isGenerating) && 'opacity-40 cursor-not-allowed'
+                )}
+                aria-label={
+                  voicePhase === 'speaking'
                     ? 'Stop speaking'
-                    : 'Dictate'
-              }
-              title={
-                voicePhase === 'listening'
-                  ? 'Tap to send dictation'
-                  : voicePhase === 'speaking'
+                    : voicePhase === 'transcribing'
+                      ? 'Transcribing'
+                      : 'Dictate'
+                }
+                title={
+                  voicePhase === 'speaking'
                     ? 'Stop speaking'
-                    : 'Dictate into chat'
-              }
-            >
-              <Mic size={18} />
-            </button>
+                    : voicePhase === 'transcribing'
+                      ? 'Transcribing…'
+                      : 'Dictate into chat'
+                }
+              >
+                {voicePhase === 'transcribing' ? (
+                  <Loader2 size={18} className="animate-spin" />
+                ) : (
+                  <Mic size={18} />
+                )}
+              </button>
+            )}
 
             {/* Full-screen Voice Chat */}
             <button
