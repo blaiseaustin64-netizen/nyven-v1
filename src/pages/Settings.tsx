@@ -9,6 +9,7 @@ import {
   Link2,
   BarChart3,
   Monitor,
+  Bug,
   ChevronLeft,
   Loader2,
   Github,
@@ -44,6 +45,7 @@ type Section =
   | 'connections'
   | 'usage'
   | 'sessions'
+  | 'support'
 
 const sections: { id: Section; label: string; icon: typeof User }[] = [
   { id: 'account', label: 'Account', icon: User },
@@ -53,6 +55,7 @@ const sections: { id: Section; label: string; icon: typeof User }[] = [
   { id: 'connections', label: 'Connected services', icon: Link2 },
   { id: 'usage', label: 'Usage', icon: BarChart3 },
   { id: 'sessions', label: 'Sessions', icon: Monitor },
+  { id: 'support', label: 'Report a Bug', icon: Bug },
 ]
 
 function Toast({ message }: { message: string | null }) {
@@ -197,7 +200,7 @@ export function Settings() {
   }
 
   const sectionNav = (
-    <nav className="sm:w-52 shrink-0 flex sm:flex-col gap-1 overflow-x-auto pb-2 sm:pb-0">
+    <nav className="sm:w-52 shrink-0 flex sm:flex-col gap-1 overflow-x-auto pb-2 sm:pb-0 -mx-1 px-1 scrollbar-thin">
       {sections.map(({ id, label, icon: Icon }) => (
         <button
           key={id}
@@ -217,7 +220,7 @@ export function Settings() {
   )
 
   return (
-    <div className="h-full overflow-y-auto">
+    <div className="h-full overflow-y-auto overscroll-contain">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
         <div className="flex items-center gap-3 mb-8">
           <Link
@@ -742,6 +745,17 @@ export function Settings() {
                 </Card>
               </>
             )}
+
+            {active === 'support' && (
+              <>
+                <SectionTitle
+                  title="Report a Bug"
+                  desc="Tell us what went wrong. Reports go to the NYVEN bug endpoint."
+                />
+                <BugReportCard />
+              </>
+            )}
+
           </motion.div>
         </div>
       </div>
@@ -841,3 +855,127 @@ function UsageRow({ label, value }: { label: string; value: number }) {
 }
 
 type AIPreferences = NyvenPreferences['ai']
+
+
+function BugReportCard() {
+  const [summary, setSummary] = useState('')
+  const [category, setCategory] = useState('general')
+  const [details, setDetails] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [done, setDone] = useState(false)
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    if (summary.trim().length < 5) {
+      setError('Please describe what went wrong (at least a few words).')
+      return
+    }
+    setBusy(true)
+    try {
+      let accessToken: string | undefined
+      try {
+        const { data } = (await getSupabase()?.auth.getSession()) ?? {
+          data: { session: null },
+        }
+        accessToken = data.session?.access_token
+      } catch {
+        /* guest */
+      }
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (accessToken) headers.Authorization = `Bearer ${accessToken}`
+
+      const res = await fetch('/api/bug-report', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          summary: summary.trim(),
+          category,
+          details: details.trim(),
+          route: typeof window !== 'undefined' ? window.location.pathname : '',
+          userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+          clientVersion: '1.0.0',
+        }),
+      })
+      const data = (await res.json().catch(() => ({}))) as {
+        success?: boolean
+        error?: string
+      }
+      if (!res.ok || !data.success) {
+        setError(data.error || 'Could not submit report.')
+        return
+      }
+      setDone(true)
+      setSummary('')
+      setDetails('')
+    } catch {
+      setError('Network error. Please try again.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (done) {
+    return (
+      <Card>
+        <p className="text-sm text-nyven-cyan">Thank you — your report was submitted.</p>
+        <button
+          type="button"
+          onClick={() => setDone(false)}
+          className="mt-3 text-sm text-nyven-text-secondary hover:text-nyven-text underline"
+        >
+          Submit another
+        </button>
+      </Card>
+    )
+  }
+
+  return (
+    <Card>
+      <form onSubmit={(e) => void submit(e)} className="space-y-3">
+        <Field label="What happened?">
+          <input
+            value={summary}
+            onChange={(e) => setSummary(e.target.value)}
+            className="w-full px-3 py-2.5 rounded-xl bg-nyven-bg border border-white/[0.08] text-sm outline-none focus:border-nyven-cyan/30 min-h-[44px]"
+            placeholder="Brief summary"
+            maxLength={500}
+          />
+        </Field>
+        <Field label="Category">
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className="w-full px-3 py-2.5 rounded-xl bg-nyven-bg border border-white/[0.08] text-sm outline-none min-h-[44px]"
+          >
+            <option value="general">General</option>
+            <option value="chat">Chat</option>
+            <option value="voice">Voice</option>
+            <option value="agents">Agents</option>
+            <option value="auth">Sign-in / account</option>
+            <option value="ui">Interface</option>
+          </select>
+        </Field>
+        <Field label="Details (optional)">
+          <textarea
+            value={details}
+            onChange={(e) => setDetails(e.target.value)}
+            rows={4}
+            className="w-full px-3 py-2.5 rounded-xl bg-nyven-bg border border-white/[0.08] text-sm outline-none focus:border-nyven-cyan/30 resize-y min-h-[96px]"
+            placeholder="Steps to reproduce, device, etc."
+            maxLength={4000}
+          />
+        </Field>
+        {error && <p className="text-sm text-red-300">{error}</p>}
+        <button
+          type="submit"
+          disabled={busy}
+          className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-nyven-cyan text-nyven-bg text-sm font-medium hover:bg-nyven-cyan/90 disabled:opacity-50 min-h-[44px]"
+        >
+          {busy ? 'Submitting…' : 'Submit report'}
+        </button>
+      </form>
+    </Card>
+  )
+}

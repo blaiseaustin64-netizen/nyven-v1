@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useLocation } from 'react-router-dom'
-import { Plus, History, Bug } from 'lucide-react'
+import { Plus, History } from 'lucide-react'
 import { ChatHistoryPanel } from '../components/ChatHistoryPanel'
-import { BugReportModal } from '../components/BugReportModal'
 import { ChatMessage } from '../components/ChatMessage'
 import { MessageComposer, type ComposerSendPayload } from '../components/MessageComposer'
 import { NIdentity } from '../components/NIdentity'
@@ -36,7 +35,8 @@ export function Chat() {
   const [messages, setMessages] = useState<Message[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
-  const [bugOpen, setBugOpen] = useState(false)
+  const [readingMessageId, setReadingMessageId] = useState<string | null>(null)
+  const [readAloudLoading, setReadAloudLoading] = useState(false)
   const [voicePhase, setVoicePhase] = useState<VoicePhase>('idle')
   const [voiceEnergy, setVoiceEnergy] = useState(0)
   const [voiceError, setVoiceError] = useState<string | null>(null)
@@ -601,6 +601,38 @@ export function Chat() {
     })()
   }
 
+
+  const stopReadAloud = () => {
+    voiceRef.current?.stopSpeaking()
+    setReadingMessageId(null)
+    setReadAloudLoading(false)
+  }
+
+  const handleReadAloud = async (messageId: string, content: string) => {
+    if (!content.trim()) return
+    // Toggle off if same message
+    if (readingMessageId === messageId) {
+      stopReadAloud()
+      return
+    }
+    // Stop any current speech (voice chat or previous read-aloud) first
+    voiceRef.current?.stopSpeaking()
+    setReadingMessageId(messageId)
+    setReadAloudLoading(true)
+    try {
+      // Unlock audio from this user gesture
+      voiceRef.current?.prepareAudio()
+      setReadAloudLoading(false)
+      // force: use Sua regardless of typed-chat autoSpeak; does NOT open mic
+      await voiceRef.current?.speak(content, { force: true })
+    } catch {
+      // Error already shown via voice onError
+    } finally {
+      setReadingMessageId(null)
+      setReadAloudLoading(false)
+    }
+  }
+
   const submitFeedback = async (messageId: string, type: 'positive' | 'negative') => {
     try {
       let accessToken: string | undefined
@@ -643,14 +675,8 @@ export function Chat() {
 
       {/* Mobile history drawer */}
       {historyOpen && (
-        <div className="md:hidden fixed inset-0 z-40 flex justify-end">
-          <button
-            type="button"
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            aria-label="Close history"
-            onClick={() => setHistoryOpen(false)}
-          />
-          <div className="relative h-full z-10 shadow-2xl">
+        <div className="md:hidden fixed inset-0 z-40 flex justify-start">
+          <div className="relative h-full z-10">
             <ChatHistoryPanel
               variant="mobile"
               conversations={conversations}
@@ -663,6 +689,12 @@ export function Chat() {
               onClose={() => setHistoryOpen(false)}
             />
           </div>
+          <button
+            type="button"
+            className="flex-1 bg-black/60 backdrop-blur-sm"
+            aria-label="Close history"
+            onClick={() => setHistoryOpen(false)}
+          />
         </div>
       )}
 
@@ -672,7 +704,7 @@ export function Chat() {
           <button
             type="button"
             onClick={() => setHistoryOpen(true)}
-            className="p-2 -ml-2 rounded-lg text-nyven-text-secondary hover:text-nyven-text"
+            className="p-2 -ml-2 rounded-lg text-nyven-text-secondary hover:text-nyven-text min-h-[44px] min-w-[44px] flex items-center justify-center"
             aria-label="Chat history"
           >
             <History size={20} />
@@ -680,16 +712,8 @@ export function Chat() {
           <div className="flex items-center gap-1">
             <button
               type="button"
-              onClick={() => setBugOpen(true)}
-              className="p-2 rounded-lg text-nyven-text-secondary hover:text-nyven-text"
-              aria-label="Report a bug"
-            >
-              <Bug size={18} />
-            </button>
-            <button
-              type="button"
               onClick={startNewChat}
-              className="p-2 -mr-2 rounded-lg text-nyven-text-secondary hover:text-nyven-text"
+              className="p-2 -mr-2 rounded-lg text-nyven-text-secondary hover:text-nyven-text min-h-[44px] min-w-[44px] flex items-center justify-center"
               aria-label="New chat"
             >
               <Plus size={20} />
@@ -733,6 +757,18 @@ export function Chat() {
                   msg.role === 'nyven' && !msg.isStreaming && !msg.isThinking
                     ? submitFeedback
                     : undefined
+                }
+                onReadAloud={
+                  msg.role === 'nyven' && !msg.isStreaming && !msg.isThinking
+                    ? handleReadAloud
+                    : undefined
+                }
+                onStopReadAloud={stopReadAloud}
+                isReadingAloud={
+                  readingMessageId === msg.id && !readAloudLoading
+                }
+                isReadAloudLoading={
+                  readingMessageId === msg.id && readAloudLoading
                 }
               />
             ))}
@@ -795,12 +831,6 @@ export function Chat() {
         statusHint={voiceError}
         lastTranscript={lastVoiceTranscript}
         lastReply={lastVoiceReply}
-      />
-
-      <BugReportModal
-        open={bugOpen}
-        onClose={() => setBugOpen(false)}
-        conversationId={activeId}
       />
     </div>
   )

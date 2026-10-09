@@ -76,7 +76,7 @@ export function Agents() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
+      <div className="max-w-5xl mx-auto px-3 sm:px-6 py-6 sm:py-10 pb-24 lg:pb-10">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-10">
           <div>
@@ -90,7 +90,7 @@ export function Agents() {
           </div>
           <button
             onClick={() => navigate('/agents/create')}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-nyven-cyan text-nyven-bg text-sm font-medium hover:bg-nyven-cyan/90 transition-colors shrink-0"
+            className="inline-flex items-center justify-center gap-2 w-full sm:w-auto px-4 py-2.5 rounded-xl bg-nyven-cyan text-nyven-bg text-sm font-medium hover:bg-nyven-cyan/90 transition-colors shrink-0 min-h-[44px]"
           >
             <Plus size={16} strokeWidth={2.25} />
             Create Agent
@@ -109,7 +109,7 @@ export function Agents() {
           </div>
 
           {loading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               {[1, 2].map((i) => (
                 <div
                   key={i}
@@ -142,7 +142,7 @@ export function Agents() {
               </button>
             </motion.div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               {instances.map((agent, i) => {
                 const typeDef = getAgentType(agent.agentType)
                 return (
@@ -212,7 +212,7 @@ export function Agents() {
             Choose a specialized agent type to configure.
           </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             {availableTypes.map((type, i) => (
               <motion.div
                 key={type.id}
