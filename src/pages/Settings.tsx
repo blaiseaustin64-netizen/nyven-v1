@@ -84,6 +84,9 @@ export function Settings() {
     useAuth()
   const userId = user?.id ?? null
   const [params, setParams] = useSearchParams()
+  // Declared before githubView reads them: the memo's deps array is evaluated during render.
+  const [githubStatus, setGithubStatus] = useState<ConnectionStatusResponse | null>(null)
+  const [githubStatusError, setGithubStatusError] = useState<string | null>(null)
 
   const loadGithubStatus = useCallback(async () => {
     try {
@@ -117,8 +120,6 @@ export function Settings() {
   const [memories, setMemories] = useState<MemoryRow[]>([])
   const [connections, setConnections] = useState<ConnectionPublicRow[]>([])
   const [githubBusy, setGithubBusy] = useState(false)
-  const [githubStatus, setGithubStatus] = useState<ConnectionStatusResponse | null>(null)
-  const [githubStatusError, setGithubStatusError] = useState<string | null>(null)
   const [githubMsg, setGithubMsg] = useState<string | null>(null)
   const [displayName, setDisplayName] = useState('')
   const [password, setPassword] = useState('')
