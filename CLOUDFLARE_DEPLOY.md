@@ -82,16 +82,61 @@ npx wrangler pages dev dist
 - Gmail Inbox skills need real server-side OAuth tokens — no fake email data.
 - Do not put API keys in frontend code or `agent.js`.
 
-## Phase 8B — GitHub OAuth
+## Phase 8B — NYVEN Code and GitHub
 
-1. Create a GitHub OAuth App (https://github.com/settings/developers):
-   - Homepage URL: your APP_URL
-   - Authorization callback URL: `https://<your-domain>/api/connectors/github/callback`
-2. Cloudflare Pages → Settings → Environment variables (Production):
-   - `GITHUB_CLIENT_ID`
-   - `GITHUB_CLIENT_SECRET`
-   - `CONNECTOR_TOKEN_SECRET` (long random string)
-   - `SUPABASE_SERVICE_ROLE_KEY` (server-only; used to store encrypted tokens)
-   - `APP_URL` (required, e.g. https://nyven-v1.pages.dev; origin only, https in production; the server returns 503 CONFIG if missing or invalid)
-3. Ensure Supabase `connections` table exists (migration 001).
-4. Never set `GITHUB_CLIENT_SECRET` or `SUPABASE_SERVICE_ROLE_KEY` as `VITE_*`.
+NYVEN Code lives at `/code` (its own workspace, not the generic Create Agent form).
+
+### 1. GitHub OAuth App (https://github.com/settings/developers)
+
+- Homepage URL: `https://nyven-v1.pages.dev` (your APP_URL)
+- **Authorization callback URL (exact):** `https://nyven-v1.pages.dev/api/connectors/github/callback`
+  - Replace the origin with your production origin if it differs. It must equal `APP_URL` + `/api/connectors/github/callback`.
+  - For local testing, register a second OAuth App (or use a dev app) with `http://localhost:8788/api/connectors/github/callback`.
+
+### 2. Cloudflare Pages → Settings → Environment variables
+
+Server-side (Functions) — **Secret** type for secrets:
+
+| Name | Notes |
+|---|---|
+| `APP_URL` | Required. Origin only, e.g. `https://nyven-v1.pages.dev`. Missing or invalid returns `503 CONFIG`. `NYVEN_APP_URL` is accepted as an alias. |
+| `GITHUB_CLIENT_ID` | GitHub OAuth App client ID |
+| `GITHUB_CLIENT_SECRET` | **Secret.** Never `VITE_*` |
+| `CONNECTOR_TOKEN_SECRET` | **Secret.** Long random string; encrypts stored GitHub tokens |
+| `SUPABASE_URL` | Project URL |
+| `SUPABASE_ANON_KEY` | Used to verify the caller's session |
+| `SUPABASE_SERVICE_ROLE_KEY` | **Secret.** Server-only. Never `VITE_*` |
+
+Build-time (browser bundle) — these must be set for the **build** environment, because Vite inlines them:
+
+| Name | Notes |
+|---|---|
+| `VITE_SUPABASE_URL` | Same project URL as `SUPABASE_URL` |
+| `VITE_SUPABASE_ANON_KEY` | Public anon key. Never the service role key |
+
+Name mismatch to check: the server reads `SUPABASE_URL` / `SUPABASE_ANON_KEY`; the browser reads `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`. Both pairs are needed.
+
+### 3. Database
+
+Apply in order in the Supabase SQL editor: `001_nyven_core.sql` (existing), then **`004_connections_client_lockdown.sql`**. Migration 004 removes client access to `token_ciphertext`, and blocks client-side writes to `connections` (only the service role writes). It is safe to re-run.
+
+### 4. Routes
+
+- Connect / status / disconnect: `/api/connectors/github/{start,callback,status,disconnect}`
+- Read-only NYVEN Code: `/api/connectors/github/{repos,repo,branches,contents,issues,pulls}`
+
+### 5. Local development
+
+```bash
+npm install
+npm run build
+npx wrangler pages dev dist     # serves http://localhost:8788
+npm test                         # server + workspace logic tests
+```
+
+Set `APP_URL=http://localhost:8788` for local OAuth. Plain http is accepted only for localhost and only when the request itself is http.
+
+### 6. Never
+
+- Put `GITHUB_CLIENT_SECRET`, `CONNECTOR_TOKEN_SECRET`, or `SUPABASE_SERVICE_ROLE_KEY` in `VITE_*` or any client bundle.
+- Commit real values to the repository or to `.env` files that are committed.

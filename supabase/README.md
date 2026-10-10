@@ -10,13 +10,12 @@
    - `VITE_SUPABASE_ANON_KEY`
 5. Deploy. Never put the service role key in `VITE_*`.
 
-## Gmail OAuth foundation
+## Connections (GitHub and future providers)
 
-Table `connections` stores provider status and an optional `token_ciphertext` column.
-**Client policies allow select/update of own rows**, but production should:
+Table `connections` stores provider status and an encrypted `token_ciphertext` column.
 
-- Write tokens only via a Cloudflare Function using the **service role**.
-- Encrypt tokens (Vault / KMS) before insert.
-- Prefer selecting `connections_public` view (no ciphertext) from the browser.
+- Migration `004_connections_client_lockdown.sql` (required for Phase 8B) removes client access to `token_ciphertext` and prevents client-side writes. Only server functions using the **service role** write connection rows.
+- Browsers read `connections_public` (no ciphertext) or the non-secret columns of `connections`.
+- Run `004` after `001`. It is idempotent.
 
 Do not store OAuth tokens in localStorage or conversation messages.

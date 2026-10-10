@@ -1155,7 +1155,16 @@ export function AgentEditor() {
 
         {activeTab === 'connections' && (
           <div>
-            {savedInstance ? (
+            {form.agentType === 'code' ? (
+              <div className="rounded-2xl border border-white/[0.06] bg-nyven-surface p-4 text-sm text-nyven-text-secondary space-y-3">
+                <p className="leading-relaxed">
+                  GitHub for NYVEN Code is managed in the dedicated NYVEN Code workspace, where you connect, browse repositories, and review issues and pull requests.
+                </p>
+                <a href="/code" className="inline-flex items-center gap-1.5 text-nyven-cyan hover:text-nyven-cyan/80 font-medium">
+                  Open NYVEN Code
+                </a>
+              </div>
+            ) : savedInstance ? (
               <ConnectionsPanel agentId={savedInstance.id} agentType={form.agentType} />
             ) : (
               <p className="text-sm text-nyven-text-secondary">Save the agent first.</p>

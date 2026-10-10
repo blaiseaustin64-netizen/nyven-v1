@@ -5,6 +5,7 @@ import {
   MessageSquare,
   FolderOpen,
   Bot,
+  Code2,
   Sparkles,
   Settings,
   User,
@@ -27,6 +28,7 @@ const mainNav = [
   { to: '/chat', label: 'Chat', icon: MessageSquare },
   { to: '/projects', label: 'Projects', icon: FolderOpen },
   { to: '/agents', label: 'Agents', icon: Bot },
+  { to: '/code', label: 'NYVEN Code', icon: Code2 },
 ]
 
 const GROUP_ORDER = ['Today', 'Yesterday', 'Previous 7 days', 'Older'] as const

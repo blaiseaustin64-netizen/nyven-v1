@@ -9,7 +9,7 @@ const quickActions = [
   { id: 'ask', label: 'Ask', icon: MessageSquare, path: '/chat', prompt: '' },
   { id: 'build', label: 'Build', icon: Hammer, path: '/build', prompt: '' },
   { id: 'create', label: 'Create', icon: Sparkles, path: '/chat', prompt: 'Help me create something new' },
-  { id: 'code', label: 'Code', icon: Code2, path: '/chat', prompt: 'I need help with code' },
+  { id: 'code', label: 'Code', icon: Code2, path: '/code', prompt: '' },
 ]
 
 export function Home() {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
@@ -27,6 +27,11 @@ import {
 } from '../lib/settings/preferences'
 import { fetchUsageSummary, type UsageSummary } from '../lib/settings/usageSummary'
 import { INTEGRATIONS, listConnections } from '../lib/settings/connectionsUi'
+import {
+  GENERIC_STATUS_ERROR,
+  deriveConnectionView,
+  type ConnectionStatusResponse,
+} from '../lib/code/codeState'
 import {
   startGitHubOAuth,
   disconnectGitHub,
@@ -79,6 +84,28 @@ export function Settings() {
     useAuth()
   const userId = user?.id ?? null
   const [params, setParams] = useSearchParams()
+
+  const loadGithubStatus = useCallback(async () => {
+    try {
+      setGithubStatus((await fetchGitHubStatus()) as ConnectionStatusResponse)
+      setGithubStatusError(null)
+    } catch {
+      setGithubStatusError(GENERIC_STATUS_ERROR)
+    }
+  }, [])
+
+  // Same derivation as NYVEN Code, so both pages always show the same GitHub state.
+  const githubView = useMemo(
+    () =>
+      deriveConnectionView({
+        authLoading,
+        supabaseConfigured: configured,
+        signedIn: !!userId,
+        status: githubStatus,
+        statusError: githubStatusError,
+      }),
+    [authLoading, configured, userId, githubStatus, githubStatusError]
+  )
   const active = (params.get('section') as Section) || 'account'
   const setActive = (s: Section) => setParams({ section: s })
 
@@ -90,6 +117,8 @@ export function Settings() {
   const [memories, setMemories] = useState<MemoryRow[]>([])
   const [connections, setConnections] = useState<ConnectionPublicRow[]>([])
   const [githubBusy, setGithubBusy] = useState(false)
+  const [githubStatus, setGithubStatus] = useState<ConnectionStatusResponse | null>(null)
+  const [githubStatusError, setGithubStatusError] = useState<string | null>(null)
   const [githubMsg, setGithubMsg] = useState<string | null>(null)
   const [displayName, setDisplayName] = useState('')
   const [password, setPassword] = useState('')
@@ -128,14 +157,7 @@ export function Settings() {
     }
     if (active === 'connections' && userId) {
       void listConnections(userId).then(setConnections)
-      void fetchGitHubStatus().then((s) => {
-        if (s.connection) {
-          setConnections((prev) => {
-            const rest = prev.filter((c) => c.provider !== 'github')
-            return [...rest, s.connection as ConnectionPublicRow]
-          })
-        }
-      })
+      void loadGithubStatus()
     }
     // OAuth return banners
     if (active === 'connections') {
@@ -610,16 +632,27 @@ export function Settings() {
                 )}
                 {INTEGRATIONS.map((integ) => {
                   const row = connections.find((c) => c.provider === integ.id)
-                  const status = row?.status || 'disconnected'
+                  const isGithub = integ.id === 'github'
+                  const status = isGithub
+                    ? githubView.kind === 'connected'
+                      ? 'connected'
+                      : githubView.kind === 'unconfigured'
+                        ? 'unconfigured'
+                        : githubView.kind === 'unavailable'
+                          ? 'error'
+                          : 'disconnected'
+                    : row?.status || 'disconnected'
                   const label = !integ.oauthReady
                     ? 'Coming soon'
                     : status === 'connected'
                       ? 'Connected'
-                      : status === 'error' || status === 'expired'
-                        ? 'Connection needs attention'
-                        : status === 'pending'
-                          ? 'Connecting…'
-                          : 'Not connected'
+                      : status === 'unconfigured'
+                        ? 'Not configured on server'
+                        : status === 'error' || status === 'expired'
+                          ? 'Connection needs attention'
+                          : status === 'pending'
+                            ? 'Connecting…'
+                            : 'Not connected'
                   const Icon =
                     integ.iconKey === 'github'
                       ? Github
@@ -657,9 +690,9 @@ export function Settings() {
                                 ))}
                               </ul>
                             )}
-                            {row?.account_label && status === 'connected' && (
+                            {(isGithub ? githubView.kind === 'connected' : !!row?.account_label && status === 'connected') && (
                               <p className="text-[11px] text-nyven-text-secondary mt-2">
-                                {row.account_label}
+                                {isGithub && githubView.kind === 'connected' ? githubView.account : row?.account_label}
                               </p>
                             )}
                           </div>
@@ -685,7 +718,12 @@ export function Settings() {
                           will be added before this can show Connected.
                         </p>
                       )}
-                      {integ.id === 'github' && integ.oauthReady && userId && (
+                      {integ.id === 'github' && integ.oauthReady && userId && githubView.kind === 'unconfigured' && (
+                        <p className="text-xs text-nyven-text-secondary mt-3 pt-2 border-t border-white/[0.04]">
+                          {githubView.message}
+                        </p>
+                      )}
+                      {integ.id === 'github' && integ.oauthReady && userId && githubView.kind !== 'unconfigured' && (
                         <div className="mt-3 pt-2 border-t border-white/[0.04] space-y-2">
                           {githubMsg && (
                             <p className="text-xs text-nyven-text-secondary">{githubMsg}</p>
@@ -694,7 +732,7 @@ export function Settings() {
                             {status !== 'connected' ? (
                               <button
                                 type="button"
-                                disabled={githubBusy}
+                                disabled={githubBusy || githubView.kind === 'loading'}
                                 onClick={() => {
                                   setGithubBusy(true)
                                   setGithubMsg(null)
@@ -720,6 +758,7 @@ export function Settings() {
                                   void disconnectGitHub()
                                     .then(() => {
                                       setGithubMsg('GitHub disconnected.')
+                                      void loadGithubStatus()
                                       return listConnections(userId).then(setConnections)
                                     })
                                     .catch((e: Error) => setGithubMsg(e.message))

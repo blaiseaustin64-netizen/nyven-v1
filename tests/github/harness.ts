@@ -32,7 +32,7 @@ export function json(body: unknown, status = 200): Response {
 
 export type FetchCall = { url: string; method: string; body: string | null; auth: string | null }
 
-type Route = (call: FetchCall) => Response | Promise<Response>
+type Route = (call: FetchCall) => Response | null | Promise<Response | null>
 
 const originalFetch = globalThis.fetch
 let calls: FetchCall[] = []
@@ -47,7 +47,8 @@ export function installFetch(route: Route): { calls: FetchCall[] } {
     const auth = new Headers(init?.headers as HeadersInit | undefined).get('Authorization')
     const call = { url, method, body, auth }
     calls.push(call)
-    return route(call)
+    const out = await route(call)
+    return out ?? json({ message: `unhandled ${method} ${url}` }, 599)
   }) as typeof fetch
   return { calls }
 }
@@ -110,7 +111,7 @@ export function fakeSupabase(opts: SupabaseFakeOptions): SupabaseFake {
 
   const route: Route = async (call) => {
     if (!call.url.startsWith(`${SUPABASE_URL}/rest/v1/connections`)) {
-      return json({ message: 'unexpected supabase path' }, 404)
+      return null
     }
     if (call.method === 'GET') {
       const mode = opts.readFailsAfterWrite && !state.wrote ? 'ok' : readMode

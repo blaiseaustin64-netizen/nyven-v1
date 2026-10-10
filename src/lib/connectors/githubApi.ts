@@ -27,7 +27,7 @@ export type GitHubRepo = {
   updated_at: string | null
 }
 
-async function authHeaders(): Promise<HeadersInit> {
+export async function authHeaders(): Promise<HeadersInit> {
   const sb = getSupabase()
   const session = sb ? (await sb.auth.getSession()).data.session : null
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }

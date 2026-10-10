@@ -256,11 +256,11 @@ export function Agents() {
                     </div>
                     <button
                       onClick={() =>
-                        navigate(`/agents/create?type=${type.id}`)
+                        navigate(type.id === 'code' ? '/code' : `/agents/create?type=${type.id}`)
                       }
                       className="mt-4 inline-flex items-center gap-1.5 text-sm text-nyven-cyan hover:text-nyven-cyan/80 font-medium transition-colors"
                     >
-                      Configure
+                      {type.id === 'code' ? 'Open workspace' : 'Configure'}
                       <ChevronRight size={14} />
                     </button>
                   </div>

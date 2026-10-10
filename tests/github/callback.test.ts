@@ -296,3 +296,41 @@ describe('GitHub OAuth callback: return destinations', () => {
     )
   })
 })
+
+describe('GitHub OAuth callback: failures return to the originating page', () => {
+  test('a state mismatch from NYVEN Code returns to /code with the error reason', async () => {
+    const env = makeEnv({ APP_URL: 'https://nyven.example' })
+    const started = await startOAuth(env, 'https://nyven.example', '/code')
+    assert.ok(!('error' in started))
+    if ('error' in started) return
+    installFetch(githubHappyRoute())
+    const res = await runCallback({
+      env,
+      request: callbackRequest(`https://nyven.example${CALLBACK_PATH}?code=c&state=forged`, started.cookieValue),
+    })
+    assert.equal(res.headers.get('Location'), 'https://nyven.example/code?github=error&reason=state_mismatch')
+  })
+
+  test('a successful NYVEN Code connection returns to /code?github=connected', async () => {
+    const env = makeEnv({ APP_URL: 'https://nyven.example' })
+    const started = await startOAuth(env, 'https://nyven.example', '/code')
+    assert.ok(!('error' in started))
+    if ('error' in started) return
+    installFetch(githubHappyRoute())
+    const res = await runCallback({
+      env,
+      request: callbackRequest(`https://nyven.example${CALLBACK_PATH}?code=c&state=${started.state}`, started.cookieValue),
+    })
+    assert.equal(res.headers.get('Location'), 'https://nyven.example/code?github=connected')
+  })
+
+  test('a missing session (no cookie) still falls back to Settings', async () => {
+    const env = makeEnv({ APP_URL: 'https://nyven.example' })
+    installFetch(githubHappyRoute())
+    const res = await runCallback({
+      env,
+      request: callbackRequest(`https://nyven.example${CALLBACK_PATH}?code=c&state=s`),
+    })
+    assert.equal(res.headers.get('Location'), 'https://nyven.example/settings?section=connections&github=error&reason=missing_session')
+  })
+})

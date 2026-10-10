@@ -59,8 +59,15 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   if (!readiness.ok) return configError(readiness.error)
   const origin = readiness.origin
 
-  const fail = (code: string) =>
-    redirect(`${origin}/settings?section=connections&github=error&reason=${encodeURIComponent(code)}`)
+  // Errors return the user to the page that started the flow once the session is read
+  // (validated return path). Earlier failures fall back to Settings.
+  let failBase = `${origin}/settings?section=connections`
+  const fail = (code: string) => {
+    const dest = new URL(failBase)
+    dest.searchParams.set('github', 'error')
+    dest.searchParams.set('reason', code)
+    return redirect(dest.href)
+  }
 
   const url = new URL(request.url)
   const code = url.searchParams.get('code')
@@ -80,6 +87,10 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
 
   const session = await unpackOAuthSession(cookieVal, secret)
   if (!session) return fail('invalid_session')
+  failBase = new URL(
+    resolveSafeReturnUrl(origin, session.returnTo || '/settings?section=connections'),
+    `${origin}/`
+  ).href
 
   const vs = parseVerifierAndState(session.codeVerifier)
   if (!vs || vs.state !== state) return fail('state_mismatch')
