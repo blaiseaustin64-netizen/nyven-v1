@@ -63,7 +63,7 @@ export function ConnectionBar({ view, busy, onConnect, onDisconnect, onRetry }: 
       {view.kind === 'unconfigured' && <div className="mt-4"><ErrorNotice message={view.message} /></div>}
       {view.kind === 'unavailable' && <div className="mt-4"><ErrorNotice message={view.message} /></div>}
       {view.kind === 'auth_unavailable' && (
-        <div className="mt-4"><ErrorNotice message="Account sign-in is not configured for this deployment, so GitHub cannot be managed here." /></div>
+        <div className="mt-4"><ErrorNotice message="Account sign-in is not available yet. The deployment must expose Supabase public URL and anon key (VITE_SUPABASE_* at build time, or SUPABASE_URL + SUPABASE_ANON_KEY for /api/public-config). GitHub cannot be connected until you can sign in." /></div>
       )}
     </Panel>
   )

@@ -8,7 +8,11 @@ import {
   type ReactNode,
 } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
-import { getSupabase, isSupabaseConfigured } from '../supabase/client'
+import {
+  ensureSupabaseConfig,
+  getSupabase,
+  isSupabaseConfigured,
+} from '../supabase/client'
 import type { ProfileRow } from '../supabase/types'
 
 type AuthState = {
@@ -18,7 +22,11 @@ type AuthState = {
   user: User | null
   profile: ProfileRow | null
   signIn: (email: string, password: string) => Promise<{ error?: string }>
-  signUp: (email: string, password: string, displayName?: string) => Promise<{ error?: string }>
+  signUp: (
+    email: string,
+    password: string,
+    displayName?: string
+  ) => Promise<{ error?: string }>
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
 }
@@ -37,24 +45,34 @@ async function fetchProfile(userId: string): Promise<ProfileRow | null> {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const configured = isSupabaseConfigured()
-  const [loading, setLoading] = useState(configured)
+  const [configured, setConfigured] = useState(() => isSupabaseConfigured())
+  const [loading, setLoading] = useState(true)
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<ProfileRow | null>(null)
 
   useEffect(() => {
-    if (!configured) {
-      setLoading(false)
-      return
-    }
-    const sb = getSupabase()
-    if (!sb) {
-      setLoading(false)
-      return
-    }
-
     let mounted = true
-    sb.auth.getSession().then(({ data }) => {
+    let unsubscribe: (() => void) | undefined
+
+    ;(async () => {
+      // Build-time env may be empty on Cloudflare; load public runtime config first
+      const ok = await ensureSupabaseConfig()
+      if (!mounted) return
+      setConfigured(ok)
+
+      if (!ok) {
+        setLoading(false)
+        return
+      }
+
+      const sb = getSupabase()
+      if (!sb) {
+        setConfigured(false)
+        setLoading(false)
+        return
+      }
+
+      const { data } = await sb.auth.getSession()
       if (!mounted) return
       setSession(data.session)
       if (data.session?.user) {
@@ -63,24 +81,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         })
       }
       setLoading(false)
-    })
 
-    const { data: sub } = sb.auth.onAuthStateChange((_event, next) => {
-      setSession(next)
-      if (next?.user) {
-        void fetchProfile(next.user.id).then(setProfile)
-      } else {
-        setProfile(null)
-      }
-    })
+      const { data: sub } = sb.auth.onAuthStateChange((_event, next) => {
+        setSession(next)
+        if (next?.user) {
+          void fetchProfile(next.user.id).then(setProfile)
+        } else {
+          setProfile(null)
+        }
+      })
+      unsubscribe = () => sub.subscription.unsubscribe()
+    })()
 
     return () => {
       mounted = false
-      sub.subscription.unsubscribe()
+      unsubscribe?.()
     }
-  }, [configured])
+  }, [])
 
   const signIn = useCallback(async (email: string, password: string) => {
+    await ensureSupabaseConfig()
     const sb = getSupabase()
     if (!sb) return { error: 'Authentication is not configured.' }
     const { error } = await sb.auth.signInWithPassword({ email, password })
@@ -90,6 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUp = useCallback(
     async (email: string, password: string, displayName?: string) => {
+      await ensureSupabaseConfig()
       const sb = getSupabase()
       if (!sb) return { error: 'Authentication is not configured.' }
       const { error } = await sb.auth.signUp({

@@ -140,3 +140,24 @@ Set `APP_URL=http://localhost:8788` for local OAuth. Plain http is accepted only
 
 - Put `GITHUB_CLIENT_SECRET`, `CONNECTOR_TOKEN_SECRET`, or `SUPABASE_SERVICE_ROLE_KEY` in `VITE_*` or any client bundle.
 - Commit real values to the repository or to `.env` files that are committed.
+
+
+## Auth + GitHub (required for connect)
+
+Client sign-in needs Supabase **public** URL and anon key available either:
+
+1. **Build-time (preferred):** Cloudflare Pages → Settings → Environment variables  
+   - `VITE_SUPABASE_URL`  
+   - `VITE_SUPABASE_ANON_KEY`  
+   Then **rebuild** the site (Vite embeds these at build time).
+
+2. **Runtime fallback:** Same project Functions env:  
+   - `SUPABASE_URL`  
+   - `SUPABASE_ANON_KEY`  
+   The app loads them via `GET /api/public-config` if VITE_* were missing at build.
+
+GitHub OAuth still requires (Functions secrets, never VITE_):  
+`GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `CONNECTOR_TOKEN_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, `APP_URL`.
+
+Callback URL on the GitHub OAuth App:  
+`https://<your-domain>/api/connectors/github/callback`
