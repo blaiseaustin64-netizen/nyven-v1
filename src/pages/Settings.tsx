@@ -28,6 +28,11 @@ import {
 import { fetchUsageSummary, type UsageSummary } from '../lib/settings/usageSummary'
 import { INTEGRATIONS, listConnections } from '../lib/settings/connectionsUi'
 import {
+  startGitHubOAuth,
+  disconnectGitHub,
+  fetchGitHubStatus,
+} from '../lib/connectors/githubApi'
+import {
   listMemories,
   deleteMemory,
   setMemoryEnabled,
@@ -84,6 +89,8 @@ export function Settings() {
   const [usage, setUsage] = useState<UsageSummary | null>(null)
   const [memories, setMemories] = useState<MemoryRow[]>([])
   const [connections, setConnections] = useState<ConnectionPublicRow[]>([])
+  const [githubBusy, setGithubBusy] = useState(false)
+  const [githubMsg, setGithubMsg] = useState<string | null>(null)
   const [displayName, setDisplayName] = useState('')
   const [password, setPassword] = useState('')
   const [password2, setPassword2] = useState('')
@@ -121,8 +128,25 @@ export function Settings() {
     }
     if (active === 'connections' && userId) {
       void listConnections(userId).then(setConnections)
+      void fetchGitHubStatus().then((s) => {
+        if (s.connection) {
+          setConnections((prev) => {
+            const rest = prev.filter((c) => c.provider !== 'github')
+            return [...rest, s.connection as ConnectionPublicRow]
+          })
+        }
+      })
     }
-  }, [active, userId])
+    // OAuth return banners
+    if (active === 'connections') {
+      const gh = params.get('github')
+      if (gh === 'connected') setGithubMsg('GitHub connected successfully.')
+      if (gh === 'error') {
+        const reason = params.get('reason') || 'unknown'
+        setGithubMsg(`GitHub connection failed (${reason}).`)
+      }
+    }
+  }, [active, userId, params])
 
   const persistPrefs = useCallback(
     async (next: NyvenPreferences) => {
@@ -661,7 +685,55 @@ export function Settings() {
                           will be added before this can show Connected.
                         </p>
                       )}
-                      {integ.oauthReady && status !== 'connected' && (
+                      {integ.id === 'github' && integ.oauthReady && userId && (
+                        <div className="mt-3 pt-2 border-t border-white/[0.04] space-y-2">
+                          {githubMsg && (
+                            <p className="text-xs text-nyven-text-secondary">{githubMsg}</p>
+                          )}
+                          <div className="flex flex-wrap gap-2">
+                            {status !== 'connected' ? (
+                              <button
+                                type="button"
+                                disabled={githubBusy}
+                                onClick={() => {
+                                  setGithubBusy(true)
+                                  setGithubMsg(null)
+                                  void startGitHubOAuth('/settings?section=connections')
+                                    .then(({ authorizeUrl }) => {
+                                      window.location.href = authorizeUrl
+                                    })
+                                    .catch((e: Error) => {
+                                      setGithubMsg(e.message)
+                                      setGithubBusy(false)
+                                    })
+                                }}
+                                className="px-3 py-2 rounded-xl text-xs font-medium bg-nyven-cyan text-nyven-bg disabled:opacity-50 min-h-[40px]"
+                              >
+                                {githubBusy ? 'Starting…' : 'Connect GitHub'}
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled={githubBusy}
+                                onClick={() => {
+                                  setGithubBusy(true)
+                                  void disconnectGitHub()
+                                    .then(() => {
+                                      setGithubMsg('GitHub disconnected.')
+                                      return listConnections(userId).then(setConnections)
+                                    })
+                                    .catch((e: Error) => setGithubMsg(e.message))
+                                    .finally(() => setGithubBusy(false))
+                                }}
+                                className="px-3 py-2 rounded-xl text-xs border border-white/[0.1] text-nyven-text-secondary min-h-[40px]"
+                              >
+                                Disconnect
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      {integ.oauthReady && integ.id !== 'github' && status !== 'connected' && (
                         <p className="text-xs text-nyven-text-secondary mt-3 pt-2 border-t border-white/[0.04]">
                           Connect is available when the OAuth flow is enabled for your
                           account.

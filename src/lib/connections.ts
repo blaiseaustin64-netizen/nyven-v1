@@ -6,7 +6,7 @@
 
 import { getLocalOwnerId } from './agentStore'
 
-export type ConnectionType = 'website' | 'gmail' | 'api' | 'mcp' | 'vexdyn'
+export type ConnectionType = 'website' | 'gmail' | 'github' | 'api' | 'mcp' | 'vexdyn'
 
 export type ConnectionStatus =
   | 'disconnected'
@@ -20,7 +20,7 @@ export interface ConnectionDefinition {
   label: string
   description: string
   permissionSummary: string[]
-  requiredForAgentTypes: Array<'support' | 'inbox'>
+  requiredForAgentTypes: Array<'support' | 'inbox' | 'code'>
 }
 
 export const CONNECTION_CATALOG: ConnectionDefinition[] = [
@@ -46,6 +46,18 @@ export const CONNECTION_CATALOG: ConnectionDefinition[] = [
       'Never send, delete, or modify mail without your confirmation',
     ],
     requiredForAgentTypes: ['inbox'],
+  },
+  {
+    type: 'github',
+    label: 'GitHub',
+    description:
+      'Access your repositories for NYVEN Code. Read-only listing in this phase; writes require future approval.',
+    permissionSummary: [
+      'List repositories you can access',
+      'Read repository metadata (name, default branch, visibility)',
+      'Tokens stay on the NYVEN server — never in the browser',
+    ],
+    requiredForAgentTypes: ['code'],
   },
   {
     type: 'api',

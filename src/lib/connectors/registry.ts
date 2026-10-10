@@ -306,7 +306,7 @@ export const CONNECTOR_REGISTRY: Record<ConnectorId, ConnectorDefinition> = {
     description: 'Code context for future NYVEN Code agents. Repositories, issues, PRs.',
     iconKey: 'github',
     authMethod: 'oauth2',
-    oauthReady: false,
+    oauthReady: true,
     defaultScopes: ['repo', 'read:user'],
     capabilities: [
       'github.repositories.read',

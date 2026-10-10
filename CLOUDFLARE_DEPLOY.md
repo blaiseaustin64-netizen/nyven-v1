@@ -81,3 +81,17 @@ npx wrangler pages dev dist
 - Agents / knowledge / conversations currently use **browser localStorage** until Supabase is added.
 - Gmail Inbox skills need real server-side OAuth tokens — no fake email data.
 - Do not put API keys in frontend code or `agent.js`.
+
+## Phase 8B — GitHub OAuth
+
+1. Create a GitHub OAuth App (https://github.com/settings/developers):
+   - Homepage URL: your APP_URL
+   - Authorization callback URL: `https://<your-domain>/api/connectors/github/callback`
+2. Cloudflare Pages → Settings → Environment variables (Production):
+   - `GITHUB_CLIENT_ID`
+   - `GITHUB_CLIENT_SECRET`
+   - `CONNECTOR_TOKEN_SECRET` (long random string)
+   - `SUPABASE_SERVICE_ROLE_KEY` (server-only; used to store encrypted tokens)
+   - `APP_URL` (required, e.g. https://nyven-v1.pages.dev; origin only, https in production; the server returns 503 CONFIG if missing or invalid)
+3. Ensure Supabase `connections` table exists (migration 001).
+4. Never set `GITHUB_CLIENT_SECRET` or `SUPABASE_SERVICE_ROLE_KEY` as `VITE_*`.

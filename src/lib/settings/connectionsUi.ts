@@ -41,7 +41,7 @@ export const INTEGRATIONS: IntegrationDef[] = [
     id: 'github',
     name: 'GitHub',
     description: 'Code context for future NYVEN Code agents. Repositories, issues, PRs.',
-    oauthReady: false,
+    oauthReady: true,
     iconKey: 'github',
     permissionSummary: [
       'Read repositories, files, issues, and pull requests you grant',
