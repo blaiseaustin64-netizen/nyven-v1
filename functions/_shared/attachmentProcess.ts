@@ -8,7 +8,7 @@ import {
   kindForMime,
   resolveMime,
 } from './attachmentLimits'
-
+ 
 export type ProcessedAttachment = {
   id: string
   name: string
