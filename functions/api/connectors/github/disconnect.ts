@@ -3,18 +3,12 @@
  */
 import { resolveIdentity } from '../../../_shared/auth'
 import { disconnectGitHub, type GitHubEnv } from '../../../_shared/github/service'
+import {
+  clearPreAccountGitHubCookie,
+  resolvePreAccountOwner,
+} from '../../../_shared/github/preAccount'
 
 interface Env extends GitHubEnv {}
-
-function json(body: unknown, status: number) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: {
-      'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': '*',
-    },
-  })
-}
 
 export const onRequestOptions: PagesFunction<Env> = async () =>
   new Response(null, {
@@ -28,21 +22,47 @@ export const onRequestOptions: PagesFunction<Env> = async () =>
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {
   const { request, env } = context
-  const identity = await resolveIdentity(request, env, request.signal)
-  if (!identity.ok) {
-    return json({ success: false, code: identity.code, error: identity.message }, 401)
-  }
-  if (!identity.identity.authenticated || !identity.identity.userId) {
-    return json({ success: false, code: 'AUTH_REQUIRED', error: 'Sign in required.' }, 401)
-  }
+  const secure = request.url.startsWith('https')
+  const headers = new Headers({
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+    'Cache-Control': 'no-store',
+  })
 
-  const result = await disconnectGitHub(env, identity.identity.userId)
-  if (!result.ok) {
-    const status = result.code === 'CONFIG' ? 503 : 500
-    return json(
-      { success: false, code: result.code || 'DB_DISCONNECT', error: result.error },
-      status
+  const identity = await resolveIdentity(request, env, request.signal)
+  if (!identity.ok && identity.code === 'AUTH_INVALID') {
+    return new Response(
+      JSON.stringify({ success: false, code: identity.code, error: identity.message }),
+      { status: 401, headers }
     )
   }
-  return json({ success: true, connected: false, revoked: result.revoked === true }, 200)
+
+  if (identity.ok && identity.identity.authenticated && identity.identity.userId) {
+    const result = await disconnectGitHub(env, identity.identity.userId)
+    if (!result.ok) {
+      const status = result.code === 'CONFIG' ? 503 : 500
+      return new Response(
+        JSON.stringify({
+          success: false,
+          code: result.code || 'DB_DISCONNECT',
+          error: result.error,
+        }),
+        { status, headers }
+      )
+    }
+    headers.append('Set-Cookie', clearPreAccountGitHubCookie(secure))
+    return new Response(
+      JSON.stringify({ success: true, connected: false, revoked: result.revoked === true }),
+      { status: 200, headers }
+    )
+  }
+
+  if (env.CONNECTOR_TOKEN_SECRET) {
+    await resolvePreAccountOwner(request, env.CONNECTOR_TOKEN_SECRET)
+  }
+  headers.append('Set-Cookie', clearPreAccountGitHubCookie(secure))
+  return new Response(JSON.stringify({ success: true, connected: false }), {
+    status: 200,
+    headers,
+  })
 }

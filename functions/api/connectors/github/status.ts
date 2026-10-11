@@ -1,29 +1,31 @@
 /**
  * GET /api/connectors/github/status
- * Public connection status for the authenticated user (no tokens).
- *
- * `configured` is true only when GitHub OAuth can actually be initiated: all server
- * secrets are present AND APP_URL (or NYVEN_APP_URL) is a valid explicit origin.
+ * Signed-in user (DB) or pre-account cookie. Never returns tokens.
  */
 import { resolveIdentity } from '../../../_shared/auth'
 import {
+  getGitHubConnectionRow,
+  githubConfigured,
+  githubDbConfigured,
   githubOAuthReadiness,
-  lookupGitHubConnectionRow,
   type GitHubEnv,
 } from '../../../_shared/github/service'
 import { toPublicConnection } from '../../../_shared/connectors'
+import {
+  loadPreAccountGitHub,
+  resolvePreAccountOwner,
+} from '../../../_shared/github/preAccount'
 
 interface Env extends GitHubEnv {}
 
-function json(body: unknown, status: number) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: {
-      'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': '*',
-      'Cache-Control': 'no-store',
-    },
+function json(body: unknown, status: number, cookies?: string[]) {
+  const headers = new Headers({
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+    'Cache-Control': 'no-store',
   })
+  if (cookies) for (const c of cookies) headers.append('Set-Cookie', c)
+  return new Response(JSON.stringify(body), { status, headers })
 }
 
 export const onRequestOptions: PagesFunction<Env> = async () =>
@@ -38,9 +40,9 @@ export const onRequestOptions: PagesFunction<Env> = async () =>
 
 export const onRequestGet: PagesFunction<Env> = async (context) => {
   const { request, env } = context
-
-  // Configuration first: never report a ready-to-connect state when OAuth cannot start.
+  const configured = githubConfigured(env)
   const readiness = githubOAuthReadiness(env, request.url)
+
   if (!readiness.ok) {
     return json(
       {
@@ -56,41 +58,71 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   }
 
   const identity = await resolveIdentity(request, env, request.signal)
-  if (!identity.ok) {
+  if (!identity.ok && identity.code === 'AUTH_INVALID') {
     return json({ success: false, code: identity.code, error: identity.message }, 401)
   }
-  if (!identity.identity.authenticated || !identity.identity.userId) {
-    return json(
-      { success: true, configured: true, connected: false, connection: null },
-      200
-    )
+
+  if (identity.ok && identity.identity.authenticated && identity.identity.userId) {
+    if (githubDbConfigured(env)) {
+      const row = await getGitHubConnectionRow(env, identity.identity.userId)
+      const connected = !!(row && row.status === 'connected')
+      return json({
+        success: true,
+        configured: true,
+        connected,
+        mode: 'account',
+        connection: row && connected ? toPublicConnection(row) : null,
+      })
+    }
   }
 
-  // A failed read is unknown, not "not connected": report it as unavailable.
-  const lookup = await lookupGitHubConnectionRow(env, identity.identity.userId)
-  if (!lookup.ok) {
+  if (!env.CONNECTOR_TOKEN_SECRET) {
+    return json({
+      success: true,
+      configured: true,
+      connected: false,
+      mode: 'preaccount',
+      connection: null,
+    })
+  }
+
+  const owner = await resolvePreAccountOwner(request, env.CONNECTOR_TOKEN_SECRET)
+  const cookies = owner.setCookie ? [owner.setCookie] : undefined
+  const store = await loadPreAccountGitHub(request, env.CONNECTOR_TOKEN_SECRET, owner.ownerId)
+  if (store) {
     return json(
       {
-        success: false,
-        code: 'DB_READ',
+        success: true,
         configured: true,
-        connected: false,
-        connection: null,
-        error: 'Could not read GitHub connection state. Try again shortly.',
+        connected: true,
+        mode: 'preaccount',
+        connection: {
+          id: 'preaccount',
+          user_id: owner.ownerId,
+          provider: 'github',
+          status: 'connected',
+          account_label: store.account_label,
+          scopes: store.scopes,
+          metadata: { github_user_id: store.github_user_id },
+          connected_at: store.connected_at,
+          created_at: store.connected_at,
+          updated_at: store.connected_at,
+        },
       },
-      503
+      200,
+      cookies
     )
   }
 
-  const row = lookup.row
-  const connected = !!(row && row.status === 'connected')
   return json(
     {
       success: true,
       configured: true,
-      connected,
-      connection: row ? toPublicConnection(row) : null,
+      connected: false,
+      mode: 'preaccount',
+      connection: null,
     },
-    200
+    200,
+    cookies
   )
 }

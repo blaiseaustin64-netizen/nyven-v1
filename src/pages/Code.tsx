@@ -68,8 +68,9 @@ export function Code() {
 
   const signedIn = !!user
   useEffect(() => {
-    if (signedIn) void loadStatus()
-  }, [signedIn, loadStatus])
+    // Pre-account: load GitHub status even without NYVEN login
+    if (!authLoading) void loadStatus()
+  }, [authLoading, loadStatus])
 
   const view = useMemo(
     () =>
@@ -79,6 +80,7 @@ export function Code() {
         signedIn,
         status,
         statusError,
+        allowPreAccountConnectors: true,
       }),
     [authLoading, supabaseConfigured, signedIn, status, statusError]
   )

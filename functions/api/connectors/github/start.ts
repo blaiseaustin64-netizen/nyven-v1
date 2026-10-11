@@ -1,27 +1,12 @@
 /**
  * POST /api/connectors/github/start
- * Requires authenticated Supabase user. Returns GitHub authorize URL.
+ * GitHub OAuth start. Authenticated Supabase user OR pre-account owner cookie.
  */
-import { resolveIdentity, extractBearerToken } from '../../../_shared/auth'
+import { resolveIdentity } from '../../../_shared/auth'
 import { buildAuthorizeUrl, githubOAuthReadiness, type GitHubEnv } from '../../../_shared/github/service'
+import { resolvePreAccountOwner } from '../../../_shared/github/preAccount'
 
-interface Env extends GitHubEnv {
-  SUPABASE_URL?: string
-  SUPABASE_ANON_KEY?: string
-  VITE_SUPABASE_URL?: string
-  VITE_SUPABASE_ANON_KEY?: string
-}
-
-function json(body: unknown, status: number, extraHeaders?: Record<string, string>) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: {
-      'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': '*',
-      ...extraHeaders,
-    },
-  })
-}
+interface Env extends GitHubEnv {}
 
 export const onRequestOptions: PagesFunction<Env> = async () =>
   new Response(null, {
@@ -36,21 +21,45 @@ export const onRequestOptions: PagesFunction<Env> = async () =>
 export const onRequestPost: PagesFunction<Env> = async (context) => {
   const { request, env } = context
 
-  // Configuration (including a valid explicit APP_URL) is checked before identity, as before.
   const readiness = githubOAuthReadiness(env, request.url)
   if (!readiness.ok) {
-    return json({ success: false, code: 'CONFIG', error: readiness.error }, 503)
+    return new Response(JSON.stringify({ success: false, code: 'CONFIG', error: readiness.error }), {
+      status: 503,
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+    })
+  }
+  if (!env.CONNECTOR_TOKEN_SECRET) {
+    return new Response(
+      JSON.stringify({
+        success: false,
+        code: 'CONFIG',
+        error: 'CONNECTOR_TOKEN_SECRET is not set.',
+      }),
+      {
+        status: 503,
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+      }
+    )
   }
 
+  let subjectId: string
+  const setCookies: string[] = []
+
   const identity = await resolveIdentity(request, env, request.signal)
-  if (!identity.ok) {
-    return json({ success: false, code: identity.code, error: identity.message }, 401)
-  }
-  if (!identity.identity.authenticated || !identity.identity.userId) {
-    return json(
-      { success: false, code: 'AUTH_REQUIRED', error: 'Sign in to connect GitHub.' },
-      401
+  if (identity.ok && identity.identity.authenticated && identity.identity.userId) {
+    subjectId = identity.identity.userId
+  } else if (!identity.ok && identity.code === 'AUTH_INVALID') {
+    return new Response(
+      JSON.stringify({ success: false, code: identity.code, error: identity.message }),
+      {
+        status: 401,
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+      }
     )
+  } else {
+    const owner = await resolvePreAccountOwner(request, env.CONNECTOR_TOKEN_SECRET)
+    subjectId = owner.ownerId
+    if (owner.setCookie) setCookies.push(owner.setCookie)
   }
 
   let returnTo = '/settings?section=connections'
@@ -58,37 +67,39 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     const body = (await request.json()) as { returnTo?: string }
     if (typeof body.returnTo === 'string') returnTo = body.returnTo
   } catch {
-    /* optional body */
+    /* optional */
   }
 
-  const built = await buildAuthorizeUrl(
-    env,
-    request.url,
-    identity.identity.userId,
-    returnTo
-  )
+  const built = await buildAuthorizeUrl(env, request.url, subjectId, returnTo)
   if ('error' in built) {
-    return json({ success: false, code: 'CONFIG', error: built.error }, 503)
+    return new Response(JSON.stringify({ success: false, code: 'CONFIG', error: built.error }), {
+      status: 503,
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+    })
   }
 
   const secure = request.url.startsWith('https')
-  const cookie = [
-    `nyven_gh_oauth=${encodeURIComponent(built.cookieValue)}`,
-    'Path=/',
-    'HttpOnly',
-    'SameSite=Lax',
-    `Max-Age=${15 * 60}`,
-    secure ? 'Secure' : '',
-  ]
-    .filter(Boolean)
-    .join('; ')
-
-  // state is inside cookie; GitHub also gets state from URL — bind them in cookie
-  void extractBearerToken
-
-  return json(
-    { success: true, authorizeUrl: built.url },
-    200,
-    { 'Set-Cookie': cookie }
+  setCookies.push(
+    [
+      `nyven_gh_oauth=${encodeURIComponent(built.cookieValue)}`,
+      'Path=/',
+      'HttpOnly',
+      'SameSite=Lax',
+      `Max-Age=${15 * 60}`,
+      secure ? 'Secure' : '',
+    ]
+      .filter(Boolean)
+      .join('; ')
   )
+
+  const headers = new Headers({
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+  })
+  for (const c of setCookies) headers.append('Set-Cookie', c)
+
+  return new Response(JSON.stringify({ success: true, authorizeUrl: built.url }), {
+    status: 200,
+    headers,
+  })
 }

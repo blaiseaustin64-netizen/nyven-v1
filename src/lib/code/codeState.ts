@@ -33,10 +33,16 @@ export function deriveConnectionView(input: {
   signedIn: boolean
   status: ConnectionStatusResponse | null
   statusError?: string | null
+  /** When true, GitHub may connect without a full NYVEN account (pre-account phase). */
+  allowPreAccountConnectors?: boolean
 }): ConnectionView {
   if (input.authLoading) return { kind: 'loading' }
-  if (!input.supabaseConfigured) return { kind: 'auth_unavailable' }
-  if (!input.signedIn) return { kind: 'signed_out' }
+  // Pre-account phase: do not block GitHub on missing NYVEN login
+  const pre = input.allowPreAccountConnectors !== false
+  if (!pre) {
+    if (!input.supabaseConfigured) return { kind: 'auth_unavailable' }
+    if (!input.signedIn) return { kind: 'signed_out' }
+  }
   if (input.statusError) return { kind: 'unavailable', message: input.statusError }
   if (!input.status) return { kind: 'loading' }
   if (input.status.success === false) {

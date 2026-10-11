@@ -1,11 +1,14 @@
 /**
  * Shared guard for NYVEN Code GitHub routes.
- * 1. Verifies the Supabase session (never trusts a client-supplied user id).
- * 2. Loads the caller's own GitHub token (RLS-independent, filtered by user id on the server).
- * Returns the token only to the route handler. It is never serialized into a response.
+ * Supports authenticated Supabase users (DB token) and pre-account cookie store.
+ * Token is never serialized into a response.
  */
 import { resolveIdentity } from '../auth'
 import { getAccessTokenForUser, type GitHubEnv } from './service'
+import {
+  loadPreAccountGitHub,
+  resolvePreAccountOwner,
+} from './preAccount'
 
 export type GitHubRouteAuth =
   | { ok: true; userId: string; token: string }
@@ -38,27 +41,50 @@ export async function authorizeGitHubRoute(
   env: GitHubEnv & { SUPABASE_ANON_KEY?: string; VITE_SUPABASE_ANON_KEY?: string }
 ): Promise<GitHubRouteAuth> {
   const identity = await resolveIdentity(request, env, request.signal)
-  if (!identity.ok) {
+  if (!identity.ok && identity.code === 'AUTH_INVALID') {
     return {
       ok: false,
       response: jsonResponse({ success: false, code: identity.code, error: identity.message }, 401),
     }
   }
-  if (!identity.identity.authenticated || !identity.identity.userId) {
+
+  if (identity.ok && identity.identity.authenticated && identity.identity.userId) {
+    const result = await getAccessTokenForUser(env, identity.identity.userId)
+    if (result.ok) {
+      return { ok: true, userId: identity.identity.userId, token: result.token }
+    }
+    // Fall through to pre-account cookie if DB has no connection
+  }
+
+  if (!env.CONNECTOR_TOKEN_SECRET) {
     return {
       ok: false,
-      response: jsonResponse({ success: false, code: 'AUTH_REQUIRED', error: 'Sign in to use NYVEN Code.' }, 401),
+      response: jsonResponse(
+        {
+          success: false,
+          code: 'NOT_CONNECTED',
+          error: 'GitHub is not connected. Connect GitHub to continue.',
+        },
+        400
+      ),
     }
   }
-  const userId = identity.identity.userId
-  const result = await getAccessTokenForUser(env, userId)
-  if (!result.ok) {
-    const status =
-      result.code === 'NOT_CONNECTED' ? 400 : result.code === 'DECRYPT' ? 500 : 503
+
+  const owner = await resolvePreAccountOwner(request, env.CONNECTOR_TOKEN_SECRET)
+  const store = await loadPreAccountGitHub(request, env.CONNECTOR_TOKEN_SECRET, owner.ownerId)
+  if (!store?.access_token) {
     return {
       ok: false,
-      response: jsonResponse({ success: false, code: result.code, error: result.error }, status),
+      response: jsonResponse(
+        {
+          success: false,
+          code: 'NOT_CONNECTED',
+          error: 'GitHub is not connected. Connect GitHub to continue.',
+        },
+        400
+      ),
     }
   }
-  return { ok: true, userId, token: result.token }
+
+  return { ok: true, userId: owner.ownerId, token: store.access_token }
 }

@@ -25,12 +25,11 @@ const PROVIDER = 'github'
 export const GITHUB_SCOPES = ['read:user', 'repo'].join(' ')
 
 export function githubConfigured(env: GitHubEnv): boolean {
+  // OAuth secrets only — Supabase DB is optional until the account system ships.
   return Boolean(
     env.GITHUB_CLIENT_ID &&
       env.GITHUB_CLIENT_SECRET &&
-      env.CONNECTOR_TOKEN_SECRET &&
-      (env.SUPABASE_URL || env.VITE_SUPABASE_URL) &&
-      env.SUPABASE_SERVICE_ROLE_KEY
+      env.CONNECTOR_TOKEN_SECRET
   )
 }
 
@@ -109,7 +108,7 @@ export function githubOAuthReadiness(env: GitHubEnv, requestUrl: string): GitHub
     return {
       ok: false,
       error:
-        'GitHub OAuth is not configured. Set GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, CONNECTOR_TOKEN_SECRET, SUPABASE_URL, and SUPABASE_SERVICE_ROLE_KEY.',
+        'GitHub OAuth is not configured. Set GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, CONNECTOR_TOKEN_SECRET, and APP_URL.',
     }
   }
   const app = resolveAppOrigin(env, requestUrl)

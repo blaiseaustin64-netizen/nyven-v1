@@ -106,6 +106,7 @@ export function Settings() {
         signedIn: !!userId,
         status: githubStatus,
         statusError: githubStatusError,
+        allowPreAccountConnectors: true,
       }),
     [authLoading, configured, userId, githubStatus, githubStatusError]
   )
@@ -156,9 +157,9 @@ export function Settings() {
     if (active === 'privacy' && userId) {
       void listMemories(userId, { includeDisabled: true }).then(setMemories)
     }
-    if (active === 'connections' && userId) {
-      void listConnections(userId).then(setConnections)
+    if (active === 'connections') {
       void loadGithubStatus()
+      if (userId) void listConnections(userId).then(setConnections)
     }
     // OAuth return banners
     if (active === 'connections') {
@@ -169,7 +170,7 @@ export function Settings() {
         setGithubMsg(`GitHub connection failed (${reason}).`)
       }
     }
-  }, [active, userId, params])
+  }, [active, userId, params, loadGithubStatus])
 
   const persistPrefs = useCallback(
     async (next: NyvenPreferences) => {
@@ -624,13 +625,13 @@ export function Settings() {
                   title="Connected services"
                   desc="Connector foundation for future agents. Status is real — never faked."
                 />
-                {!userId && (
-                  <Card>
-                    <p className="text-sm text-nyven-text-secondary">
-                      Sign in to manage connections. Tokens are stored server-side only.
-                    </p>
-                  </Card>
-                )}
+                <Card>
+                  <p className="text-sm text-nyven-text-secondary">
+                    GitHub can be connected now for development (pre-account phase). Tokens stay
+                    server-side (encrypted cookie or database). Full NYVEN accounts will attach
+                    connections to each user later.
+                  </p>
+                </Card>
                 {INTEGRATIONS.map((integ) => {
                   const row = connections.find((c) => c.provider === integ.id)
                   const isGithub = integ.id === 'github'
@@ -719,12 +720,12 @@ export function Settings() {
                           will be added before this can show Connected.
                         </p>
                       )}
-                      {integ.id === 'github' && integ.oauthReady && userId && githubView.kind === 'unconfigured' && (
+                      {integ.id === 'github' && integ.oauthReady && githubView.kind === 'unconfigured' && (
                         <p className="text-xs text-nyven-text-secondary mt-3 pt-2 border-t border-white/[0.04]">
                           {githubView.message}
                         </p>
                       )}
-                      {integ.id === 'github' && integ.oauthReady && userId && githubView.kind !== 'unconfigured' && (
+                      {integ.id === 'github' && integ.oauthReady && githubView.kind !== 'unconfigured' && (
                         <div className="mt-3 pt-2 border-t border-white/[0.04] space-y-2">
                           {githubMsg && (
                             <p className="text-xs text-nyven-text-secondary">{githubMsg}</p>
@@ -760,7 +761,7 @@ export function Settings() {
                                     .then(() => {
                                       setGithubMsg('GitHub disconnected.')
                                       void loadGithubStatus()
-                                      return listConnections(userId).then(setConnections)
+                                      if (userId) return listConnections(userId).then(setConnections)
                                     })
                                     .catch((e: Error) => setGithubMsg(e.message))
                                     .finally(() => setGithubBusy(false))

@@ -1,6 +1,8 @@
 /**
  * GET /api/connectors/github/callback
- * GitHub OAuth redirect. Validates state, exchanges code, stores encrypted token.
+ * Validates OAuth, exchanges code, stores credentials:
+ * - Authenticated NYVEN user → encrypted row in connections (service role)
+ * - Pre-account subject → encrypted HttpOnly cookie (accounts postponed)
  */
 import {
   callbackUrl,
@@ -11,41 +13,45 @@ import {
   fetchGitHubUser,
   upsertGitHubConnection,
   resolveSafeReturnUrl,
+  githubDbConfigured,
   type GitHubEnv,
 } from '../../../_shared/github/service'
+import {
+  isPreAccountSubject,
+  savePreAccountGitHub,
+  clearPreAccountGitHubCookie,
+} from '../../../_shared/github/preAccount'
 
 interface Env extends GitHubEnv {}
 
 function configError(message: string) {
-  return new Response(
-    JSON.stringify({ success: false, code: 'CONFIG', error: message }),
-    {
-      status: 503,
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-store',
-      },
-    }
-  )
+  return new Response(JSON.stringify({ success: false, code: 'CONFIG', error: message }), {
+    status: 503,
+    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+  })
 }
 
-function redirect(url: string, clearCookie = true) {
+function redirect(url: string, cookies: string[] = []) {
   const headers = new Headers({ Location: url })
-  if (clearCookie) {
-    headers.append(
-      'Set-Cookie',
-      'nyven_gh_oauth=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0'
-    )
-  }
+  headers.append(
+    'Set-Cookie',
+    'nyven_gh_oauth=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0'
+  )
+  for (const c of cookies) headers.append('Set-Cookie', c)
   return new Response(null, { status: 302, headers })
 }
 
 function readCookie(request: Request, name: string): string | null {
   const raw = request.headers.get('Cookie') || ''
-  const parts = raw.split(';')
-  for (const p of parts) {
+  for (const p of raw.split(';')) {
     const [k, ...rest] = p.trim().split('=')
-    if (k === name) return decodeURIComponent(rest.join('='))
+    if (k === name) {
+      try {
+        return decodeURIComponent(rest.join('='))
+      } catch {
+        return rest.join('=')
+      }
+    }
   }
   return null
 }
@@ -53,14 +59,10 @@ function readCookie(request: Request, name: string): string | null {
 export const onRequestGet: PagesFunction<Env> = async (context) => {
   const { request, env } = context
 
-  // The app origin must be explicitly configured. Without a valid origin there is
-  // nowhere safe to redirect, so fail before touching any OAuth state.
   const readiness = githubOAuthReadiness(env, request.url)
   if (!readiness.ok) return configError(readiness.error)
   const origin = readiness.origin
 
-  // Errors return the user to the page that started the flow once the session is read
-  // (validated return path). Earlier failures fall back to Settings.
   let failBase = `${origin}/settings?section=connections`
   const fail = (code: string) => {
     const dest = new URL(failBase)
@@ -95,28 +97,46 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   const vs = parseVerifierAndState(session.codeVerifier)
   if (!vs || vs.state !== state) return fail('state_mismatch')
 
-  // Same validated origin as the authorize step, so redirect_uri matches exactly.
   const tokenResult = await exchangeCode(env, code, vs.codeVerifier, callbackUrl(origin))
   if ('error' in tokenResult) return fail('token_exchange')
 
   const ghUser = await fetchGitHubUser(tokenResult.access_token)
   if (!ghUser) return fail('github_user')
 
-  const saved = await upsertGitHubConnection(
-    env,
-    session.userId,
-    tokenResult,
-    ghUser
-  )
-  if (!saved.ok) return fail('save_failed')
+  const secure = origin.startsWith('https')
+  const extraCookies: string[] = []
 
-  // Session userId is the only owner for the write — never from query params
-  const safePath = resolveSafeReturnUrl(origin, session.returnTo || '/settings?section=connections')
-  const dest = new URL(safePath, `${origin}/`)
-  if (dest.origin !== origin) {
-    return fail('bad_redirect')
+  if (isPreAccountSubject(session.userId)) {
+    // Pre-account: encrypted cookie store (no Supabase user required)
+    const set = await savePreAccountGitHub(
+      {
+        access_token: tokenResult.access_token,
+        account_label: ghUser.login,
+        scopes: (tokenResult.scope || 'read:user repo').split(/[\s,]+/).filter(Boolean),
+        connected_at: new Date().toISOString(),
+        github_user_id: ghUser.id,
+        owner_id: session.userId,
+      },
+      secret,
+      secure
+    )
+    extraCookies.push(set)
+  } else {
+    if (!githubDbConfigured(env)) {
+      return fail('config')
+    }
+    const saved = await upsertGitHubConnection(env, session.userId, tokenResult, ghUser)
+    if (!saved.ok) return fail('save_failed')
+    // Clear any leftover pre-account cookie
+    extraCookies.push(clearPreAccountGitHubCookie(secure))
   }
+
+  const safePath = resolveSafeReturnUrl(
+    origin,
+    session.returnTo || '/settings?section=connections'
+  )
+  const dest = new URL(safePath, `${origin}/`)
+  if (dest.origin !== origin) return fail('bad_redirect')
   dest.searchParams.set('github', 'connected')
-  // Absolute, built from the validated origin, so the redirect never depends on the Host the callback arrived on.
-  return redirect(dest.href)
+  return redirect(dest.href, extraCookies)
 }
