@@ -67,7 +67,7 @@ export function deriveConnectionView(input: {
 }
 
 const CODE_MESSAGES: Record<string, string> = {
-  AUTH_REQUIRED: 'Sign in to use NYVEN Code.',
+  AUTH_REQUIRED: 'GitHub authorization is required to use this action. Connect GitHub if you have not already.',
   AUTH_INVALID: 'Your session expired. Sign in again.',
   NOT_CONNECTED: 'GitHub is not connected. Connect GitHub to browse repositories.',
   GITHUB_AUTH: 'GitHub no longer accepts the stored authorization. Reconnect GitHub.',
