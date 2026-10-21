@@ -11,7 +11,6 @@ import { VoiceController, type VoicePhase } from '../lib/voice/controller'
 import { getVoicePreferences } from '../lib/voice/preferences'
 import { useConversationHistory } from '../lib/chat/ConversationHistoryContext'
 import { useAuth } from '../lib/auth/AuthContext'
-import { getSupabase } from '../lib/supabase/client'
 import {
   loadConversationMessages,
   ensureConversation,
@@ -349,9 +348,7 @@ export function Chat() {
       let accessToken: string | null = null
       if (userId) {
         try {
-          const sb = getSupabase()
-          const { data } = await sb?.auth.getSession() ?? { data: { session: null } }
-          accessToken = data.session?.access_token ?? null
+          /* session via HttpOnly cookie */ ?? null
         } catch {
           accessToken = null
         }
@@ -632,18 +629,15 @@ export function Chat() {
     }
   }
 
+  const [feedbackToast, setFeedbackToast] = useState<string | null>(null)
+
   const submitFeedback = async (messageId: string, type: 'positive' | 'negative') => {
     try {
-      let accessToken: string | undefined
-      if (userId) {
-        const { data } = (await getSupabase()?.auth.getSession()) ?? { data: { session: null } }
-        accessToken = data.session?.access_token
-      }
       const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-      if (accessToken) headers.Authorization = `Bearer ${accessToken}`
-      await fetch('/api/feedback', {
+      const res = await fetch('/api/feedback', {
         method: 'POST',
         headers,
+        credentials: 'include',
         body: JSON.stringify({
           feedbackType: type,
           conversationId: activeId,
@@ -651,13 +645,26 @@ export function Chat() {
           clientVersion: '1.0.0',
         }),
       })
+      const data = (await res.json().catch(() => ({}))) as { success?: boolean; message?: string }
+      if (res.ok && data.success) {
+        setFeedbackToast(data.message || 'Thank you for your feedback!')
+        window.setTimeout(() => setFeedbackToast(null), 3500)
+      }
     } catch {
       /* non-blocking */
     }
   }
 
   return (
-    <div className="h-full flex">
+    <div className="h-full flex relative">
+      {feedbackToast && (
+        <div
+          role="status"
+          className="absolute top-3 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full bg-nyven-surface border border-nyven-cyan/30 text-sm text-nyven-text shadow-lg"
+        >
+          {feedbackToast}
+        </div>
+      )}
 
       {/* Main chat area */}
       <div className="flex-1 flex flex-col min-w-0 min-h-0">

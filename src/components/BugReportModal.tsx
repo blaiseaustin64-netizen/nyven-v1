@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { X, Bug, Loader2 } from 'lucide-react'
-import { getSupabase } from '../lib/supabase/client'
 
 type Props = {
   open: boolean
@@ -40,7 +39,7 @@ export function BugReportModal({ open, onClose, conversationId, messageId }: Pro
     try {
       let accessToken: string | undefined
       try {
-        const { data } = (await getSupabase()?.auth.getSession()) ?? { data: { session: null } }
+        const { data } = (await Promise.resolve({ data: { session: null } })) ?? { data: { session: null } }
         accessToken = data.session?.access_token
       } catch {
         /* guest */

@@ -4,7 +4,23 @@
  * Reuses NYVEN Gemini routing. No API keys in responses.
  */
 
+import { resolveIdentity } from '../../_shared/auth'
+import { resolveUsageSubject } from '../../_shared/db/guestKey'
+import {
+  checkBurst,
+  consumeChatMessage,
+  consumeProviderRequest,
+} from '../../_shared/db/usage'
+import type { D1Database } from '../../_shared/db/types'
+
+
 interface Env {
+  DB?: D1Database
+  SUPABASE_URL?: string
+  SUPABASE_ANON_KEY?: string
+  VITE_SUPABASE_URL?: string
+  VITE_SUPABASE_ANON_KEY?: string
+  PROVIDER_BUDGET_GEMINI?: string
   GEMINI_API_KEY: string
   GEMINI_CHAT_MODEL?: string
   GEMINI_AGENT_MODEL?: string
@@ -543,6 +559,55 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
     const systemInstruction =
       buildAgentSystemInstruction(config, knowledgeBlock, knowledgeUsed) + extraContext
+
+
+    // Durable usage limits (D1) — fail closed if unbound
+    const identityResult = await resolveIdentity(request, env as never, request.signal)
+    if (!identityResult.ok && identityResult.code === 'AUTH_INVALID') {
+      return jsonResponse(
+        { success: false, error: identityResult.message, code: identityResult.code },
+        401
+      )
+    }
+    const identity =
+      identityResult.ok ? identityResult.identity : { authenticated: false as const }
+    const userId = identity.authenticated ? identity.userId : undefined
+    const usageSubject = await resolveUsageSubject(request, userId)
+    const subject = usageSubject.subject
+    const durableBurst = await checkBurst(
+      env.DB,
+      `agent-chat:${subject.type}:${subject.id}`,
+      15
+    )
+    if (!durableBurst.ok) {
+      return jsonResponse(
+        { success: false, code: durableBurst.code, error: durableBurst.message },
+        durableBurst.httpStatus
+      )
+    }
+    const chatQuota = await consumeChatMessage(
+      env.DB,
+      subject.type,
+      subject.id,
+      !!identity.authenticated
+    )
+    if (!chatQuota.ok) {
+      return jsonResponse(
+        {
+          success: false,
+          code: chatQuota.code,
+          error: chatQuota.message,
+        },
+        chatQuota.httpStatus
+      )
+    }
+    const providerOk = await consumeProviderRequest(env.DB, 'gemini', env)
+    if (!providerOk.ok) {
+      return jsonResponse(
+        { success: false, code: providerOk.code, error: providerOk.message },
+        providerOk.httpStatus
+      )
+    }
 
     const apiKey = env.GEMINI_API_KEY
     if (!apiKey) {

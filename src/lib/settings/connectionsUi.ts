@@ -1,20 +1,22 @@
 /**
- * Settings-facing connection helpers.
- * Backed by Phase 8A connector registry — no fake Connected states.
+ * Connections catalog + status for Settings UI.
+ * GitHub status comes from Cloudflare connector APIs (session cookie).
  */
 
-import { getSupabase } from '../supabase/client'
-import type { ConnectionPublicRow } from '../supabase/types'
-import {
-  listProductConnectors,
-  buildConnectorStatusView,
-  connectionStateLabel,
-  type ConnectorDefinition,
-  type ConnectorStatusView,
-  type ConnectorId,
-} from '../connectors'
+import { fetchGitHubStatus, type ConnectionPublic } from '../connectors/githubApi'
 
-export type IntegrationDef = {
+export type ConnectionPublicRow = ConnectionPublic & {
+  id?: string
+  user_id?: string
+  provider: string
+  status: string
+  account_label?: string | null
+  connected_at?: string | null
+  created_at?: string
+  updated_at?: string
+}
+
+export type CatalogItem = {
   id: string
   name: string
   description: string
@@ -23,24 +25,11 @@ export type IntegrationDef = {
   permissionSummary: string[]
 }
 
-/** Catalog from connector registry (product-visible only) */
-export function getIntegrations(): IntegrationDef[] {
-  return listProductConnectors().map((c: ConnectorDefinition) => ({
-    id: c.id,
-    name: c.name,
-    description: c.description,
-    oauthReady: c.oauthReady,
-    iconKey: c.iconKey,
-    permissionSummary: c.permissionSummary,
-  }))
-}
-
-/** Prefer getIntegrations() — kept for existing imports */
-export const INTEGRATIONS: IntegrationDef[] = [
+export const CONNECTIONS_CATALOG: CatalogItem[] = [
   {
     id: 'github',
     name: 'GitHub',
-    description: 'Code context for future NYVEN Code agents. Repositories, issues, PRs.',
+    description: 'Repositories and issues for NYVEN Code. Tokens never leave the server.',
     oauthReady: true,
     iconKey: 'github',
     permissionSummary: [
@@ -52,92 +41,67 @@ export const INTEGRATIONS: IntegrationDef[] = [
   {
     id: 'gmail',
     name: 'Gmail',
-    description: 'Email for NYVEN Inbox. Read, search, draft; send only with approval.',
+    description: 'Email for NYVEN Inbox. Shared deployment tokens disabled by default.',
     oauthReady: false,
     iconKey: 'mail',
     permissionSummary: [
-      'Read email metadata and bodies required for your request',
-      'Search your mailbox',
-      'Create draft replies (not sent until you approve)',
-      'Never send, delete, or modify mail without your confirmation',
+      'Per-user OAuth not enabled yet',
+      'Shared Gmail tokens are off unless explicitly enabled server-side',
     ],
   },
   {
     id: 'google_calendar',
     name: 'Google Calendar',
-    description: 'Schedule awareness for future NYVEN Scheduler agents.',
+    description: 'Not implemented yet.',
     oauthReady: false,
     iconKey: 'calendar',
-    permissionSummary: [
-      'Read calendars and events you grant',
-      'Check availability',
-      'Create/update/delete events only with approval',
-    ],
+    permissionSummary: ['Not connected'],
   },
   {
     id: 'watch',
     name: 'Website monitoring',
-    description: 'HTTP health, status, latency, and uptime for future NYVEN Watch.',
+    description: 'Not implemented yet.',
     oauthReady: false,
     iconKey: 'activity',
-    permissionSummary: [
-      'Probe user-configured URLs for health and latency',
-      'No third-party OAuth required',
-      'Targets must be explicitly configured by the user',
-    ],
+    permissionSummary: ['Not connected'],
   },
   {
     id: 'sales',
     name: 'CRM / Sheets',
-    description: 'CRM and spreadsheet access for future NYVEN Sales. Not implemented.',
+    description: 'Not implemented yet.',
     oauthReady: false,
     iconKey: 'table',
-    permissionSummary: [
-      'Read and search records you connect',
-      'Create/update only with approval',
-      'Provider-specific OAuth (Sheets, Airtable, CRM) not wired yet',
-    ],
+    permissionSummary: ['Not connected'],
   },
 ]
 
 export async function listConnections(userId: string | null): Promise<ConnectionPublicRow[]> {
   if (!userId) return []
-  const sb = getSupabase()
-  if (!sb) return []
-  const { data, error } = await sb.from('connections_public').select('*').eq('user_id', userId)
-  if (error) {
-    const { data: d2 } = await sb
-      .from('connections')
-      .select(
-        'id, user_id, provider, status, account_label, scopes, metadata, connected_at, created_at, updated_at'
-      )
-      .eq('user_id', userId)
-    return (d2 || []) as ConnectionPublicRow[]
+  try {
+    const status = await fetchGitHubStatus()
+    if (status.connected && status.connection) {
+      return [
+        {
+          provider: 'github',
+          status: 'connected',
+          account_label: status.connection.account_label || null,
+          connected_at: status.connection.connected_at || null,
+          id: status.connection.id,
+        },
+      ]
+    }
+  } catch {
+    /* empty */
   }
-  return (data || []) as ConnectionPublicRow[]
+  return []
 }
 
 export function connectionsByProvider(
   rows: ConnectionPublicRow[]
-): Record<string, ConnectionPublicRow> {
-  const map: Record<string, ConnectionPublicRow> = {}
+): Record<string, ConnectionPublicRow | undefined> {
+  const out: Record<string, ConnectionPublicRow | undefined> = {}
   for (const r of rows) {
-    map[r.provider] = r
+    out[r.provider] = r
   }
-  return map
-}
-
-export function statusViewForConnector(
-  connectorId: ConnectorId,
-  rows: ConnectionPublicRow[]
-): ConnectorStatusView {
-  const by = connectionsByProvider(rows)
-  return buildConnectorStatusView(connectorId, by[connectorId] || null)
-}
-
-export function labelForConnector(
-  connectorId: ConnectorId,
-  rows: ConnectionPublicRow[]
-): string {
-  return connectionStateLabel(statusViewForConnector(connectorId, rows).state)
+  return out
 }

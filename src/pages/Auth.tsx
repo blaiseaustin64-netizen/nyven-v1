@@ -1,19 +1,47 @@
-import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { NIdentity } from '../components/NIdentity'
 import { useAuth } from '../lib/auth/AuthContext'
-import { migrateLocalToSupabase } from '../lib/chatPersistence'
 
 export function Auth() {
-  const { signIn, signUp, configured, user } = useAuth()
+  const {
+    signIn,
+    signUp,
+    configured,
+    user,
+    requestPasswordReset,
+    resetPassword,
+    verifyEmail,
+  } = useAuth()
   const navigate = useNavigate()
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin')
+  const [params] = useSearchParams()
+  const [mode, setMode] = useState<'signin' | 'signup' | 'forgot' | 'reset'>('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [info, setInfo] = useState<string | null>(null)
+  const [resetToken, setResetToken] = useState('')
+
+  useEffect(() => {
+    const verify = params.get('verify')
+    const reset = params.get('reset')
+    if (verify) {
+      setBusy(true)
+      void verifyEmail(verify).then((r) => {
+        setBusy(false)
+        if (r.error) setError(r.error)
+        else {
+          setInfo('Email verified. You can sign in.')
+          setMode('signin')
+        }
+      })
+    } else if (reset) {
+      setResetToken(reset)
+      setMode('reset')
+    }
+  }, [params, verifyEmail])
 
   if (user) {
     navigate('/chat', { replace: true })
@@ -31,15 +59,8 @@ export function Auth() {
           setError(res.error)
           return
         }
-        const sbUser = (await import('../lib/supabase/client')).getSupabase()
-        const session = await sbUser?.auth.getSession()
-        const uid = session?.data.session?.user?.id
-        if (uid) {
-          const n = await migrateLocalToSupabase(uid)
-          if (n > 0) setInfo(`Migrated ${n} local conversation(s) to your account.`)
-        }
         navigate('/chat')
-      } else {
+      } else if (mode === 'signup') {
         if (password.length < 8) {
           setError('Password must be at least 8 characters.')
           return
@@ -49,8 +70,23 @@ export function Auth() {
           setError(res.error)
           return
         }
-        setInfo('Check your email to confirm your account if required, then sign in.')
+        setInfo('Account created. Check your email to verify, then sign in.')
         setMode('signin')
+      } else if (mode === 'forgot') {
+        const res = await requestPasswordReset(email.trim())
+        if (res.error) setError(res.error)
+        else setInfo(res.message || 'If an account exists, reset instructions were sent.')
+      } else if (mode === 'reset') {
+        if (password.length < 8) {
+          setError('Password must be at least 8 characters.')
+          return
+        }
+        const res = await resetPassword(resetToken, password)
+        if (res.error) setError(res.error)
+        else {
+          setInfo('Password updated. Sign in with your new password.')
+          setMode('signin')
+        }
       }
     } finally {
       setBusy(false)
@@ -64,12 +100,11 @@ export function Auth() {
           <NIdentity state="white" size={48} className="mx-auto opacity-80" />
           <h1 className="font-display text-xl font-medium">Authentication unavailable</h1>
           <p className="text-sm text-nyven-text-secondary">
-            Set <code className="text-nyven-cyan">VITE_SUPABASE_URL</code> and{' '}
-            <code className="text-nyven-cyan">VITE_SUPABASE_ANON_KEY</code>, then run the Phase 6
-            SQL migration in your Supabase project.
+            Cloudflare D1 auth is not configured. Bind the <code className="text-nyven-cyan">DB</code>{' '}
+            database on Pages and apply migrations.
           </p>
-          <Link to="/chat" className="text-sm text-nyven-cyan hover:underline">
-            Continue as guest
+          <Link to="/" className="text-sm text-nyven-cyan">
+            Back home
           </Link>
         </div>
       </div>
@@ -78,89 +113,102 @@ export function Auth() {
 
   return (
     <div className="h-full flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
-        <div className="flex flex-col items-center mb-8">
-          <NIdentity state="white" size={44} className="mb-4 opacity-90" />
-          <h1 className="font-display text-2xl font-medium">
-            {mode === 'signin' ? 'Sign in to NYVEN' : 'Create your account'}
+      <div className="w-full max-w-md space-y-6">
+        <div className="text-center space-y-2">
+          <NIdentity state="white" size={48} className="mx-auto opacity-80" />
+          <h1 className="font-display text-xl font-medium">
+            {mode === 'signup'
+              ? 'Create account'
+              : mode === 'forgot'
+                ? 'Reset password'
+                : mode === 'reset'
+                  ? 'Choose new password'
+                  : 'Sign in'}
           </h1>
-          <p className="text-sm text-nyven-text-secondary mt-2 text-center">
-            Sync conversations, memory, and preferences across devices.
-          </p>
+          <p className="text-sm text-nyven-text-secondary">NYVEN account via Cloudflare Auth</p>
         </div>
 
-        <form
-          onSubmit={submit}
-          className="bg-nyven-surface border border-white/[0.06] rounded-2xl p-5 space-y-4"
-        >
-          {mode === 'signup' && (
-            <div>
-              <label className="text-xs text-nyven-text-secondary mb-1 block">Display name</label>
+        <form onSubmit={submit} className="space-y-4 rounded-2xl border border-white/10 bg-nyven-surface p-6">
+          {mode !== 'reset' && mode !== 'forgot' && mode === 'signup' && (
+            <label className="block text-sm">
+              <span className="text-nyven-text-secondary">Display name</span>
               <input
+                className="mt-1 w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                className="w-full bg-nyven-bg border border-white/[0.08] rounded-xl px-3 py-2.5 text-sm outline-none focus:border-nyven-cyan/40"
-                placeholder="Optional"
+                autoComplete="nickname"
               />
-            </div>
+            </label>
           )}
-          <div>
-            <label className="text-xs text-nyven-text-secondary mb-1 block">Email</label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-nyven-bg border border-white/[0.08] rounded-xl px-3 py-2.5 text-sm outline-none focus:border-nyven-cyan/40"
-              autoComplete="email"
-            />
-          </div>
-          <div>
-            <label className="text-xs text-nyven-text-secondary mb-1 block">Password</label>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-nyven-bg border border-white/[0.08] rounded-xl px-3 py-2.5 text-sm outline-none focus:border-nyven-cyan/40"
-              autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
-            />
-          </div>
-
-          {error && <p className="text-xs text-red-300">{error}</p>}
-          {info && <p className="text-xs text-nyven-cyan">{info}</p>}
-
+          {mode !== 'reset' && (
+            <label className="block text-sm">
+              <span className="text-nyven-text-secondary">Email</span>
+              <input
+                type="email"
+                required
+                className="mt-1 w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="email"
+              />
+            </label>
+          )}
+          {(mode === 'signin' || mode === 'signup' || mode === 'reset') && (
+            <label className="block text-sm">
+              <span className="text-nyven-text-secondary">Password</span>
+              <input
+                type="password"
+                required
+                className="mt-1 w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
+              />
+            </label>
+          )}
+          {error && <p className="text-sm text-red-300">{error}</p>}
+          {info && <p className="text-sm text-nyven-cyan">{info}</p>}
           <button
             type="submit"
             disabled={busy}
-            className="w-full py-2.5 rounded-xl bg-nyven-cyan text-nyven-bg text-sm font-medium hover:bg-nyven-cyan/90 disabled:opacity-50"
+            className="w-full rounded-xl bg-nyven-cyan/90 text-black font-medium py-2.5 disabled:opacity-50"
           >
-            {busy ? 'Please wait…' : mode === 'signin' ? 'Sign in' : 'Sign up'}
+            {busy
+              ? 'Please wait…'
+              : mode === 'signup'
+                ? 'Create account'
+                : mode === 'forgot'
+                  ? 'Send reset link'
+                  : mode === 'reset'
+                    ? 'Update password'
+                    : 'Sign in'}
           </button>
         </form>
 
-        <p className="text-center text-sm text-nyven-text-secondary mt-4">
-          {mode === 'signin' ? (
+        <div className="text-center text-sm text-nyven-text-secondary space-y-2">
+          {mode === 'signin' && (
             <>
-              No account?{' '}
               <button type="button" className="text-nyven-cyan" onClick={() => setMode('signup')}>
-                Sign up
+                Create an account
               </button>
-            </>
-          ) : (
-            <>
-              Already have an account?{' '}
-              <button type="button" className="text-nyven-cyan" onClick={() => setMode('signin')}>
-                Sign in
-              </button>
+              <div>
+                <button type="button" className="underline" onClick={() => setMode('forgot')}>
+                  Forgot password?
+                </button>
+              </div>
             </>
           )}
-        </p>
-        <p className="text-center mt-3">
-          <Link to="/chat" className="text-xs text-nyven-text-secondary hover:text-nyven-text">
-            Continue as guest
-          </Link>
-        </p>
+          {mode !== 'signin' && (
+            <button type="button" className="text-nyven-cyan" onClick={() => setMode('signin')}>
+              Back to sign in
+            </button>
+          )}
+          <div>
+            <Link to="/" className="underline">
+              Continue as guest
+            </Link>
+          </div>
+        </div>
       </div>
     </div>
   )

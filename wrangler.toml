@@ -1,0 +1,19 @@
+# NYVEN — Cloudflare Pages + D1 configuration
+# Local: npx wrangler pages dev dist --d1=DB=nyven-db
+# Create DB: npx wrangler d1 create nyven-db
+# Apply migrations (local): npx wrangler d1 migrations apply nyven-db --local
+# Apply migrations (remote): npx wrangler d1 migrations apply nyven-db --remote
+
+name = "nyven"
+compatibility_date = "2024-09-23"
+pages_build_output_dir = "dist"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "nyven-db"
+database_id = "d8131027-693a-4139-a424-50ce6b72ef97"
+migrations_dir = "migrations/d1"
+
+# Optional Workers AI binding for STT (configure in dashboard if not using wrangler pages)
+# [ai]
+# binding = "AI"

@@ -1,7 +1,25 @@
 // Cloudflare Pages Function — replaces api/build.ts (Vercel version)
 // Same logic as before; only the handler signature and env access changed.
 
+import { resolveIdentity } from '../_shared/auth'
+import { resolveUsageSubject, guestCookieHeader } from '../_shared/db/guestKey'
+import {
+  checkBurst,
+  consumeChatMessage,
+  consumeProviderRequest,
+} from '../_shared/db/usage'
+import type { D1Database } from '../_shared/db/types'
+
 interface Env {
+  DB?: D1Database
+  APP_URL?: string
+  ALLOWED_ORIGINS?: string
+  SUPABASE_URL?: string
+  SUPABASE_ANON_KEY?: string
+  VITE_SUPABASE_URL?: string
+  VITE_SUPABASE_ANON_KEY?: string
+  PROVIDER_BUDGET_OPENROUTER?: string
+
   OPENROUTER_API_KEY: string
   OPENROUTER_BUILDER_MODEL?: string
 }
@@ -562,6 +580,58 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       return jsonResponse(
         { success: false, error: 'Please describe the website you want NYVEN to build.' },
         400
+      )
+    }
+
+
+    // Server usage + provider budget (fail closed without D1)
+    const identityResult = await resolveIdentity(request, env as never, request.signal)
+    if (!identityResult.ok) {
+      const status = identityResult.code === 'AUTH_CONFIG' ? 503 : 401
+      return jsonResponse(
+        { success: false, error: identityResult.message, code: identityResult.code },
+        status
+      )
+    }
+    const identity = identityResult.identity
+    const userId = identity.authenticated ? identity.userId : undefined
+    const usageSubject = await resolveUsageSubject(request, userId)
+    const subject = usageSubject.subject
+    const burst = await checkBurst(env.DB, `build:${subject.type}:${subject.id}`, 5)
+    if (!burst.ok) {
+      return jsonResponse(
+        { success: false, code: burst.code, error: burst.message },
+        burst.httpStatus
+      )
+    }
+    // Builder counts as a chat-class message against daily allowance
+    const chatQuota = await consumeChatMessage(
+      env.DB,
+      subject.type,
+      subject.id,
+      !!identity.authenticated
+    )
+    if (!chatQuota.ok) {
+      return jsonResponse(
+        {
+          success: false,
+          code: chatQuota.code,
+          error: chatQuota.message,
+          usage: {
+            chatCount: chatQuota.snapshot.chatCount,
+            chatRemaining: chatQuota.snapshot.chatRemaining,
+            limits: chatQuota.snapshot.limits,
+            resetsAt: chatQuota.snapshot.resetsAt,
+          },
+        },
+        chatQuota.httpStatus
+      )
+    }
+    const providerOk = await consumeProviderRequest(env.DB, 'openrouter', env)
+    if (!providerOk.ok) {
+      return jsonResponse(
+        { success: false, code: providerOk.code, error: providerOk.message },
+        providerOk.httpStatus
       )
     }
 

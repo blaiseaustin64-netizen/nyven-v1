@@ -7,6 +7,7 @@ import { encryptToken, decryptToken, randomUrlSafe, hmacSign, hmacVerify } from 
 import { toPublicConnection, type ConnectionPublicDTO } from '../connectors'
 
 export type GitHubEnv = {
+  DB?: import('../db/types').D1Database
   GITHUB_CLIENT_ID?: string
   GITHUB_CLIENT_SECRET?: string
   CONNECTOR_TOKEN_SECRET?: string
@@ -345,14 +346,6 @@ export async function upsertGitHubConnection(
   ghUser: { login: string; id: number; name?: string },
   userJwt?: string
 ): Promise<{ ok: true; row: ConnectionPublicDTO } | { ok: false; error: string }> {
-  const cfg = supabaseAdmin(env)
-  if (!cfg) {
-    return {
-      ok: false,
-      error:
-        'Server configuration error: SUPABASE_SERVICE_ROLE_KEY and SUPABASE_URL are required to store GitHub connections.',
-    }
-  }
   if (!env.CONNECTOR_TOKEN_SECRET) {
     return { ok: false, error: 'CONNECTOR_TOKEN_SECRET is not set.' }
   }
@@ -367,18 +360,41 @@ export async function upsertGitHubConnection(
   )
 
   const now = new Date().toISOString()
+  const scopes = (token.scope || GITHUB_SCOPES).split(/[\s,]+/).filter(Boolean)
+  const metadata = {
+    github_user_id: ghUser.id,
+    github_login: ghUser.login,
+    github_name: ghUser.name || null,
+  }
+
+  if (env.DB) {
+    const d1 = await d1UpsertGitHub(env, userId, {
+      account_label: ghUser.login,
+      scopes,
+      token_ciphertext: ciphertext,
+      metadata,
+    })
+    if (!d1.ok) return d1
+    return { ok: true, row: toPublicConnection(d1.row) }
+  }
+
+  const cfg = supabaseAdmin(env)
+  if (!cfg) {
+    return {
+      ok: false,
+      error:
+        'Server configuration error: D1 DB binding or SUPABASE_SERVICE_ROLE_KEY is required to store GitHub connections.',
+    }
+  }
+
   const body = {
     user_id: userId,
     provider: PROVIDER,
     status: 'connected',
     account_label: ghUser.login,
-    scopes: (token.scope || GITHUB_SCOPES).split(/[\s,]+/).filter(Boolean),
+    scopes,
     token_ciphertext: ciphertext,
-    metadata: {
-      github_user_id: ghUser.id,
-      github_login: ghUser.login,
-      github_name: ghUser.name || null,
-    },
+    metadata,
     connected_at: now,
     updated_at: now,
   }
@@ -418,11 +434,82 @@ export type GitHubConnectionLookup =
   | { ok: true; row: Record<string, unknown> | null }
   | { ok: false; error: string }
 
+
+async function d1LookupGitHub(env: GitHubEnv, userId: string): Promise<GitHubConnectionLookup> {
+  if (!env.DB) return { ok: false, error: 'Database not configured.' }
+  try {
+    const row = await env.DB.prepare(
+      `SELECT * FROM oauth_connections WHERE user_id = ? AND provider = 'github'`
+    )
+      .bind(userId)
+      .first<Record<string, unknown>>()
+    return { ok: true, row: row || null }
+  } catch {
+    return { ok: false, error: 'Could not read GitHub connection state.' }
+  }
+}
+
+async function d1UpsertGitHub(
+  env: GitHubEnv,
+  userId: string,
+  fields: {
+    account_label: string
+    scopes: string[]
+    token_ciphertext: string
+    metadata: Record<string, unknown>
+  }
+): Promise<{ ok: true; row: Record<string, unknown> } | { ok: false; error: string }> {
+  if (!env.DB) return { ok: false, error: 'Database not configured.' }
+  const now = new Date().toISOString()
+  const id = crypto.randomUUID()
+  try {
+    await env.DB.prepare(
+      `INSERT INTO oauth_connections
+        (id, user_id, provider, status, account_label, scopes, token_ciphertext, metadata_json, connected_at, created_at, updated_at)
+       VALUES (?, ?, 'github', 'connected', ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(user_id, provider) DO UPDATE SET
+         status = 'connected',
+         account_label = excluded.account_label,
+         scopes = excluded.scopes,
+         token_ciphertext = excluded.token_ciphertext,
+         metadata_json = excluded.metadata_json,
+         connected_at = excluded.connected_at,
+         updated_at = excluded.updated_at`
+    )
+      .bind(
+        id,
+        userId,
+        fields.account_label,
+        fields.scopes.join(' '),
+        fields.token_ciphertext,
+        JSON.stringify(fields.metadata),
+        now,
+        now,
+        now
+      )
+      .run()
+    const row = await env.DB.prepare(
+      `SELECT * FROM oauth_connections WHERE user_id = ? AND provider = 'github'`
+    )
+      .bind(userId)
+      .first<Record<string, unknown>>()
+    if (!row) return { ok: false, error: 'Could not save GitHub connection.' }
+    return { ok: true, row }
+  } catch (e) {
+    console.error('d1 github upsert failed', e instanceof Error ? e.name : 'unknown')
+    return { ok: false, error: 'Could not save GitHub connection.' }
+  }
+}
+
+
 export async function lookupGitHubConnectionRow(
   env: GitHubEnv,
   userId: string,
   userJwt?: string
 ): Promise<GitHubConnectionLookup> {
+  if (env.DB) {
+    return d1LookupGitHub(env, userId)
+  }
   const cfg = supabaseAdmin(env)
   if (!cfg) {
     return { ok: false, error: 'Database admin access is not configured.' }

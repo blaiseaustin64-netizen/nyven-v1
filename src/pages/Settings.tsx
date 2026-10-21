@@ -44,7 +44,6 @@ import {
 } from '../lib/memoryStore'
 import type { MemoryRow } from '../lib/supabase/types'
 import type { ConnectionPublicRow } from '../lib/supabase/types'
-import { getSupabase } from '../lib/supabase/client'
 import { setVoicePreferences } from '../lib/voice/preferences'
 import { VoiceSpeechSettings } from '../components/voice/VoiceSpeechSettings'
 import { resolveFishVoiceId } from '../lib/voice/catalog'
@@ -192,7 +191,7 @@ export function Settings() {
 
   const saveProfile = async () => {
     if (!userId) return
-    const sb = getSupabase()
+    const sb = null
     if (!sb) return
     setSaving(true)
     const { error } = await sb
@@ -217,7 +216,7 @@ export function Settings() {
       showToast('Passwords do not match')
       return
     }
-    const sb = getSupabase()
+    const sb = null
     if (!sb) return
     setSaving(true)
     const { error } = await sb.auth.updateUser({ password })
@@ -791,7 +790,7 @@ export function Settings() {
               <>
                 <SectionTitle
                   title="Usage"
-                  desc="Real event counts from the last 30 days. Not rate-limit enforcement."
+                  desc="Server-enforced daily limits when D1 is bound; otherwise historical event counts."
                 />
                 {!usage && (
                   <p className="text-sm text-nyven-text-secondary">Loading…</p>
@@ -805,15 +804,49 @@ export function Settings() {
                 )}
                 {usage?.available && (
                   <Card>
-                    <UsageRow label="Messages" value={usage.message} />
-                    <UsageRow label="Voice (STT)" value={usage.voice_stt} />
-                    <UsageRow label="Voice (TTS)" value={usage.voice_tts} />
-                    <UsageRow label="Attachments" value={usage.attachment} />
-                    <UsageRow label="Web searches" value={usage.web_search} />
-                    <UsageRow label="Tool calls" value={usage.tool_call} />
-                    <p className="text-xs text-nyven-text-secondary mt-3">
-                      Since {new Date(usage.since).toLocaleDateString()}
-                    </p>
+                    {usage.source === 'd1' ? (
+                      <>
+                        <UsageRow
+                          label="Chat messages today"
+                          value={`${usage.message} / ${usage.chatLimit ?? '—'}`}
+                        />
+                        <UsageRow
+                          label="Chat remaining"
+                          value={String(usage.chatRemaining ?? '—')}
+                        />
+                        <UsageRow
+                          label="Voice used (seconds)"
+                          value={`${usage.voice_stt} / ${usage.voiceLimitSeconds ?? '—'}`}
+                        />
+                        <UsageRow
+                          label="Voice remaining (seconds)"
+                          value={String(usage.voiceRemainingSeconds ?? '—')}
+                        />
+                        <UsageRow
+                          label="Max voice session"
+                          value={`${usage.maxSessionSeconds ?? 300}s`}
+                        />
+                        <p className="text-xs text-nyven-text-secondary mt-3">
+                          Daily window: {usage.since} ({usage.timezone || 'UTC'}). Resets{' '}
+                          {usage.resetsAt
+                            ? new Date(usage.resetsAt).toLocaleString()
+                            : 'end of UTC day'}
+                          .
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <UsageRow label="Messages" value={usage.message} />
+                        <UsageRow label="Voice (STT)" value={usage.voice_stt} />
+                        <UsageRow label="Voice (TTS)" value={usage.voice_tts} />
+                        <UsageRow label="Attachments" value={usage.attachment} />
+                        <UsageRow label="Web searches" value={usage.web_search} />
+                        <UsageRow label="Tool calls" value={usage.tool_call} />
+                        <p className="text-xs text-nyven-text-secondary mt-3">
+                          Since {usage.since ? new Date(usage.since).toLocaleDateString() : '—'}
+                        </p>
+                      </>
+                    )}
                   </Card>
                 )}
               </>
@@ -960,7 +993,7 @@ function Select({
   )
 }
 
-function UsageRow({ label, value }: { label: string; value: number }) {
+function UsageRow({ label, value }: { label: string; value: number | string }) {
   return (
     <div className="flex justify-between text-sm py-1.5 border-b border-white/[0.04] last:border-0">
       <span className="text-nyven-text-secondary">{label}</span>
@@ -991,7 +1024,7 @@ function BugReportCard() {
     try {
       let accessToken: string | undefined
       try {
-        const { data } = (await getSupabase()?.auth.getSession()) ?? {
+        const { data } = (await null?.auth.getSession()) ?? {
           data: { session: null },
         }
         accessToken = data.session?.access_token

@@ -7,20 +7,21 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import type { Session, User } from '@supabase/supabase-js'
-import {
-  ensureSupabaseConfig,
-  getSupabase,
-  isSupabaseConfigured,
-} from '../supabase/client'
-import type { ProfileRow } from '../supabase/types'
+
+export type NyvenUser = {
+  id: string
+  email: string
+  displayName: string | null
+  emailVerified: boolean
+  createdAt?: string
+}
 
 type AuthState = {
   configured: boolean
   loading: boolean
-  session: Session | null
-  user: User | null
-  profile: ProfileRow | null
+  session: { user: NyvenUser } | null
+  user: NyvenUser | null
+  profile: { id: string; display_name: string | null; email?: string } | null
   signIn: (email: string, password: string) => Promise<{ error?: string }>
   signUp: (
     email: string,
@@ -29,129 +30,191 @@ type AuthState = {
   ) => Promise<{ error?: string }>
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
+  requestPasswordReset: (email: string) => Promise<{ error?: string; message?: string }>
+  resetPassword: (token: string, password: string) => Promise<{ error?: string }>
+  verifyEmail: (token: string) => Promise<{ error?: string }>
 }
 
 const AuthContext = createContext<AuthState | null>(null)
 
-async function fetchProfile(userId: string): Promise<ProfileRow | null> {
-  const sb = getSupabase()
-  if (!sb) return null
-  const { data, error } = await sb.from('profiles').select('*').eq('id', userId).maybeSingle()
-  if (error) {
-    console.warn('profile fetch', error.message)
+async function fetchMe(): Promise<NyvenUser | null> {
+  try {
+    const res = await fetch('/api/auth/me', { credentials: 'include' })
+    const data = (await res.json().catch(() => ({}))) as {
+      success?: boolean
+      authenticated?: boolean
+      user?: NyvenUser
+    }
+    if (res.ok && data.success && data.authenticated && data.user) return data.user
+    return null
+  } catch {
     return null
   }
-  return data as ProfileRow | null
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [configured, setConfigured] = useState(() => isSupabaseConfigured())
+  const [configured, setConfigured] = useState(true)
   const [loading, setLoading] = useState(true)
-  const [session, setSession] = useState<Session | null>(null)
-  const [profile, setProfile] = useState<ProfileRow | null>(null)
+  const [user, setUser] = useState<NyvenUser | null>(null)
+
+  const refreshProfile = useCallback(async () => {
+    const u = await fetchMe()
+    setUser(u)
+    setConfigured(true)
+  }, [])
 
   useEffect(() => {
     let mounted = true
-    let unsubscribe: (() => void) | undefined
-
     ;(async () => {
-      // Build-time env may be empty on Cloudflare; load public runtime config first
-      const ok = await ensureSupabaseConfig()
+      const u = await fetchMe()
       if (!mounted) return
-      setConfigured(ok)
-
-      if (!ok) {
-        setLoading(false)
-        return
-      }
-
-      const sb = getSupabase()
-      if (!sb) {
-        setConfigured(false)
-        setLoading(false)
-        return
-      }
-
-      const { data } = await sb.auth.getSession()
-      if (!mounted) return
-      setSession(data.session)
-      if (data.session?.user) {
-        void fetchProfile(data.session.user.id).then((p) => {
-          if (mounted) setProfile(p)
-        })
-      }
+      setUser(u)
       setLoading(false)
-
-      const { data: sub } = sb.auth.onAuthStateChange((_event, next) => {
-        setSession(next)
-        if (next?.user) {
-          void fetchProfile(next.user.id).then(setProfile)
-        } else {
-          setProfile(null)
-        }
-      })
-      unsubscribe = () => sub.subscription.unsubscribe()
     })()
-
     return () => {
       mounted = false
-      unsubscribe?.()
     }
   }, [])
 
   const signIn = useCallback(async (email: string, password: string) => {
-    await ensureSupabaseConfig()
-    const sb = getSupabase()
-    if (!sb) return { error: 'Authentication is not configured.' }
-    const { error } = await sb.auth.signInWithPassword({ email, password })
-    if (error) return { error: error.message }
-    return {}
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      })
+      const data = (await res.json().catch(() => ({}))) as {
+        success?: boolean
+        error?: string
+        user?: NyvenUser
+      }
+      if (!res.ok || !data.success) {
+        return { error: data.error || 'Sign in failed.' }
+      }
+      setUser(data.user || (await fetchMe()))
+      return {}
+    } catch {
+      return { error: 'Network error. Please try again.' }
+    }
   }, [])
 
   const signUp = useCallback(
     async (email: string, password: string, displayName?: string) => {
-      await ensureSupabaseConfig()
-      const sb = getSupabase()
-      if (!sb) return { error: 'Authentication is not configured.' }
-      const { error } = await sb.auth.signUp({
-        email,
-        password,
-        options: {
-          data: displayName ? { display_name: displayName } : undefined,
-        },
-      })
-      if (error) return { error: error.message }
-      return {}
+      try {
+        const res = await fetch('/api/auth/register', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password, displayName }),
+        })
+        const data = (await res.json().catch(() => ({}))) as {
+          success?: boolean
+          error?: string
+          message?: string
+        }
+        if (!res.ok || !data.success) {
+          return { error: data.error || 'Could not create account.' }
+        }
+        return {}
+      } catch {
+        return { error: 'Network error. Please try again.' }
+      }
     },
     []
   )
 
   const signOut = useCallback(async () => {
-    const sb = getSupabase()
-    if (!sb) return
-    await sb.auth.signOut()
-    setProfile(null)
+    try {
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
+    } catch {
+      /* ignore */
+    }
+    setUser(null)
   }, [])
 
-  const refreshProfile = useCallback(async () => {
-    if (session?.user) {
-      setProfile(await fetchProfile(session.user.id))
+  const requestPasswordReset = useCallback(async (email: string) => {
+    try {
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      })
+      const data = (await res.json().catch(() => ({}))) as {
+        success?: boolean
+        error?: string
+        message?: string
+      }
+      if (!res.ok || !data.success) return { error: data.error || 'Request failed.' }
+      return { message: data.message }
+    } catch {
+      return { error: 'Network error.' }
     }
-  }, [session])
+  }, [])
+
+  const resetPassword = useCallback(async (token: string, password: string) => {
+    try {
+      const res = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, password }),
+      })
+      const data = (await res.json().catch(() => ({}))) as { success?: boolean; error?: string }
+      if (!res.ok || !data.success) return { error: data.error || 'Reset failed.' }
+      return {}
+    } catch {
+      return { error: 'Network error.' }
+    }
+  }, [])
+
+  const verifyEmail = useCallback(async (token: string) => {
+    try {
+      const res = await fetch('/api/auth/verify-email', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
+      })
+      const data = (await res.json().catch(() => ({}))) as { success?: boolean; error?: string }
+      if (!res.ok || !data.success) return { error: data.error || 'Verification failed.' }
+      await refreshProfile()
+      return {}
+    } catch {
+      return { error: 'Network error.' }
+    }
+  }, [refreshProfile])
 
   const value = useMemo<AuthState>(
     () => ({
       configured,
       loading,
-      session,
-      user: session?.user ?? null,
-      profile,
+      session: user ? { user } : null,
+      user,
+      profile: user
+        ? { id: user.id, display_name: user.displayName, email: user.email }
+        : null,
       signIn,
       signUp,
       signOut,
       refreshProfile,
+      requestPasswordReset,
+      resetPassword,
+      verifyEmail,
     }),
-    [configured, loading, session, profile, signIn, signUp, signOut, refreshProfile]
+    [
+      configured,
+      loading,
+      user,
+      signIn,
+      signUp,
+      signOut,
+      refreshProfile,
+      requestPasswordReset,
+      resetPassword,
+      verifyEmail,
+    ]
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
@@ -159,8 +222,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuth(): AuthState {
   const ctx = useContext(AuthContext)
-  if (!ctx) {
-    throw new Error('useAuth must be used within AuthProvider')
-  }
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider')
   return ctx
 }

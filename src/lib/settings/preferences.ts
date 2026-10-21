@@ -1,9 +1,6 @@
 /**
- * User preferences — Supabase profile.preferences when signed in,
- * localStorage fallback for guests.
+ * User preferences — D1 via /api/preferences when signed in, localStorage otherwise.
  */
-
-import { getSupabase } from '../supabase/client'
 
 export type AIPreferences = {
   responseStyle: 'concise' | 'balanced' | 'detailed'
@@ -14,7 +11,6 @@ export type AIPreferences = {
 export type VoiceUIPreferences = {
   voiceEnabled: boolean
   autoSpeak: boolean
-  /** Fish Audio voice id (Sarah / ALEX J / Adrian) */
   voiceId: string
 }
 
@@ -73,17 +69,21 @@ export function saveLocalPreferences(prefs: NyvenPreferences) {
 
 export async function loadPreferences(userId: string | null): Promise<NyvenPreferences> {
   if (!userId) return loadLocalPreferences()
-  const sb = getSupabase()
-  if (!sb) return loadLocalPreferences()
-  const { data, error } = await sb
-    .from('profiles')
-    .select('preferences')
-    .eq('id', userId)
-    .maybeSingle()
-  if (error || !data) return loadLocalPreferences()
-  const merged = mergePrefs(data.preferences)
-  saveLocalPreferences(merged)
-  return merged
+  try {
+    const res = await fetch('/api/preferences', { credentials: 'include' })
+    const data = (await res.json().catch(() => ({}))) as {
+      success?: boolean
+      preferences?: unknown
+    }
+    if (res.ok && data.success && data.preferences) {
+      const merged = mergePrefs(data.preferences)
+      saveLocalPreferences(merged)
+      return merged
+    }
+  } catch {
+    /* fall through */
+  }
+  return loadLocalPreferences()
 }
 
 export async function savePreferences(
@@ -92,12 +92,19 @@ export async function savePreferences(
 ): Promise<{ ok: boolean; error?: string }> {
   saveLocalPreferences(prefs)
   if (!userId) return { ok: true }
-  const sb = getSupabase()
-  if (!sb) return { ok: true }
-  const { error } = await sb
-    .from('profiles')
-    .update({ preferences: prefs, updated_at: new Date().toISOString() })
-    .eq('id', userId)
-  if (error) return { ok: false, error: error.message }
-  return { ok: true }
+  try {
+    const res = await fetch('/api/preferences', {
+      method: 'PUT',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ preferences: prefs }),
+    })
+    const data = (await res.json().catch(() => ({}))) as { success?: boolean; error?: string }
+    if (!res.ok || !data.success) {
+      return { ok: false, error: data.error || 'Could not sync preferences to the server.' }
+    }
+    return { ok: true }
+  } catch {
+    return { ok: false, error: 'Network error syncing preferences.' }
+  }
 }

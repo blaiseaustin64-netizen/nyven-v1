@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { NIdentity } from '../components/NIdentity'
 import { useAuth } from '../lib/auth/AuthContext'
-import { getSupabase } from '../lib/supabase/client'
 
 export function Profile() {
   const { user, profile, configured, loading, signOut, refreshProfile } = useAuth()
@@ -17,7 +16,7 @@ export function Profile() {
 
   const save = async () => {
     if (!user) return
-    const sb = getSupabase()
+    const sb = null
     if (!sb) return
     setSaving(true)
     setMsg(null)

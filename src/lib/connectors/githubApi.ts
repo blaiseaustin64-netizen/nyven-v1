@@ -1,16 +1,20 @@
 /**
- * Client helpers for the shared GitHub connector (Settings + NYVEN Code).
- * Never handles raw tokens — server only.
+ * Client helpers for GitHub connector. Session via cookie; never handles raw tokens.
  */
 
-import { getSupabase } from '../supabase/client'
-import type { ConnectionPublicRow } from '../supabase/types'
+export type ConnectionPublic = {
+  id?: string
+  provider?: string
+  status?: string
+  account_label?: string | null
+  connected_at?: string | null
+}
 
 export type GitHubStatusResponse = {
   success: boolean
   configured?: boolean
   connected?: boolean
-  connection?: ConnectionPublicRow | null
+  connection?: ConnectionPublic | null
   error?: string
   code?: string
 }
@@ -28,18 +32,13 @@ export type GitHubRepo = {
 }
 
 export async function authHeaders(): Promise<HeadersInit> {
-  const sb = getSupabase()
-  const session = sb ? (await sb.auth.getSession()).data.session : null
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-  if (session?.access_token) {
-    headers.Authorization = `Bearer ${session.access_token}`
-  }
-  return headers
+  return { 'Content-Type': 'application/json' }
 }
 
 export async function fetchGitHubStatus(): Promise<GitHubStatusResponse> {
   const res = await fetch('/api/connectors/github/status', {
     headers: await authHeaders(),
+    credentials: 'include',
   })
   return (await res.json()) as GitHubStatusResponse
 }
@@ -48,6 +47,7 @@ export async function startGitHubOAuth(returnTo: string): Promise<{ authorizeUrl
   const res = await fetch('/api/connectors/github/start', {
     method: 'POST',
     headers: await authHeaders(),
+    credentials: 'include',
     body: JSON.stringify({ returnTo }),
   })
   const data = (await res.json()) as {
@@ -56,7 +56,7 @@ export async function startGitHubOAuth(returnTo: string): Promise<{ authorizeUrl
     error?: string
   }
   if (!res.ok || !data.authorizeUrl) {
-    throw new Error(data.error || 'Could not start GitHub authorization.')
+    throw new Error(data.error || 'Could not start GitHub OAuth.')
   }
   return { authorizeUrl: data.authorizeUrl }
 }
@@ -65,24 +65,20 @@ export async function disconnectGitHub(): Promise<void> {
   const res = await fetch('/api/connectors/github/disconnect', {
     method: 'POST',
     headers: await authHeaders(),
+    credentials: 'include',
   })
-  const data = (await res.json()) as { success?: boolean; error?: string }
-  if (!res.ok || !data.success) {
-    throw new Error(data.error || 'Could not disconnect GitHub.')
+  if (!res.ok) {
+    const data = (await res.json().catch(() => ({}))) as { error?: string }
+    throw new Error(data.error || 'Disconnect failed.')
   }
 }
 
-export async function listGitHubRepos(page = 1): Promise<GitHubRepo[]> {
-  const res = await fetch(`/api/connectors/github/repos?page=${page}`, {
+export async function listGitHubRepos(): Promise<GitHubRepo[]> {
+  const res = await fetch('/api/connectors/github/repos', {
     headers: await authHeaders(),
+    credentials: 'include',
   })
-  const data = (await res.json()) as {
-    success?: boolean
-    repos?: GitHubRepo[]
-    error?: string
-  }
-  if (!res.ok || !data.success) {
-    throw new Error(data.error || 'Could not list repositories.')
-  }
+  const data = (await res.json()) as { success?: boolean; repos?: GitHubRepo[]; error?: string }
+  if (!res.ok || !data.success) throw new Error(data.error || 'Could not list repos.')
   return data.repos || []
 }

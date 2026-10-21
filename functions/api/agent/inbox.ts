@@ -17,6 +17,11 @@ interface Env {
   /** Per-deployment test token only — production should use per-user OAuth store */
   GMAIL_ACCESS_TOKEN?: string
   GMAIL_REFRESH_TOKEN?: string
+  /**
+   * DANGEROUS: allows deployment-wide Gmail tokens (one mailbox for all callers).
+   * Default off. Only enable for single-tenant admin testing.
+   */
+  ENABLE_SHARED_GMAIL_INBOX?: string
 }
 
 type InboxAction =
@@ -47,7 +52,17 @@ const pendingSends = new Map<
   { to: string; subject: string; body: string; agentId: string; expires: number }
 >()
 
+function sharedInboxExplicitlyEnabled(env: Env): boolean {
+  const v = (env.ENABLE_SHARED_GMAIL_INBOX || '').trim().toLowerCase()
+  return v === '1' || v === 'true' || v === 'yes'
+}
+
+/**
+ * Shared deployment Gmail tokens are multi-tenant unsafe.
+ * Disabled unless ENABLE_SHARED_GMAIL_INBOX is explicitly set.
+ */
 function gmailConfigured(env: Env): boolean {
+  if (!sharedInboxExplicitlyEnabled(env)) return false
   return !!(env.GMAIL_ACCESS_TOKEN || (env.GMAIL_REFRESH_TOKEN && env.GOOGLE_CLIENT_ID))
 }
 

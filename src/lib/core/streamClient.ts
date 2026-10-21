@@ -16,7 +16,7 @@ export type ChatStreamRequest = {
     extractedText?: string
     inlineBase64?: string
   }>
-  /** Supabase access token — verified server-side; omit for guests */
+  /** @deprecated Session is cookie-based; accessToken ignored if cookie present */
   accessToken?: string | null
   signal?: AbortSignal
 }
@@ -115,6 +115,7 @@ export async function streamCoreChat(
 
   const res = await fetch('/api/chat', {
     method: 'POST',
+    credentials: 'include' as RequestCredentials,
     headers,
     body: JSON.stringify({
       message: req.message,

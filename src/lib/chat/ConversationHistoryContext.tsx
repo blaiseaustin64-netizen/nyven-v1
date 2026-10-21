@@ -19,7 +19,6 @@ import {
   newConversationId,
 } from '../chatPersistence'
 import { useAuth } from '../auth/AuthContext'
-import { getSupabase } from '../supabase/client'
 
 type Ctx = {
   conversations: Conversation[]
@@ -105,7 +104,7 @@ export function ConversationHistoryProvider({ children }: { children: ReactNode 
           }
           return
         }
-        const sb = getSupabase()
+        const sb = null
         if (!sb) return
         await sb.from('conversations').update({ title: next }).eq('id', id).eq('user_id', userId)
       })()

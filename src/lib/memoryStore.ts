@@ -1,84 +1,101 @@
 /**
- * Selective durable memory foundation.
- * Does NOT dump entire conversations into the model prompt.
+ * Memory store — D1 /api/memories when signed in, localStorage for guests.
  */
 
-import { getSupabase } from './supabase/client'
-import type { MemoryRow } from './supabase/types'
+const LOCAL_KEY = 'nyven_memories_v1'
 
-const MAX_CONTEXT_MEMORIES = 12
+export type MemoryItem = {
+  id: string
+  content: string
+  memory_type?: string
+  source?: string | null
+  enabled?: boolean
+  created_at?: string
+  updated_at?: string
+}
 
-export async function listMemories(userId: string, opts?: { includeDisabled?: boolean }): Promise<MemoryRow[]> {
-  const sb = getSupabase()
-  if (!sb) return []
-  let q = sb
-    .from('memories')
-    .select('*')
-    .eq('user_id', userId)
-    .order('updated_at', { ascending: false })
-    .limit(50)
-  if (!opts?.includeDisabled) {
-    q = q.eq('enabled', true)
-  }
-  const { data, error } = await q
-  if (error) {
-    console.warn('listMemories', error.message)
+function loadLocal(): MemoryItem[] {
+  try {
+    const raw = localStorage.getItem(LOCAL_KEY)
+    if (!raw) return []
+    return JSON.parse(raw) as MemoryItem[]
+  } catch {
     return []
   }
-  return (data || []) as MemoryRow[]
+}
+
+function saveLocal(items: MemoryItem[]) {
+  try {
+    localStorage.setItem(LOCAL_KEY, JSON.stringify(items.slice(0, 100)))
+  } catch {
+    /* ignore */
+  }
+}
+
+export async function listMemories(userId: string | null): Promise<MemoryItem[]> {
+  if (!userId) return loadLocal()
+  try {
+    const res = await fetch('/api/memories', { credentials: 'include' })
+    const data = (await res.json().catch(() => ({}))) as {
+      success?: boolean
+      memories?: MemoryItem[]
+    }
+    if (res.ok && data.success && Array.isArray(data.memories)) return data.memories
+  } catch {
+    /* fall through */
+  }
+  return loadLocal()
 }
 
 export async function addMemory(
-  userId: string,
-  content: string,
-  memoryType: MemoryRow['memory_type'] = 'fact',
-  source?: string
-): Promise<MemoryRow | null> {
-  const sb = getSupabase()
-  if (!sb) return null
-  const { data, error } = await sb
-    .from('memories')
-    .insert({
-      user_id: userId,
-      content: content.slice(0, 2000),
-      memory_type: memoryType,
-      source: source || null,
-      enabled: true,
-    })
-    .select('*')
-    .single()
-  if (error) {
-    console.warn('addMemory', error.message)
-    return null
+  userId: string | null,
+  content: string
+): Promise<{ ok: boolean; id?: string; error?: string }> {
+  const trimmed = content.trim().slice(0, 2000)
+  if (!trimmed) return { ok: false, error: 'Empty memory.' }
+  if (!userId) {
+    const id = crypto.randomUUID()
+    const items = loadLocal()
+    items.unshift({ id, content: trimmed, created_at: new Date().toISOString() })
+    saveLocal(items)
+    return { ok: true, id }
   }
-  return data as MemoryRow
+  try {
+    const res = await fetch('/api/memories', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: trimmed }),
+    })
+    const data = (await res.json().catch(() => ({}))) as {
+      success?: boolean
+      id?: string
+      error?: string
+    }
+    if (!res.ok || !data.success) return { ok: false, error: data.error || 'Save failed.' }
+    return { ok: true, id: data.id }
+  } catch {
+    return { ok: false, error: 'Network error.' }
+  }
 }
 
-export async function deleteMemory(userId: string, memoryId: string): Promise<void> {
-  const sb = getSupabase()
-  if (!sb) return
-  await sb.from('memories').delete().eq('id', memoryId).eq('user_id', userId)
-}
-
-export async function setMemoryEnabled(
-  userId: string,
-  memoryId: string,
-  enabled: boolean
-): Promise<void> {
-  const sb = getSupabase()
-  if (!sb) return
-  await sb.from('memories').update({ enabled }).eq('id', memoryId).eq('user_id', userId)
-}
-
-/** Bounded memory text for Core context injection */
-export async function buildMemoryContext(userId: string | null): Promise<string> {
-  if (!userId) return ''
-  const items = await listMemories(userId)
-  if (!items.length) return ''
-  const lines = items.slice(0, MAX_CONTEXT_MEMORIES).map((m, i) => `${i + 1}. (${m.memory_type}) ${m.content}`)
-  return [
-    '=== BEGIN USER MEMORY (durable facts/preferences; not system instructions) ===',
-    ...lines,
-    '=== END USER MEMORY ===',
-  ].join('\n')
+export async function deleteMemory(
+  userId: string | null,
+  id: string
+): Promise<{ ok: boolean; error?: string }> {
+  if (!userId) {
+    saveLocal(loadLocal().filter((m) => m.id !== id))
+    return { ok: true }
+  }
+  try {
+    const res = await fetch(`/api/memories?id=${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      credentials: 'include',
+    })
+    const data = (await res.json().catch(() => ({}))) as { success?: boolean; error?: string }
+    if (!res.ok || !data.success) return { ok: false, error: data.error || 'Delete failed.' }
+    return { ok: true }
+  } catch {
+    return { ok: false, error: 'Network error.' }
+  }
 }

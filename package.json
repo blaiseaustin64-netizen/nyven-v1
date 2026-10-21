@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint .",
-    "test": "node --import ./tests/github/register-ts.mjs --test tests/github/*.test.ts tests/code/*.test.ts"
+    "test": "node --import ./tests/github/register-ts.mjs --test tests/github/*.test.ts tests/code/*.test.ts tests/usage/*.test.ts tests/email/*.test.ts tests/feedback/*.test.ts tests/auth/*.test.ts",
+    "test:usage": "node --import ./tests/github/register-ts.mjs --test tests/usage/*.test.ts tests/email/*.test.ts tests/feedback/*.test.ts"
   },
   "dependencies": {
     "@google/genai": "^2.0.0",
@@ -17,8 +18,7 @@
     "react-router-dom": "^6.26.2",
     "lucide-react": "^0.441.0",
     "clsx": "^2.1.1",
-    "framer-motion": "^11.5.4",
-    "@supabase/supabase-js": "^2.45.0"
+    "framer-motion": "^11.5.4"
   },
   "devDependencies": {
     "@types/react": "^18.3.5",

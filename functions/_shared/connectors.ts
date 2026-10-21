@@ -39,16 +39,34 @@ export type ConnectionPublicDTO = {
  * Strip any accidental token material before responding to clients.
  */
 export function toPublicConnection(row: Record<string, unknown>): ConnectionPublicDTO {
+  let scopes: string[] | null = null
+  const rawScopes = row.scopes
+  if (Array.isArray(rawScopes)) scopes = rawScopes.map(String)
+  else if (typeof rawScopes === 'string' && rawScopes.trim()) {
+    scopes = rawScopes.split(/[\s,]+/).filter(Boolean)
+  }
+
+  let metadata: Record<string, unknown> = {}
+  if (row.metadata && typeof row.metadata === 'object') {
+    metadata = row.metadata as Record<string, unknown>
+  } else if (typeof row.metadata_json === 'string' && row.metadata_json) {
+    try {
+      metadata = JSON.parse(row.metadata_json) as Record<string, unknown>
+    } catch {
+      metadata = {}
+    }
+  }
+
   return {
-    id: String(row.id),
-    user_id: String(row.user_id),
-    provider: String(row.provider),
+    id: String(row.id ?? ''),
+    user_id: String(row.user_id ?? ''),
+    provider: String(row.provider ?? ''),
     status: String(row.status || 'disconnected'),
     account_label: (row.account_label as string) ?? null,
-    scopes: (row.scopes as string[]) ?? null,
-    metadata: (row.metadata as Record<string, unknown>) || {},
+    scopes,
+    metadata,
     connected_at: (row.connected_at as string) ?? null,
-    created_at: String(row.created_at),
-    updated_at: String(row.updated_at),
+    created_at: String(row.created_at ?? ''),
+    updated_at: String(row.updated_at ?? ''),
   }
 }
