@@ -345,14 +345,8 @@ export function Chat() {
     let sawError = false
 
     try {
-      let accessToken: string | null = null
-      if (userId) {
-        try {
-          /* session via HttpOnly cookie */ ?? null
-        } catch {
-          accessToken = null
-        }
-      }
+      // Auth: the HttpOnly `nyven_session` cookie is sent automatically by
+      // streamCoreChat (credentials: 'include'); no client-side token is needed.
       const memoryCtx = await buildMemoryContext(userId)
       const coreMessage = [memoryCtx, text || 'Please analyze the attached content.']
         .filter(Boolean)
@@ -360,7 +354,6 @@ export function Chat() {
       await streamCoreChat(
         {
           message: coreMessage,
-          accessToken,
           history,
           attachments: filePayloads,
           signal: controller.signal,
