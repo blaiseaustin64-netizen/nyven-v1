@@ -31,6 +31,78 @@ function saveLocal(userId: string | null, items: Conversation[]) {
   }
 }
 
+/** Generate a new client-side conversation id. */
+export function newConversationId(): string {
+  try {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID()
+    }
+  } catch {
+    /* fall through */
+  }
+  return `c-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+}
+
+/** Drop transient streaming/UI state before storing a message. */
+function toStoredMessage(message: Message): Message {
+  return {
+    ...message,
+    isThinking: false,
+    isStreaming: false,
+    activityState: undefined,
+    activityDetail: undefined,
+  }
+}
+
+/**
+ * Make sure a conversation record exists (creates an empty one if needed).
+ * Returns the conversation id to use for subsequent writes.
+ */
+export async function ensureConversation(
+  userId: string | null,
+  conversationId: string,
+  title: string
+): Promise<string> {
+  const items = loadLocal(userId)
+  if (!items.some((c) => c.id === conversationId)) {
+    items.unshift({
+      id: conversationId,
+      title: title || 'Chat',
+      messages: [],
+      updatedAt: Date.now(),
+    })
+    items.sort((a, b) => b.updatedAt - a.updatedAt)
+    saveLocal(userId, items.slice(0, 80))
+  }
+  return conversationId
+}
+
+/**
+ * Insert or update a single message in a conversation (idempotent by message id).
+ * Creates the conversation if it does not exist yet.
+ */
+export async function persistMessage(
+  userId: string | null,
+  conversationId: string,
+  message: Message,
+  title?: string
+): Promise<void> {
+  const items = loadLocal(userId)
+  let conv = items.find((c) => c.id === conversationId)
+  if (!conv) {
+    conv = { id: conversationId, title: title || 'Chat', messages: [], updatedAt: Date.now() }
+    items.unshift(conv)
+  }
+  const stored = toStoredMessage(message)
+  const idx = conv.messages.findIndex((m) => m.id === stored.id)
+  if (idx >= 0) conv.messages[idx] = stored
+  else conv.messages.push(stored)
+  if (title && (!conv.title || conv.title === 'Chat')) conv.title = title
+  conv.updatedAt = Date.now()
+  items.sort((a, b) => b.updatedAt - a.updatedAt)
+  saveLocal(userId, items.slice(0, 80))
+}
+
 export async function listConversations(userId: string | null): Promise<Conversation[]> {
   return loadLocal(userId)
 }

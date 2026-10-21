@@ -13,3 +13,12 @@ export async function trackUsageEvent(
 export async function getLocalUsageHint(): Promise<null> {
   return null
 }
+
+/** Fire-and-forget usage event (client hint only; server enforces real limits). */
+export async function recordUsage(
+  userId: string | null,
+  eventType: string,
+  meta?: Record<string, unknown>
+): Promise<void> {
+  await trackUsageEvent(userId, eventType, meta)
+}

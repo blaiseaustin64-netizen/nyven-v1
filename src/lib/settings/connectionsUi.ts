@@ -75,6 +75,9 @@ export const CONNECTIONS_CATALOG: CatalogItem[] = [
   },
 ]
 
+/** Integrations shown in Settings → Connections. */
+export const INTEGRATIONS: CatalogItem[] = CONNECTIONS_CATALOG
+
 export async function listConnections(userId: string | null): Promise<ConnectionPublicRow[]> {
   if (!userId) return []
   try {
