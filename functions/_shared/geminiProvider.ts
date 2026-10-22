@@ -43,7 +43,8 @@ function mapProviderError(status: number, message: string): { code: string; mess
   if (status === 401 || status === 403 || msg.includes('api key') || msg.includes('unauthenticated')) {
     return {
       code: 'AUTH_ERROR',
-      message: 'NYVEN is temporarily unavailable. Please try again later.',
+      message:
+        'Gemini rejected the API key (401/403). Check GEMINI_API_KEY in Cloudflare Pages → Settings → Environment variables (Production), then redeploy.',
     }
   }
 

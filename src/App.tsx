@@ -61,6 +61,17 @@ export default function App() {
     )
   }
 
+  // Full-page auth (landing-style) — no sidebar chrome
+  if (location.pathname === '/auth') {
+    return (
+      <AuthProvider>
+        <div className="h-full overflow-y-auto">
+          <Auth />
+        </div>
+      </AuthProvider>
+    )
+  }
+
   return (
     <AuthProvider>
     <ConversationHistoryProvider>
@@ -87,8 +98,7 @@ export default function App() {
             <Route path="/code" element={<Code />} />
             <Route path="/agents/:id" element={<AgentEditor />} />
             <Route path="/nyven-plus" element={<NyvenPlus />} />
-            <Route path="/auth" element={<Auth />} />
-        <Route path="/settings" element={<Settings />} />
+            <Route path="/settings" element={<Settings />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/preview/:slug" element={<Preview />} />
           </Routes>

@@ -118,7 +118,7 @@ export async function registerUser(
     return {
       ok: false,
       code: 'EMAIL_IN_USE',
-      message: 'If this email can be used, check your inbox for next steps—or sign in.',
+      message: 'An account with this email already exists. Try logging in instead.',
       httpStatus: 409,
     }
   }

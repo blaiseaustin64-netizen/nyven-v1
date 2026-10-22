@@ -119,9 +119,10 @@ export async function runCore(
     }
   }
 
-  const apiKey = env.GEMINI_API_KEY
+  const apiKey = (env.GEMINI_API_KEY || '').trim()
   if (!apiKey) {
-    const message = 'NYVEN is temporarily unavailable. Please try again later.'
+    const message =
+      'NYVEN chat is not configured: GEMINI_API_KEY is missing on Cloudflare Pages. Add it under Settings → Environment variables (Production), mark as Secret, then redeploy.'
     emit(emitFn, {
       type: 'error',
       code: 'CONFIG_ERROR',

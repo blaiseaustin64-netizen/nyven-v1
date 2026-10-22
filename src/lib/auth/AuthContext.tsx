@@ -27,7 +27,7 @@ type AuthState = {
     email: string,
     password: string,
     displayName?: string
-  ) => Promise<{ error?: string }>
+  ) => Promise<{ error?: string; message?: string }>
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
   requestPasswordReset: (email: string) => Promise<{ error?: string; message?: string }>
@@ -90,7 +90,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user?: NyvenUser
       }
       if (!res.ok || !data.success) {
-        return { error: data.error || 'Sign in failed.' }
+        return {
+          error:
+            data.error ||
+            (res.status === 503
+              ? 'Sign-in unavailable: D1 binding missing. Bind DB to nyven-db and redeploy.'
+              : 'Sign in failed.'),
+        }
       }
       setUser(data.user || (await fetchMe()))
       return {}
@@ -112,11 +118,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           success?: boolean
           error?: string
           message?: string
+          code?: string
         }
         if (!res.ok || !data.success) {
-          return { error: data.error || 'Could not create account.' }
+          const detail = [data.error, data.code ? `(${data.code})` : ''].filter(Boolean).join(' ')
+          return {
+            error:
+              detail ||
+              (res.status === 503
+                ? 'Server storage is unavailable. Confirm D1 binding DB is set, then redeploy.'
+                : 'Could not create account.'),
+          }
         }
-        return {}
+        return { message: data.message }
       } catch {
         return { error: 'Network error. Please try again.' }
       }

@@ -14,7 +14,6 @@ database_name = "nyven-db"
 database_id = "d8131027-693a-4139-a424-50ce6b72ef97"
 migrations_dir = "migrations/d1"
 
-
-# Workers AI binding for NYVEN voice
-[ai]
-binding = "AI"
+# Optional Workers AI binding for STT (configure in dashboard if not using wrangler pages)
+# [ai]
+# binding = "AI"
