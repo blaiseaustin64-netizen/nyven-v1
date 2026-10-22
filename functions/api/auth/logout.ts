@@ -15,9 +15,19 @@ export const onRequestOptions: PagesFunction<Env> = async (c) =>
 export const onRequestPost: PagesFunction<Env> = async (context) => {
   const { request, env } = context
   const { setCookie } = await logoutSession(env, request)
+  const ch = corsHeaders(request, env, 'POST, OPTIONS')
+  if (ch['Access-Control-Allow-Origin'] === '*') {
+    const reqOrigin = request.headers.get('Origin')
+    if (reqOrigin) {
+      ch['Access-Control-Allow-Origin'] = reqOrigin
+      ch['Access-Control-Allow-Credentials'] = 'true'
+    }
+  } else if (ch['Access-Control-Allow-Origin']) {
+    ch['Access-Control-Allow-Credentials'] = 'true'
+  }
   const headers = new Headers({
     'Content-Type': 'application/json',
-    ...corsHeaders(request, env, 'POST, OPTIONS'),
+    ...ch,
   })
   headers.append('Set-Cookie', setCookie)
   return new Response(JSON.stringify({ success: true }), { status: 200, headers })

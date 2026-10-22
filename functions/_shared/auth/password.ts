@@ -3,7 +3,7 @@
  * Stored format: pbkdf2$iterations$saltB64$urlSafeHashB64
  */
 
-const ITERATIONS = 310_000
+const ITERATIONS = 100_000
 const SALT_BYTES = 16
 const KEY_BITS = 256
 

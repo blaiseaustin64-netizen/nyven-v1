@@ -30,6 +30,30 @@ export function Auth() {
   const [info, setInfo] = useState<string | null>(null)
   const [resetToken, setResetToken] = useState('')
   const [pwScore, setPwScore] = useState(0)
+  const [diag, setDiag] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const h = await fetch('/api/health', { credentials: 'include' })
+        const hj = (await h.json().catch(() => ({}))) as {
+          d1Bound?: boolean
+          d1Ok?: boolean
+          d1Error?: string
+          success?: boolean
+        }
+        const m = await fetch('/api/auth/me', { credentials: 'include' })
+        const statusLine = `API health: HTTP ${h.status} · D1 bound: ${hj.d1Bound === true ? 'yes' : 'no'} · D1 ok: ${hj.d1Ok === true ? 'yes' : 'no'} · /api/auth/me: HTTP ${m.status}`
+        if (!cancelled) setDiag(statusLine + (hj.d1Error ? ` · ${hj.d1Error}` : ''))
+      } catch {
+        if (!cancelled) setDiag('Cannot reach /api/health — Pages Functions may not be deployed.')
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     const verify = params.get('verify')
@@ -96,9 +120,15 @@ export function Auth() {
           setError(res.error)
           return
         }
+        // Immediately try sign-in so a session cookie is set
+        const loginRes = await signIn(email.trim(), password)
+        if (!loginRes.error) {
+          navigate('/chat')
+          return
+        }
         setInfo(
           res.message ||
-            'Account created. You can sign in now. (Email verification is sent when Brevo is configured.)'
+            'Account created. Please sign in with the same email and password.'
         )
         setMode('signin')
         setPassword('')
@@ -378,6 +408,11 @@ export function Auth() {
               </div>
             )}
 
+            {diag && (
+              <p className="text-xs text-nyven-text-secondary font-mono leading-relaxed break-words" role="status">
+                {diag}
+              </p>
+            )}
             {error && (
               <p className="text-sm text-red-300 font-medium" role="alert">
                 {error}

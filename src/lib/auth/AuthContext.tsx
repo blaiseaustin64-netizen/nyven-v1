@@ -8,6 +8,34 @@ import {
   type ReactNode,
 } from 'react'
 
+
+async function readApiError(res: Response, fallback: string): Promise<string> {
+  const text = await res.text().catch(() => '')
+  let data: { error?: string; message?: string; code?: string; success?: boolean } = {}
+  try {
+    if (text) data = JSON.parse(text) as typeof data
+  } catch {
+    /* HTML or empty — Function missing/crashed */
+  }
+  if (data.error) {
+    return data.code ? `${data.error} (${data.code})` : data.error
+  }
+  if (data.message && data.success === false) return data.message
+  if (res.status === 404) {
+    return 'Auth API not found (404). Redeploy with functions/api/auth/* and functions/_shared present.'
+  }
+  if (res.status === 503) {
+    return 'Service unavailable (503). Bind D1 as DB on Production and redeploy.'
+  }
+  if (res.status >= 500) {
+    return `Server error (${res.status}). Check Pages Function logs — often missing functions/_shared or D1.`
+  }
+  if (!text) return `${fallback} (HTTP ${res.status}, empty response)`
+  // Truncate HTML noise
+  const snippet = text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160)
+  return `${fallback} (HTTP ${res.status}${snippet ? `: ${snippet}` : ''})`
+}
+
 export type NyvenUser = {
   id: string
   email: string
@@ -81,27 +109,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({ email, password }),
       })
+      if (!res.ok) {
+        return { error: await readApiError(res, 'Sign in failed.') }
+      }
       const data = (await res.json().catch(() => ({}))) as {
         success?: boolean
         error?: string
         user?: NyvenUser
       }
-      if (!res.ok || !data.success) {
-        return {
-          error:
-            data.error ||
-            (res.status === 503
-              ? 'Sign-in unavailable: D1 binding missing. Bind DB to nyven-db and redeploy.'
-              : 'Sign in failed.'),
-        }
+      if (!data.success) {
+        return { error: data.error || 'Sign in failed.' }
       }
       setUser(data.user || (await fetchMe()))
       return {}
     } catch {
-      return { error: 'Network error. Please try again.' }
+      return { error: 'Network error reaching /api/auth/login. Is the site deployed with Pages Functions?' }
     }
   }, [])
 
@@ -111,28 +136,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const res = await fetch('/api/auth/register', {
           method: 'POST',
           credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
           body: JSON.stringify({ email, password, displayName }),
         })
+        if (!res.ok) {
+          return { error: await readApiError(res, 'Could not create account.') }
+        }
         const data = (await res.json().catch(() => ({}))) as {
           success?: boolean
           error?: string
           message?: string
           code?: string
         }
-        if (!res.ok || !data.success) {
+        if (!data.success) {
           const detail = [data.error, data.code ? `(${data.code})` : ''].filter(Boolean).join(' ')
-          return {
-            error:
-              detail ||
-              (res.status === 503
-                ? 'Server storage is unavailable. Confirm D1 binding DB is set, then redeploy.'
-                : 'Could not create account.'),
-          }
+          return { error: detail || 'Could not create account.' }
         }
         return { message: data.message }
       } catch {
-        return { error: 'Network error. Please try again.' }
+        return { error: 'Network error reaching /api/auth/register. Is the site deployed with Pages Functions?' }
       }
     },
     []

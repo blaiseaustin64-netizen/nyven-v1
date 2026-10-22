@@ -1,6 +1,5 @@
 /**
  * GET /api/health — production diagnostics (no secrets).
- * Use to verify D1 binding and optional auth session without side effects.
  */
 import { optionsResponse, jsonWithCors } from '../_shared/cors'
 import type { D1Database } from '../_shared/db/types'
@@ -24,6 +23,8 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   let d1Ok = false
   let d1Error: string | null = null
   let tableProbe: string | null = null
+  let authTablesOk = false
+  let authTablesMissing: string[] = []
 
   if (env.DB) {
     try {
@@ -32,9 +33,20 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       ).first<{ name: string }>()
       d1Ok = !!row?.name
       tableProbe = row?.name || null
-      if (!d1Ok) {
-        d1Error = 'usage_daily table not found on bound database'
+      if (!d1Ok) d1Error = 'usage_daily table not found on bound database'
+
+      const needed = ['auth_users', 'auth_sessions', 'auth_email_tokens']
+      const found: string[] = []
+      for (const name of needed) {
+        const t = await env.DB.prepare(
+          `SELECT name FROM sqlite_master WHERE type='table' AND name=? LIMIT 1`
+        )
+          .bind(name)
+          .first<{ name: string }>()
+        if (t?.name) found.push(name)
+        else authTablesMissing.push(name)
       }
+      authTablesOk = authTablesMissing.length === 0
     } catch (e) {
       d1Error = e instanceof Error ? e.message.slice(0, 120) : 'query_failed'
     }
@@ -61,6 +73,8 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       d1Ok,
       d1Error,
       tableProbe,
+      authTablesOk,
+      authTablesMissing,
       authenticated,
       hasGeminiKey: !!env.GEMINI_API_KEY,
       hasOpenRouterKey: !!env.OPENROUTER_API_KEY,

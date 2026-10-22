@@ -48,13 +48,18 @@ export function corsHeaders(
   extraHeaders = 'Content-Type, Authorization'
 ): Record<string, string> {
   const origin = resolveCorsOrigin(request, env)
-  return {
+  const headers: Record<string, string> = {
     'Access-Control-Allow-Origin': origin,
     'Access-Control-Allow-Methods': methods,
     'Access-Control-Allow-Headers': extraHeaders,
     'Access-Control-Max-Age': '86400',
     Vary: 'Origin',
   }
+  // Required when browser sends credentials: 'include' and origin is not *
+  if (origin && origin !== '*') {
+    headers['Access-Control-Allow-Credentials'] = 'true'
+  }
+  return headers
 }
 
 export function jsonWithCors(

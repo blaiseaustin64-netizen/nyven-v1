@@ -128,28 +128,56 @@ export async function registerUser(
   const password_hash = await hashPassword(input.password)
   const display_name = (input.displayName || '').trim().slice(0, 80) || null
 
-  await db
-    .prepare(
-      `INSERT INTO auth_users
-        (id, email, email_normalized, password_hash, display_name, email_verified, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, 0, ?, ?)`
-    )
-    .bind(id, email, normalizeEmail(email), password_hash, display_name, now, now)
-    .run()
+  try {
+    await db
+      .prepare(
+        `INSERT INTO auth_users
+          (id, email, email_normalized, password_hash, display_name, email_verified, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, 0, ?, ?)`
+      )
+      .bind(id, email, normalizeEmail(email), password_hash, display_name, now, now)
+      .run()
 
-  const verifyToken = randomToken(24)
-  const tokenHash = await sha256Hex(verifyToken)
-  const expires = new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString()
-  await db
-    .prepare(
-      `INSERT INTO auth_email_tokens (id, user_id, purpose, token_hash, expires_at, created_at, attempts)
-       VALUES (?, ?, 'verify_email', ?, ?, ?, 0)`
-    )
-    .bind(newId(), id, tokenHash, expires, now)
-    .run()
+    const verifyToken = randomToken(24)
+    const tokenHash = await sha256Hex(verifyToken)
+    const expires = new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString()
+    await db
+      .prepare(
+        `INSERT INTO auth_email_tokens (id, user_id, purpose, token_hash, expires_at, created_at, attempts)
+         VALUES (?, ?, 'verify_email', ?, ?, ?, 0)`
+      )
+      .bind(newId(), id, tokenHash, expires, now)
+      .run()
 
-  const user = await findUserById(db, id)
-  return { ok: true, user: toPublic(user!), verifyToken }
+    const user = await findUserById(db, id)
+    if (!user) {
+      return {
+        ok: false,
+        code: 'REGISTER_READBACK_FAILED',
+        message: 'Account write succeeded but user could not be loaded. Try signing in.',
+        httpStatus: 500,
+      }
+    }
+    return { ok: true, user: toPublic(user), verifyToken }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'unknown'
+    console.error('registerUser D1 error', msg.slice(0, 200))
+    // Unique constraint → treat as email in use
+    if (/unique|constraint|already/i.test(msg)) {
+      return {
+        ok: false,
+        code: 'EMAIL_IN_USE',
+        message: 'An account with this email already exists. Try logging in instead.',
+        httpStatus: 409,
+      }
+    }
+    return {
+      ok: false,
+      code: 'REGISTER_DB_ERROR',
+      message: `Could not create account (database error). ${msg.slice(0, 120)}`,
+      httpStatus: 500,
+    }
+  }
 }
 
 export async function loginUser(
