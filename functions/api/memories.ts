@@ -9,7 +9,7 @@ interface Env extends AuthEnv {
 }
 
 export const onRequestOptions: PagesFunction<Env> = async (c) =>
-  optionsResponse(c.request, c.env, 'GET, POST, PATCH, DELETE, OPTIONS')
+  optionsResponse(c.request, c.env, 'GET, POST, DELETE, OPTIONS')
 
 export const onRequestGet: PagesFunction<Env> = async (context) => {
   const { request, env } = context
@@ -26,10 +26,9 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       503
     )
   }
-  const includeDisabled = new URL(request.url).searchParams.get('all') === '1'
   const rows = await env.DB.prepare(
     `SELECT id, content, memory_type, source, enabled, created_at, updated_at
-     FROM user_memories WHERE user_id = ?${includeDisabled ? '' : ' AND enabled = 1'} ORDER BY updated_at DESC LIMIT 200`
+     FROM user_memories WHERE user_id = ? AND enabled = 1 ORDER BY updated_at DESC LIMIT 200`
   )
     .bind(idRes.identity.userId)
     .all()
@@ -108,43 +107,6 @@ export const onRequestDelete: PagesFunction<Env> = async (context) => {
     `DELETE FROM user_memories WHERE id = ? AND user_id = ?`
   )
     .bind(id, idRes.identity.userId)
-    .run()
-  if (!result.meta || (result.meta as { changes?: number }).changes === 0) {
-    return jsonWithCors(request, env, { success: false, error: 'Not found.' }, 404)
-  }
-  return jsonWithCors(request, env, { success: true }, 200)
-}
-
-export const onRequestPatch: PagesFunction<Env> = async (context) => {
-  const { request, env } = context
-  const idRes = await resolveIdentity(request, env)
-  if (!idRes.ok) return jsonWithCors(request, env, { success: false, error: idRes.message }, 401)
-  if (!idRes.identity.authenticated) {
-    return jsonWithCors(request, env, { success: false, error: 'Sign in required.' }, 401)
-  }
-  if (!env.DB) {
-    return jsonWithCors(
-      request,
-      env,
-      { success: false, code: 'QUOTA_STORE_UNAVAILABLE', error: 'Storage unavailable.' },
-      503
-    )
-  }
-  const id = (new URL(request.url).searchParams.get('id') || '').trim()
-  if (!id) return jsonWithCors(request, env, { success: false, error: 'Missing id.' }, 400)
-  let body: { enabled?: boolean }
-  try {
-    body = (await request.json()) as typeof body
-  } catch {
-    return jsonWithCors(request, env, { success: false, error: 'Invalid JSON' }, 400)
-  }
-  if (typeof body.enabled !== 'boolean') {
-    return jsonWithCors(request, env, { success: false, error: 'enabled (boolean) required.' }, 400)
-  }
-  const result = await env.DB.prepare(
-    `UPDATE user_memories SET enabled = ?, updated_at = ? WHERE id = ? AND user_id = ?`
-  )
-    .bind(body.enabled ? 1 : 0, new Date().toISOString(), id, idRes.identity.userId)
     .run()
   if (!result.meta || (result.meta as { changes?: number }).changes === 0) {
     return jsonWithCors(request, env, { success: false, error: 'Not found.' }, 404)

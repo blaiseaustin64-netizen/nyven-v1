@@ -37,6 +37,21 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     )
   }
 
+  if (!env.DB) {
+    return jsonWithCors(
+      request,
+      env,
+      {
+        success: false,
+        code: 'QUOTA_STORE_UNAVAILABLE',
+        error:
+          'D1 binding DB is not available to this Function. In Cloudflare Pages → Settings → Functions, bind database nyven-db with variable name DB (Production environment), then redeploy.',
+        d1Bound: false,
+      },
+      503
+    )
+  }
+
   const identity = identityResult.identity
   const userId = identity.authenticated ? identity.userId : undefined
   const usageSubject = await resolveUsageSubject(request, userId)

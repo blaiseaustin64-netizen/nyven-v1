@@ -93,7 +93,7 @@ export async function registerUser(
     return {
       ok: false,
       code: 'QUOTA_STORE_UNAVAILABLE',
-      message: 'Authentication service is temporarily unavailable.',
+      message: 'Authentication is unavailable: D1 binding DB is missing on this Pages Function. Bind nyven-db as DB and redeploy.',
       httpStatus: 503,
     }
   }
@@ -164,7 +164,7 @@ export async function loginUser(
     return {
       ok: false,
       code: 'QUOTA_STORE_UNAVAILABLE',
-      message: 'Authentication service is temporarily unavailable.',
+      message: 'Authentication is unavailable: D1 binding DB is missing on this Pages Function. Bind nyven-db as DB and redeploy.',
       httpStatus: 503,
     }
   }

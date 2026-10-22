@@ -69,7 +69,7 @@ export function requireDb(
       ok: false,
       code: 'QUOTA_STORE_UNAVAILABLE',
       message:
-        'NYVEN usage controls are temporarily unavailable. Please try again shortly.',
+        'NYVEN usage controls are unavailable: the D1 binding (DB) is not attached to this Pages Function. Bind nyven-db as DB in Cloudflare Pages → Settings → Functions, then redeploy.',
       httpStatus: 503,
     }
   }
@@ -197,7 +197,7 @@ export async function consumeChatMessage(
     return {
       ok: false,
       code: 'QUOTA_STORE_ERROR',
-      message: 'NYVEN usage controls are temporarily unavailable. Please try again shortly.',
+      message: 'NYVEN usage controls hit a database error. Confirm D1 tables exist (usage_daily, rate_buckets, provider_budget) on the bound nyven-db database.',
       snapshot,
       httpStatus: 503,
     }
@@ -302,7 +302,7 @@ export async function consumeVoiceSeconds(
     return {
       ok: false,
       code: 'QUOTA_STORE_ERROR',
-      message: 'NYVEN usage controls are temporarily unavailable. Please try again shortly.',
+      message: 'NYVEN usage controls hit a database error. Confirm D1 tables exist (usage_daily, rate_buckets, provider_budget) on the bound nyven-db database.',
       snapshot,
       httpStatus: 503,
     }
@@ -369,7 +369,7 @@ export async function checkBurst(
     return {
       ok: false,
       code: 'QUOTA_STORE_ERROR',
-      message: 'NYVEN usage controls are temporarily unavailable. Please try again shortly.',
+      message: 'NYVEN usage controls hit a database error. Confirm D1 tables exist (usage_daily, rate_buckets, provider_budget) on the bound nyven-db database.',
       httpStatus: 503,
     }
   }
@@ -453,7 +453,7 @@ export async function consumeProviderRequest(
     return {
       ok: false,
       code: 'QUOTA_STORE_ERROR',
-      message: 'NYVEN usage controls are temporarily unavailable. Please try again shortly.',
+      message: 'NYVEN usage controls hit a database error. Confirm D1 tables exist (usage_daily, rate_buckets, provider_budget) on the bound nyven-db database.',
       httpStatus: 503,
     }
   }

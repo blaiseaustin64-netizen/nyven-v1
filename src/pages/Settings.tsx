@@ -191,19 +191,9 @@ export function Settings() {
 
   const saveProfile = async () => {
     if (!userId) return
-    const sb = null
-    if (!sb) return
-    setSaving(true)
-    const { error } = await sb
-      .from('profiles')
-      .update({ display_name: displayName.trim() || null })
-      .eq('id', userId)
-    setSaving(false)
-    if (error) showToast(error.message)
-    else {
-      await refreshProfile()
-      showToast('Profile updated')
-    }
+    // Display name is local-only until a profile update API is wired.
+    // Auth user.displayName comes from /api/auth/me session.
+    showToast('Profile name is stored for this browser session. Server profile update API is not enabled yet.')
   }
 
   const changePassword = async () => {
@@ -216,17 +206,9 @@ export function Settings() {
       showToast('Passwords do not match')
       return
     }
-    const sb = null
-    if (!sb) return
-    setSaving(true)
-    const { error } = await sb.auth.updateUser({ password })
-    setSaving(false)
-    if (error) showToast(error.message)
-    else {
-      setPassword('')
-      setPassword2('')
-      showToast('Password updated')
-    }
+    showToast('Use Forgot password on the sign-in page to reset your password securely by email.')
+    setPassword('')
+    setPassword2('')
   }
 
   const clearGuestHistory = () => {
