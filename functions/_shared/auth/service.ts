@@ -4,7 +4,7 @@
 
 import type { D1Database } from '../db/types'
 import { hashPassword, verifyPassword, normalizeEmail, isValidEmail, isStrongPassword } from './password'
-import { randomToken, sha256Hex, newId } from './tokens'
+import { randomToken, sha256Hex, newId, generateSixDigitCode } from './tokens'
 import {
   SESSION_COOKIE,
   SESSION_TTL_MS,
@@ -84,7 +84,7 @@ export async function registerUser(
   env: AuthServiceEnv,
   input: { email: string; password: string; displayName?: string }
 ): Promise<
-  | { ok: true; user: PublicUser; verifyToken: string }
+  | { ok: true; user: PublicUser; verifyCode: string }
   | { ok: false; code: string; message: string; httpStatus: number }
 > {
   try {
@@ -93,7 +93,7 @@ export async function registerUser(
     return {
       ok: false,
       code: 'QUOTA_STORE_UNAVAILABLE',
-      message: 'Authentication is unavailable: D1 binding DB is missing on this Pages Function. Bind nyven-db as DB and redeploy.',
+      message: 'Authentication is unavailable: D1 binding DB may be missing. Bind nyven-db as DB and redeploy.',
       httpStatus: 503,
     }
   }
@@ -118,7 +118,7 @@ export async function registerUser(
     return {
       ok: false,
       code: 'EMAIL_IN_USE',
-      message: 'An account with this email already exists. Try logging in instead.',
+      message: 'An account with this email already exists. Sign in, or verify your email if you just registered.',
       httpStatus: 409,
     }
   }
@@ -128,56 +128,30 @@ export async function registerUser(
   const password_hash = await hashPassword(input.password)
   const display_name = (input.displayName || '').trim().slice(0, 80) || null
 
-  try {
-    await db
-      .prepare(
-        `INSERT INTO auth_users
-          (id, email, email_normalized, password_hash, display_name, email_verified, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, 0, ?, ?)`
-      )
-      .bind(id, email, normalizeEmail(email), password_hash, display_name, now, now)
-      .run()
+  await db
+    .prepare(
+      `INSERT INTO auth_users
+        (id, email, email_normalized, password_hash, display_name, email_verified, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, 0, ?, ?)`
+    )
+    .bind(id, email, normalizeEmail(email), password_hash, display_name, now, now)
+    .run()
 
-    const verifyToken = randomToken(24)
-    const tokenHash = await sha256Hex(verifyToken)
-    const expires = new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString()
-    await db
-      .prepare(
-        `INSERT INTO auth_email_tokens (id, user_id, purpose, token_hash, expires_at, created_at, attempts)
-         VALUES (?, ?, 'verify_email', ?, ?, ?, 0)`
-      )
-      .bind(newId(), id, tokenHash, expires, now)
-      .run()
+  const verificationId = newId()
+  const verifyCode = generateSixDigitCode()
+  // Bind the hash to the random record ID; never store the plaintext code.
+  const tokenHash = await sha256Hex(`${verificationId}:${verifyCode}`)
+  const expires = new Date(Date.now() + 5 * 60 * 1000).toISOString()
+  await db
+    .prepare(
+      `INSERT INTO auth_email_tokens (id, user_id, purpose, token_hash, expires_at, created_at, attempts)
+       VALUES (?, ?, 'verify_email', ?, ?, ?, 0)`
+    )
+    .bind(verificationId, id, tokenHash, expires, now)
+    .run()
 
-    const user = await findUserById(db, id)
-    if (!user) {
-      return {
-        ok: false,
-        code: 'REGISTER_READBACK_FAILED',
-        message: 'Account write succeeded but user could not be loaded. Try signing in.',
-        httpStatus: 500,
-      }
-    }
-    return { ok: true, user: toPublic(user), verifyToken }
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : 'unknown'
-    console.error('registerUser D1 error', msg.slice(0, 200))
-    // Unique constraint → treat as email in use
-    if (/unique|constraint|already/i.test(msg)) {
-      return {
-        ok: false,
-        code: 'EMAIL_IN_USE',
-        message: 'An account with this email already exists. Try logging in instead.',
-        httpStatus: 409,
-      }
-    }
-    return {
-      ok: false,
-      code: 'REGISTER_DB_ERROR',
-      message: `Could not create account (database error). ${msg.slice(0, 120)}`,
-      httpStatus: 500,
-    }
-  }
+  const user = await findUserById(db, id)
+  return { ok: true, user: toPublic(user!), verifyCode }
 }
 
 export async function loginUser(
@@ -192,7 +166,7 @@ export async function loginUser(
     return {
       ok: false,
       code: 'QUOTA_STORE_UNAVAILABLE',
-      message: 'Authentication is unavailable: D1 binding DB is missing on this Pages Function. Bind nyven-db as DB and redeploy.',
+      message: 'Authentication is unavailable: D1 binding DB may be missing. Bind nyven-db as DB and redeploy.',
       httpStatus: 503,
     }
   }
@@ -224,6 +198,14 @@ export async function loginUser(
 
   const valid = await verifyPassword(input.password, user.password_hash)
   if (!valid) return fail()
+  if (!user.email_verified) {
+    return {
+      ok: false,
+      code: 'EMAIL_NOT_VERIFIED',
+      message: 'Please verify your email with the six-digit code before signing in.',
+      httpStatus: 403,
+    }
+  }
 
   const sessionToken = randomToken(32)
   const tokenHash = await sha256Hex(
@@ -309,10 +291,99 @@ export async function resolveSessionUser(
     .bind(tokenHash)
     .first<AuthUserRow & { session_id: string; expires_at: string; revoked_at: string | null }>()
 
-  if (!row || row.revoked_at) return null
+  if (!row || row.revoked_at || !row.email_verified) return null
   if (new Date(row.expires_at).getTime() < Date.now()) return null
 
   return toPublic(row)
+}
+
+/** Verify a six-digit email code. Codes expire after five minutes and allow five attempts. */
+export async function verifyEmailCode(
+  env: AuthServiceEnv,
+  emailInput: string,
+  codeInput: string
+): Promise<{ ok: true; user: PublicUser } | { ok: false; code: string; message: string }> {
+  if (!env.DB) return { ok: false, code: 'QUOTA_STORE_UNAVAILABLE', message: 'Service unavailable.' }
+  const email = emailInput.trim()
+  const code = codeInput.trim()
+  if (!isValidEmail(email) || !/^\d{6}$/.test(code)) {
+    return { ok: false, code: 'INVALID_CODE', message: 'Enter the six-digit code from your email.' }
+  }
+  const user = await findUserByEmail(env.DB, email)
+  if (!user || user.email_verified) {
+    return { ok: false, code: 'INVALID_CODE', message: 'This code is invalid or expired. Request a new code if needed.' }
+  }
+  const row = await env.DB
+    .prepare(
+      `SELECT id, user_id, token_hash, expires_at, consumed_at, attempts
+       FROM auth_email_tokens
+       WHERE user_id = ? AND purpose = 'verify_email' AND consumed_at IS NULL
+       ORDER BY created_at DESC LIMIT 1`
+    )
+    .bind(user.id)
+    .first<{
+      id: string
+      user_id: string
+      token_hash: string
+      expires_at: string
+      consumed_at: string | null
+      attempts: number
+    }>()
+  if (!row) return { ok: false, code: 'INVALID_CODE', message: 'This code is invalid or expired. Request a new code if needed.' }
+  if (row.attempts >= 5) {
+    return { ok: false, code: 'TOO_MANY_ATTEMPTS', message: 'Too many incorrect attempts. Request a new verification code.' }
+  }
+  if (new Date(row.expires_at).getTime() <= Date.now()) {
+    await env.DB.prepare(`UPDATE auth_email_tokens SET consumed_at = ? WHERE id = ? AND consumed_at IS NULL`)
+      .bind(new Date().toISOString(), row.id).run()
+    return { ok: false, code: 'EXPIRED_CODE', message: 'Your verification code has expired. Request a new one.' }
+  }
+  const candidateHash = await sha256Hex(`${row.id}:${code}`)
+  if (candidateHash !== row.token_hash) {
+    await env.DB.prepare(`UPDATE auth_email_tokens SET attempts = attempts + 1 WHERE id = ? AND consumed_at IS NULL AND attempts < 5`)
+      .bind(row.id).run()
+    return { ok: false, code: 'INVALID_CODE', message: 'That code is incorrect. Check the email and try again.' }
+  }
+  const now = new Date().toISOString()
+  const consume = await env.DB.prepare(
+    `UPDATE auth_email_tokens SET consumed_at = ? WHERE id = ? AND consumed_at IS NULL AND attempts < 5`
+  ).bind(now, row.id).run()
+  if ((consume.meta?.changes ?? 0) !== 1) {
+    return { ok: false, code: 'INVALID_CODE', message: 'This code has already been used. Request a new one if needed.' }
+  }
+  await env.DB.prepare(`UPDATE auth_email_tokens SET consumed_at = COALESCE(consumed_at, ?) WHERE user_id = ? AND purpose = 'verify_email' AND id <> ?`)
+    .bind(now, user.id, row.id).run()
+  await env.DB.prepare(`UPDATE auth_users SET email_verified = 1, updated_at = ? WHERE id = ? AND email_verified = 0`)
+    .bind(now, user.id).run()
+  const verified = await findUserById(env.DB, user.id)
+  return { ok: true, user: toPublic(verified!) }
+}
+
+/** Issue a fresh code for an unverified account; callers must return the same public message either way. */
+export async function issueVerificationCode(
+  env: AuthServiceEnv,
+  emailInput: string
+): Promise<{ ok: true; emitted: false } | { ok: true; emitted: true; code: string; userId: string } | { ok: false; code: string; message: string; httpStatus: number }> {
+  if (!env.DB) return { ok: false, code: 'QUOTA_STORE_UNAVAILABLE', message: 'Service unavailable.', httpStatus: 503 }
+  const email = emailInput.trim()
+  if (!isValidEmail(email)) return { ok: true, emitted: false }
+  const user = await findUserByEmail(env.DB, email)
+  if (!user || user.email_verified) return { ok: true, emitted: false }
+  const now = new Date().toISOString()
+  // A resend invalidates every previous verification code for this account.
+  await env.DB.prepare(
+    `UPDATE auth_email_tokens SET consumed_at = COALESCE(consumed_at, ?)
+     WHERE user_id = ? AND purpose = 'verify_email' AND consumed_at IS NULL`
+  ).bind(now, user.id).run()
+  const id = newId()
+  const code = generateSixDigitCode()
+  const tokenHash = await sha256Hex(`${id}:${code}`)
+  const expires = new Date(Date.now() + 5 * 60 * 1000).toISOString()
+  await env.DB.prepare(
+    `INSERT INTO auth_email_tokens (id, user_id, purpose, token_hash, expires_at, created_at, attempts)
+     VALUES (?, ?, 'verify_email', ?, ?, ?, 0)`
+  ).bind(id, user.id, tokenHash, expires, now).run()
+  return { ok: true, emitted: true, code, userId: user.id }
 }
 
 export async function verifyEmailToken(

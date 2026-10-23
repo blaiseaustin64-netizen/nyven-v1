@@ -16,3 +16,9 @@ export async function sha256Hex(input: string): Promise<string> {
 export function newId(): string {
   return crypto.randomUUID()
 }
+
+/** Cryptographically random six-digit email verification code. */
+export function generateSixDigitCode(): string {
+  const values = crypto.getRandomValues(new Uint32Array(1))
+  return String(values[0]! % 1_000_000).padStart(6, '0')
+}

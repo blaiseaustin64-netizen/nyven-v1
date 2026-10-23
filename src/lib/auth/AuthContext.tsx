@@ -8,34 +8,6 @@ import {
   type ReactNode,
 } from 'react'
 
-
-async function readApiError(res: Response, fallback: string): Promise<string> {
-  const text = await res.text().catch(() => '')
-  let data: { error?: string; message?: string; code?: string; success?: boolean } = {}
-  try {
-    if (text) data = JSON.parse(text) as typeof data
-  } catch {
-    /* HTML or empty — Function missing/crashed */
-  }
-  if (data.error) {
-    return data.code ? `${data.error} (${data.code})` : data.error
-  }
-  if (data.message && data.success === false) return data.message
-  if (res.status === 404) {
-    return 'Auth API not found (404). Redeploy with functions/api/auth/* and functions/_shared present.'
-  }
-  if (res.status === 503) {
-    return 'Service unavailable (503). Bind D1 as DB on Production and redeploy.'
-  }
-  if (res.status >= 500) {
-    return `Server error (${res.status}). Check Pages Function logs — often missing functions/_shared or D1.`
-  }
-  if (!text) return `${fallback} (HTTP ${res.status}, empty response)`
-  // Truncate HTML noise
-  const snippet = text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160)
-  return `${fallback} (HTTP ${res.status}${snippet ? `: ${snippet}` : ''})`
-}
-
 export type NyvenUser = {
   id: string
   email: string
@@ -50,17 +22,19 @@ type AuthState = {
   session: { user: NyvenUser } | null
   user: NyvenUser | null
   profile: { id: string; display_name: string | null; email?: string } | null
-  signIn: (email: string, password: string) => Promise<{ error?: string }>
+  signIn: (email: string, password: string) => Promise<{ error?: string; code?: string }>
   signUp: (
     email: string,
     password: string,
     displayName?: string
-  ) => Promise<{ error?: string; message?: string }>
+  ) => Promise<{ error?: string; message?: string; emailDelivery?: string }>
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
   requestPasswordReset: (email: string) => Promise<{ error?: string; message?: string }>
   resetPassword: (token: string, password: string) => Promise<{ error?: string }>
   verifyEmail: (token: string) => Promise<{ error?: string }>
+  verifyEmailCode: (email: string, code: string) => Promise<{ error?: string }>
+  resendVerification: (email: string) => Promise<{ error?: string; message?: string }>
 }
 
 const AuthContext = createContext<AuthState | null>(null)
@@ -109,24 +83,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       })
-      if (!res.ok) {
-        return { error: await readApiError(res, 'Sign in failed.') }
-      }
       const data = (await res.json().catch(() => ({}))) as {
         success?: boolean
         error?: string
+        code?: string
         user?: NyvenUser
       }
-      if (!data.success) {
-        return { error: data.error || 'Sign in failed.' }
+      if (!res.ok || !data.success) {
+        return { error: data.error || 'Sign in failed.', code: data.code }
       }
       setUser(data.user || (await fetchMe()))
       return {}
     } catch {
-      return { error: 'Network error reaching /api/auth/login. Is the site deployed with Pages Functions?' }
+      return { error: 'Network error. Please try again.' }
     }
   }, [])
 
@@ -136,25 +108,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const res = await fetch('/api/auth/register', {
           method: 'POST',
           credentials: 'include',
-          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, password, displayName }),
         })
-        if (!res.ok) {
-          return { error: await readApiError(res, 'Could not create account.') }
-        }
         const data = (await res.json().catch(() => ({}))) as {
           success?: boolean
           error?: string
           message?: string
-          code?: string
+          emailDelivery?: string
         }
-        if (!data.success) {
-          const detail = [data.error, data.code ? `(${data.code})` : ''].filter(Boolean).join(' ')
-          return { error: detail || 'Could not create account.' }
+        if (!res.ok || !data.success) {
+          return { error: data.error || 'Could not create account.' }
         }
-        return { message: data.message }
+        return { message: data.message, emailDelivery: data.emailDelivery }
       } catch {
-        return { error: 'Network error reaching /api/auth/register. Is the site deployed with Pages Functions?' }
+        return { error: 'Network error. Please try again.' }
       }
     },
     []
@@ -222,6 +190,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [refreshProfile])
 
+  const verifyEmailCode = useCallback(async (email: string, code: string) => {
+    try {
+      const res = await fetch('/api/auth/verify-email', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, code }),
+      })
+      const data = (await res.json().catch(() => ({}))) as { success?: boolean; error?: string }
+      if (!res.ok || !data.success) return { error: data.error || 'Verification failed.' }
+      return {}
+    } catch { return { error: 'Network error. Please try again.' } }
+  }, [])
+
+  const resendVerification = useCallback(async (email: string) => {
+    try {
+      const res = await fetch('/api/auth/resend-verification', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      })
+      const data = (await res.json().catch(() => ({}))) as { success?: boolean; error?: string; message?: string }
+      if (!res.ok || !data.success) return { error: data.error || 'Could not resend the code.' }
+      return { message: data.message || 'If the account needs verification, a new code has been sent.' }
+    } catch { return { error: 'Network error. Please try again.' } }
+  }, [])
+
   const value = useMemo<AuthState>(
     () => ({
       configured,
@@ -238,6 +232,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       requestPasswordReset,
       resetPassword,
       verifyEmail,
+      verifyEmailCode,
+      resendVerification,
     }),
     [
       configured,
@@ -250,6 +246,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       requestPasswordReset,
       resetPassword,
       verifyEmail,
+      verifyEmailCode,
+      resendVerification,
     ]
   )
 

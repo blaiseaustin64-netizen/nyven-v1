@@ -29,8 +29,8 @@ function layout(title: string, bodyHtml: string, preheader: string): string {
         <table role="presentation" width="100%" style="max-width:560px;background:${COLORS.surface};border-radius:16px;overflow:hidden;border:1px solid rgba(98,230,255,0.12);">
           <tr>
             <td style="padding:28px 28px 12px;text-align:center;">
-              <div style="font-size:22px;font-weight:600;letter-spacing:0.04em;color:${COLORS.cyan};">NYVEN</div>
-              <div style="font-size:12px;color:${COLORS.muted};margin-top:4px;">Intelligence, built for what&rsquo;s next</div>
+              <img src="https://nyven-v1.pages.dev/nyven-wordmark.png" alt="NYVEN" width="164" height="26" style="display:block;width:164px;height:auto;max-width:100%;margin:0 auto 8px;border:0;" />
+              <div style="font-size:12px;color:${COLORS.cyan};margin-top:4px;letter-spacing:0.03em;">Intelligence, built for what&rsquo;s next</div>
             </td>
           </tr>
           <tr>
@@ -67,12 +67,12 @@ export function verificationEmail(opts: {
 }): { subject: string; html: string; text: string } {
   const isReset = opts.purpose === 'password_reset'
   const subject = isReset ? 'Reset your NYVEN password' : 'Verify your NYVEN email'
-  const heading = isReset ? 'Password reset code' : 'Your verification code'
+  const heading = isReset ? 'Password reset code' : 'Verify your email address'
   const bodyHtml = `
     <h1 style="margin:0 0 12px;font-size:20px;color:${COLORS.text};">${heading}</h1>
     <p style="margin:0 0 16px;font-size:14px;line-height:1.5;color:${COLORS.muted};">
       Use this code in NYVEN. It expires in <strong style="color:${COLORS.text};">${opts.expiresMinutes} minutes</strong>.
-      If you did not request this, you can ignore this email.
+      Do not share this code with anyone. If you did not create a NYVEN account, you can ignore this email.
     </p>
     <div style="margin:20px 0;padding:16px;text-align:center;background:${COLORS.bg};border-radius:12px;border:1px solid rgba(98,230,255,0.2);">
       <span style="font-size:28px;letter-spacing:0.35em;font-weight:600;color:${COLORS.cyan};">${escapeHtml(opts.code)}</span>

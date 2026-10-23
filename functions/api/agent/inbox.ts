@@ -286,7 +286,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
           ? `Summarize this email for the recipient in 3-5 concise bullets.\nFrom: ${email.from}\nSubject: ${email.subject}\n\n${email.bodyText.slice(0, 6000)}`
           : `Categorize this email for prioritization. Reply with JSON: {"priority":"high|medium|low","category":"string","reason":"short"}.\nFrom: ${email.from}\nSubject: ${email.subject}\n\n${email.bodyText.slice(0, 4000)}`
 
-      const model = env.GEMINI_CHAT_MODEL || 'gemini-3.1-flash-lite'
+      const model = env.GEMINI_CHAT_MODEL || 'gemini-2.0-flash'
       const geminiRes = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${env.GEMINI_API_KEY}`,
         {

@@ -192,7 +192,7 @@ export async function runCore(
 
   const providerConfig = {
     apiKey,
-    model: env.GEMINI_CHAT_MODEL || 'gemini-3.1-flash-lite',
+    model: env.GEMINI_CHAT_MODEL || 'gemini-2.0-flash',
   }
 
   const searchEnv: SearchEnv = {

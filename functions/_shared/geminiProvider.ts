@@ -24,7 +24,9 @@ export type GeminiStreamResult =
   | { ok: false; code: string; message: string; httpStatus?: number }
 
 function mapProviderError(status: number, message: string): { code: string; message: string } {
-  const msg = (message || '').toLowerCase()
+  const raw = (message || '').trim()
+  const msg = raw.toLowerCase()
+  const hint = raw ? raw.slice(0, 180) : ''
 
   if (
     status === 429 ||
@@ -36,28 +38,48 @@ function mapProviderError(status: number, message: string): { code: string; mess
     return {
       code: 'RATE_LIMITED',
       message:
-        "NYVEN's AI service is temporarily unavailable because the current model quota has been reached. Please try again later.",
+        "NYVEN's AI service hit a Gemini rate/quota limit. Wait a bit or check your Google AI Studio quota." +
+        (hint ? ` (${hint})` : ''),
     }
   }
 
-  if (status === 401 || status === 403 || msg.includes('api key') || msg.includes('unauthenticated')) {
+  if (status === 401 || status === 403 || msg.includes('api key') || msg.includes('unauthenticated') || msg.includes('permission')) {
     return {
       code: 'AUTH_ERROR',
       message:
-        'Gemini rejected the API key (401/403). Check GEMINI_API_KEY in Cloudflare Pages → Settings → Environment variables (Production), then redeploy.',
+        'Gemini rejected the API key. Check GEMINI_API_KEY in Cloudflare Pages → Environment variables (Production), then redeploy.',
+    }
+  }
+
+  if (
+    status === 404 ||
+    msg.includes('not found') ||
+    msg.includes('is not found') ||
+    msg.includes('not supported')
+  ) {
+    return {
+      code: 'MODEL_NOT_FOUND',
+      message:
+        'Gemini model is invalid or unavailable for this API key. Set GEMINI_CHAT_MODEL to gemini-2.0-flash (or gemini-1.5-flash) in Pages env, then redeploy.' +
+        (hint ? ` Details: ${hint}` : ''),
     }
   }
 
   if (status === 400 || msg.includes('invalid') || msg.includes('safety') || msg.includes('blocked')) {
     return {
       code: 'INVALID_REQUEST',
-      message: 'I cannot respond to that request. Please try a different question.',
+      message:
+        'Gemini could not process that request. Try a shorter message or different wording.' +
+        (hint ? ` (${hint})` : ''),
     }
   }
 
   return {
     code: 'MODEL_UNAVAILABLE',
-    message: 'NYVEN could not complete that request. Please try again.',
+    message:
+      'NYVEN could not complete that request.' +
+      (status ? ` (HTTP ${status})` : '') +
+      (hint ? ` ${hint}` : ' Please try again.'),
   }
 }
 
@@ -160,7 +182,7 @@ export async function streamGeminiChat(
   handlers: GeminiStreamHandlers,
   attachments?: AttachmentInput[]
 ): Promise<GeminiStreamResult> {
-  const model = config.model || 'gemini-3.1-flash-lite'
+  const model = config.model || 'gemini-2.0-flash'
   const systemInstruction = config.systemInstruction || NYVEN_SYSTEM_INSTRUCTION
   const contents = buildContents(message.trim(), history, attachments)
 
@@ -341,7 +363,7 @@ export async function planWithTools(
   signal?: AbortSignal,
   extraUserText?: string
 ): Promise<GeminiPlanResult> {
-  const model = config.model || 'gemini-3.1-flash-lite'
+  const model = config.model || 'gemini-2.0-flash'
   const systemInstruction = config.systemInstruction || NYVEN_SYSTEM_INSTRUCTION
   const contents = buildContents(
     [message.trim(), extraUserText].filter(Boolean).join('\n\n'),
@@ -425,6 +447,6 @@ export async function planWithTools(
   return {
     kind: 'error',
     code: 'EMPTY_RESPONSE',
-    message: 'NYVEN could not complete that request. Please try again.',
+    message: 'Gemini returned an empty response. Try again, or set GEMINI_CHAT_MODEL to gemini-2.0-flash.',
   }
 }

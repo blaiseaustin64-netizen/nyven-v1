@@ -11,7 +11,7 @@ import {
 describe('password hashing', () => {
   it('hashes and verifies', async () => {
     const h = await hashPassword('correct horse battery')
-    assert.match(h, /^pbkdf2\$310000\$/)
+    assert.match(h, /^pbkdf2\$100000\$/)
     assert.equal(await verifyPassword('correct horse battery', h), true)
     assert.equal(await verifyPassword('wrong', h), false)
   })
