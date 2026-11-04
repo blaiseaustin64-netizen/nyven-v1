@@ -10,7 +10,7 @@ const WEB_SEARCH: ToolDefinition = {
   id: 'web_search',
   name: 'Web Search',
   description:
-    'Search the public web for current information, news, prices, people, events, or facts that require up-to-date external data. Do NOT use for general knowledge, coding help, creative writing, or casual conversation.',
+    'Search the live public web (Google via Serper) for current information: recent news, announcements, releases, scores, prices, people, events, documentation, and any fact that may have changed after your knowledge cutoff. ALWAYS use this for "latest", "today", "this week", "recent", "current", "new release", or time-sensitive questions. Do NOT use for pure math, coding syntax, or casual chat that needs no external data.',
   parameters: {
     type: 'object',
     properties: {

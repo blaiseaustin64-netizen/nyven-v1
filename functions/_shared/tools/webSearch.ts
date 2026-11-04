@@ -152,10 +152,14 @@ async function searchTavily(
 }
 
 export function resolveSearchProvider(env: SearchEnv): string | null {
-  if (env.SERPER_API_KEY) return 'serper'
-  if (env.BRAVE_API_KEY || env.BRAVE_SEARCH_API_KEY) return 'brave'
-  if (env.TAVILY_API_KEY) return 'tavily'
+  if (env.SERPER_API_KEY?.trim()) return 'serper'
+  if ((env.BRAVE_API_KEY || env.BRAVE_SEARCH_API_KEY || '').trim()) return 'brave'
+  if (env.TAVILY_API_KEY?.trim()) return 'tavily'
   return null
+}
+
+export function isSearchConfigured(env: SearchEnv): boolean {
+  return resolveSearchProvider(env) !== null
 }
 
 export async function executeWebSearch(

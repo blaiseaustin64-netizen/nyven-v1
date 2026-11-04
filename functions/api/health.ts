@@ -9,6 +9,10 @@ interface Env {
   AI?: { run: (model: string, input: Record<string, unknown>) => Promise<unknown> }
   GROQ_API_KEY?: string
   OPENROUTER_API_KEY?: string
+  SERPER_API_KEY?: string
+  BRAVE_API_KEY?: string
+  BRAVE_SEARCH_API_KEY?: string
+  TAVILY_API_KEY?: string
 
   DB?: D1Database
   APP_URL?: string
@@ -16,6 +20,10 @@ interface Env {
   AUTH_SESSION_SECRET?: string
   GEMINI_API_KEY?: string
   OPENROUTER_API_KEY?: string
+  SERPER_API_KEY?: string
+  BRAVE_API_KEY?: string
+  BRAVE_SEARCH_API_KEY?: string
+  TAVILY_API_KEY?: string
 }
 
 export const onRequestOptions: PagesFunction<Env> = async (c) =>
@@ -85,6 +93,19 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       sttConfigured: !!(env.AI || (env.GROQ_API_KEY && env.GROQ_API_KEY.trim())),
       ttsConfigured: !!(env.OPENROUTER_API_KEY && env.OPENROUTER_API_KEY.trim()),
       workersAiBound: !!env.AI,
+      searchConfigured: !!(
+        (env.SERPER_API_KEY && env.SERPER_API_KEY.trim()) ||
+        (env.BRAVE_API_KEY && env.BRAVE_API_KEY.trim()) ||
+        (env.BRAVE_SEARCH_API_KEY && env.BRAVE_SEARCH_API_KEY.trim()) ||
+        (env.TAVILY_API_KEY && env.TAVILY_API_KEY.trim())
+      ),
+      searchProvider: env.SERPER_API_KEY?.trim()
+        ? 'serper'
+        : (env.BRAVE_API_KEY || env.BRAVE_SEARCH_API_KEY)?.trim()
+          ? 'brave'
+          : env.TAVILY_API_KEY?.trim()
+            ? 'tavily'
+            : null,
       appUrlSet: !!(env.APP_URL && env.APP_URL.startsWith('http')),
     },
     status

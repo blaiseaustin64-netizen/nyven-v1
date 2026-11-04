@@ -8,13 +8,25 @@ import type { CoreEvent, CoreRequest, CoreResult, EmitFn } from './coreTypes'
 import { planWithTools, streamGeminiChat } from './geminiProvider'
 import { toGeminiFunctionDeclarations } from './tools/registry'
 import { executeTool } from './tools/executor'
+import { NYVEN_SYSTEM_INSTRUCTION } from './nyvenPolicy'
 import {
-  citationsFromSearch,
+  isSearchConfigured,
   formatSearchForModel,
+  citationsFromSearch,
   type SearchEnv,
 } from './tools/webSearch'
 import type { WebSearchResponse } from './tools/types'
 import { TOOL_LOOP_LIMITS } from './tools/types'
+
+/** Appended to system instruction only when Serper/Brave/Tavily is configured. */
+const WEB_SEARCH_SYSTEM_ADDENDUM = `
+Live web search:
+- You HAVE a live web_search tool connected to real search APIs (Serper/Google primary).
+- For recent events, current news, new releases, live scores, prices, "today/this week/latest", or anything after your knowledge cutoff, you MUST call web_search before answering.
+- Do NOT say you lack live browsing, web access, or real-time information when this tool is available.
+- After search results return, ground your answer in those results and cite sources by title/domain. Never invent URLs.
+- For ordinary knowledge, math, coding, or creative tasks that do not need current external data, answer directly without searching.
+`
 
 export type CoreRuntimeEnv = {
   GEMINI_API_KEY?: string
@@ -190,7 +202,11 @@ export async function runCore(
     }
   }
 
-  const providerConfig = {
+  const providerConfig: {
+    apiKey: string
+    model: string
+    systemInstruction?: string
+  } = {
     apiKey,
     model: env.GEMINI_CHAT_MODEL || 'gemini-3.5-flash-lite',
   }
@@ -202,7 +218,13 @@ export async function runCore(
     TAVILY_API_KEY: env.TAVILY_API_KEY,
   }
 
-  const functionDeclarations = toGeminiFunctionDeclarations()
+  const searchReady = isSearchConfigured(searchEnv)
+  // Only expose web_search when a provider key is actually configured
+  const functionDeclarations = searchReady ? toGeminiFunctionDeclarations() : []
+  if (searchReady) {
+    providerConfig.systemInstruction =
+      NYVEN_SYSTEM_INSTRUCTION + '\n' + WEB_SEARCH_SYSTEM_ADDENDUM
+  }
   const toolContextBlocks: string[] = []
   const allCitations: Array<{ id: string; title: string; url: string; source?: string }> = []
   const seenQueries = new Set<string>()
