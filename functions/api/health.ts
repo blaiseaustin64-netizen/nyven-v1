@@ -6,6 +6,10 @@ import type { D1Database } from '../_shared/db/types'
 import { resolveSessionUser } from '../_shared/auth/service'
 
 interface Env {
+  AI?: { run: (model: string, input: Record<string, unknown>) => Promise<unknown> }
+  GROQ_API_KEY?: string
+  OPENROUTER_API_KEY?: string
+
   DB?: D1Database
   APP_URL?: string
   ALLOWED_ORIGINS?: string
@@ -78,6 +82,9 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       authenticated,
       hasGeminiKey: !!env.GEMINI_API_KEY,
       hasOpenRouterKey: !!env.OPENROUTER_API_KEY,
+      sttConfigured: !!(env.AI || (env.GROQ_API_KEY && env.GROQ_API_KEY.trim())),
+      ttsConfigured: !!(env.OPENROUTER_API_KEY && env.OPENROUTER_API_KEY.trim()),
+      workersAiBound: !!env.AI,
       appUrlSet: !!(env.APP_URL && env.APP_URL.startsWith('http')),
     },
     status

@@ -622,7 +622,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     }
 
     const CHAT_MODEL =
-      env.GEMINI_AGENT_MODEL || env.GEMINI_CHAT_MODEL || 'gemini-2.0-flash'
+      env.GEMINI_AGENT_MODEL || env.GEMINI_CHAT_MODEL || 'gemini-3.5-flash-lite'
 
     const contents: Array<{ role: string; parts: Array<{ text: string }> }> = []
     if (Array.isArray(body.history) && body.history.length > 0) {

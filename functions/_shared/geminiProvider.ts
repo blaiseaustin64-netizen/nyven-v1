@@ -6,6 +6,28 @@
 import { NYVEN_SYSTEM_INSTRUCTION } from './nyvenPolicy'
 import type { CoreHistoryMessage } from './coreTypes'
 
+
+/** Strip accidental "models/" prefix from env values. */
+export function normalizeGeminiModelId(raw: string | undefined | null): string {
+  let m = (raw || '').trim()
+  if (!m) return 'gemini-3.5-flash-lite'
+  if (m.startsWith('models/')) m = m.slice('models/'.length)
+  return m
+}
+
+/** Lightweight chat models preferred by NYVEN (not Builder). */
+const GEMINI_CHAT_FALLBACKS = [
+  'gemini-3.5-flash-lite',
+  'gemini-3.1-flash-lite',
+  'gemini-2.5-flash-lite',
+]
+
+function chatModelCandidates(preferred?: string): string[] {
+  const primary = normalizeGeminiModelId(preferred)
+  const list = [primary, ...GEMINI_CHAT_FALLBACKS.filter((m) => m !== primary)]
+  return list
+}
+
 export type GeminiProviderConfig = {
   apiKey: string
   model?: string
@@ -60,7 +82,7 @@ function mapProviderError(status: number, message: string): { code: string; mess
     return {
       code: 'MODEL_NOT_FOUND',
       message:
-        'Gemini model is invalid or unavailable for this API key. Set GEMINI_CHAT_MODEL to gemini-2.0-flash (or gemini-1.5-flash) in Pages env, then redeploy.' +
+        'Gemini model is invalid or unavailable for this API key. Set GEMINI_CHAT_MODEL to gemini-3.5-flash-lite (or gemini-3.1-flash-lite) in Pages env, then redeploy.' +
         (hint ? ` Details: ${hint}` : ''),
     }
   }
@@ -182,7 +204,6 @@ export async function streamGeminiChat(
   handlers: GeminiStreamHandlers,
   attachments?: AttachmentInput[]
 ): Promise<GeminiStreamResult> {
-  const model = config.model || 'gemini-2.0-flash'
   const systemInstruction = config.systemInstruction || NYVEN_SYSTEM_INSTRUCTION
   const contents = buildContents(message.trim(), history, attachments)
 
@@ -195,31 +216,49 @@ export async function streamGeminiChat(
     },
   })
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${config.apiKey}`
+  const candidates = chatModelCandidates(config.model)
+  let res: Response | null = null
+  let lastMapped: { code: string; message: string; httpStatus?: number } | null = null
 
-  let res: Response
-  try {
-    res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body,
-      signal: handlers.signal,
-    })
-  } catch (err: unknown) {
-    if (handlers.signal?.aborted || (err as { name?: string })?.name === 'AbortError') {
-      return { ok: false, code: 'ABORTED', message: 'Generation stopped.' }
+  for (const model of candidates) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${config.apiKey}`
+    try {
+      res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+        signal: handlers.signal,
+      })
+    } catch (err: unknown) {
+      if (handlers.signal?.aborted || (err as { name?: string })?.name === 'AbortError') {
+        return { ok: false, code: 'ABORTED', message: 'Generation stopped.' }
+      }
+      lastMapped = {
+        code: 'MODEL_UNAVAILABLE',
+        message: 'NYVEN could not reach the model. Please try again.',
+      }
+      res = null
+      continue
     }
-    return {
-      ok: false,
-      code: 'MODEL_UNAVAILABLE',
-      message: 'NYVEN could not reach the model. Please try again.',
-    }
-  }
 
-  if (!res.ok) {
+    if (res.ok) break
+
     const data = (await res.json().catch(() => ({}))) as { error?: { message?: string } }
     const mapped = mapProviderError(res.status, data?.error?.message || `Gemini error (${res.status})`)
-    return { ok: false, code: mapped.code, message: mapped.message, httpStatus: res.status }
+    lastMapped = { ...mapped, httpStatus: res.status }
+    if (mapped.code !== 'MODEL_NOT_FOUND' && res.status !== 404) {
+      return { ok: false, code: mapped.code, message: mapped.message, httpStatus: res.status }
+    }
+    res = null
+  }
+
+  if (!res || !res.ok) {
+    const mapped = lastMapped || {
+      code: 'MODEL_UNAVAILABLE',
+      message:
+        'Gemini model is invalid or unavailable for this API key. Set GEMINI_CHAT_MODEL to gemini-3.5-flash-lite.',
+    }
+    return { ok: false, code: mapped.code, message: mapped.message, httpStatus: mapped.httpStatus }
   }
 
   if (!res.body) {
@@ -363,7 +402,7 @@ export async function planWithTools(
   signal?: AbortSignal,
   extraUserText?: string
 ): Promise<GeminiPlanResult> {
-  const model = config.model || 'gemini-2.0-flash'
+  const model = normalizeGeminiModelId(config.model)
   const systemInstruction = config.systemInstruction || NYVEN_SYSTEM_INSTRUCTION
   const contents = buildContents(
     [message.trim(), extraUserText].filter(Boolean).join('\n\n'),
@@ -447,6 +486,6 @@ export async function planWithTools(
   return {
     kind: 'error',
     code: 'EMPTY_RESPONSE',
-    message: 'Gemini returned an empty response. Try again, or set GEMINI_CHAT_MODEL to gemini-2.0-flash.',
+    message: 'Gemini returned an empty response. Try again, or set GEMINI_CHAT_MODEL to gemini-3.5-flash-lite.',
   }
 }
