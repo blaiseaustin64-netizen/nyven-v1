@@ -109,6 +109,7 @@ export function Settings() {
       }),
     [authLoading, configured, userId, githubStatus, githubStatusError]
   )
+  const [mobileShowDetail, setMobileShowDetail] = useState(false)
   const active = (params.get('section') as Section) || 'account'
   const setActive = (s: Section) => setParams({ section: s })
 
@@ -236,15 +237,19 @@ export function Settings() {
         <button
           key={id}
           type="button"
-          onClick={() => setActive(id)}
-          className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-left whitespace-nowrap transition-colors ${
+          onClick={() => {
+            setActive(id)
+            setMobileShowDetail(true)
+          }}
+          className={`flex items-center gap-2 px-3 py-3 sm:py-2 rounded-xl text-sm font-medium text-left whitespace-nowrap transition-colors min-h-[44px] ${
             active === id
               ? 'bg-nyven-surface text-nyven-cyan'
               : 'text-nyven-text-secondary hover:text-nyven-text hover:bg-white/[0.03]'
           }`}
         >
           <Icon size={16} strokeWidth={1.75} />
-          {label}
+          <span className="flex-1">{label}</span>
+          <span className="sm:hidden text-nyven-text-secondary/60">›</span>
         </button>
       ))}
     </nav>
@@ -266,16 +271,26 @@ export function Settings() {
           )}
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-6 sm:gap-8">
-          {sectionNav}
+        <div className="flex flex-col sm:flex-row gap-6 sm:gap-8 min-w-0">
+          <div className={`min-w-0 ${mobileShowDetail ? 'hidden sm:block' : 'block'}`}>
+            {sectionNav}
+          </div>
 
           <motion.div
             key={active}
             initial={{ opacity: 0, x: 8 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.2 }}
-            className="flex-1 min-w-0 space-y-6"
+            className={`flex-1 min-w-0 space-y-6 ${mobileShowDetail ? 'block' : 'hidden sm:block'}`}
           >
+            <button
+              type="button"
+              className="sm:hidden inline-flex items-center gap-1 text-sm text-nyven-text-secondary mb-2 min-h-[44px] px-1"
+              onClick={() => setMobileShowDetail(false)}
+            >
+              <ChevronLeft size={18} />
+              Settings
+            </button>
             {prefsLoading && (
               <p className="text-sm text-nyven-text-secondary">Loading preferences…</p>
             )}

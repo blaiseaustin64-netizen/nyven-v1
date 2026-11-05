@@ -266,7 +266,10 @@ export function MessageComposer({
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    // Mobile / coarse pointer: Enter inserts newline. Desktop: Enter sends.
+    const isCoarse =
+      typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches
+    if (e.key === 'Enter' && !e.shiftKey && !isCoarse) {
       e.preventDefault()
       handleSubmit()
     }
@@ -276,7 +279,7 @@ export function MessageComposer({
     const el = textareaRef.current
     if (el) {
       el.style.height = 'auto'
-      el.style.height = `${Math.min(el.scrollHeight, 160)}px`
+      el.style.height = `${Math.min(el.scrollHeight, 168)}px`
     }
   }
 
@@ -488,7 +491,7 @@ export function MessageComposer({
                 onClick={onVoiceToggle}
                 disabled={!onVoiceToggle || isGenerating}
                 className={clsx(
-                  'p-2 rounded-xl transition-colors',
+              'p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl transition-colors',
                   voicePhase === 'speaking' && 'text-nyven-cyan bg-nyven-cyan/10',
                   voicePhase === 'transcribing' && 'text-nyven-text-secondary',
                   (voicePhase === 'idle' ||
@@ -526,7 +529,7 @@ export function MessageComposer({
               onClick={onOpenVoiceChat}
               disabled={!onOpenVoiceChat || isGenerating}
               className={clsx(
-                'p-2 rounded-xl transition-colors text-nyven-text-secondary hover:text-nyven-text hover:bg-white/[0.05]',
+              'p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl transition-colors text-nyven-text-secondary hover:text-nyven-text hover:bg-white/[0.05]',
                 (!onOpenVoiceChat || isGenerating) && 'opacity-40 cursor-not-allowed'
               )}
               aria-label="Open voice chat"
@@ -550,7 +553,7 @@ export function MessageComposer({
                 onClick={handleSubmit}
                 disabled={!canSend}
                 className={clsx(
-                  'p-2 rounded-xl transition-all duration-200',
+              'p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl transition-all duration-200',
                   canSend
                     ? 'bg-nyven-cyan text-nyven-bg hover:bg-nyven-cyan/90'
                     : 'bg-white/[0.06] text-nyven-text-secondary cursor-not-allowed'

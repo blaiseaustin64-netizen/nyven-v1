@@ -164,3 +164,34 @@ input:focus-visible {
 .safe-top {
   padding-top: env(safe-area-inset-top, 0px);
     }
+
+/* Message markdown: contain overflow inside message column */
+.nyven-md {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.nyven-md pre {
+  max-width: 100%;
+}
+
+/* highlight.js — NYVEN dark tokens (no external CSS file required) */
+.nyven-code-pre .hljs {
+  background: transparent;
+  color: #e8ecf5;
+  padding: 0;
+}
+.nyven-code-pre .hljs-keyword,
+.nyven-code-pre .hljs-selector-tag { color: #b794f6; }
+.nyven-code-pre .hljs-string,
+.nyven-code-pre .hljs-attr { color: #f6ad55; }
+.nyven-code-pre .hljs-number,
+.nyven-code-pre .hljs-literal { color: #63b3ed; }
+.nyven-code-pre .hljs-comment { color: #68d391; font-style: italic; }
+.nyven-code-pre .hljs-function .hljs-title,
+.nyven-code-pre .hljs-title.function_ { color: #f6e05e; }
+.nyven-code-pre .hljs-built_in,
+.nyven-code-pre .hljs-type { color: #76e4f7; }
+.nyven-code-pre .hljs-params { color: #e8ecf5; }
+.nyven-code-pre .hljs-meta { color: #a0aec0; }

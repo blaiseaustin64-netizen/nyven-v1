@@ -38,6 +38,9 @@ export function Chat() {
 
   const [messages, setMessages] = useState<Message[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
+  const [online, setOnline] = useState(
+    typeof navigator !== 'undefined' ? navigator.onLine : true
+  )
   const [readingMessageId, setReadingMessageId] = useState<string | null>(null)
   const [readAloudLoading, setReadAloudLoading] = useState(false)
   const [voicePhase, setVoicePhase] = useState<VoicePhase>('idle')
@@ -62,9 +65,23 @@ export function Chat() {
   const skipNextActiveLoadRef = useRef(false)
   const isGeneratingRef = useRef(isGenerating)
   isGeneratingRef.current = isGenerating
+
+  useEffect(() => {
+    const on = () => setOnline(true)
+    const off = () => setOnline(false)
+    window.addEventListener('online', on)
+    window.addEventListener('offline', off)
+    return () => {
+      window.removeEventListener('online', on)
+      window.removeEventListener('offline', off)
+    }
+  }, [])
+
   /** Voice-originated turn — ref so stream onDone sees the real flag */
   const fromVoiceRef = useRef(false)
   const voiceSubmitInFlightRef = useRef(false)
+  const stickToBottomRef = useRef(true)
+  const [showJumpLatest, setShowJumpLatest] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
   const streamMsgIdRef = useRef<string | null>(null)
@@ -72,8 +89,18 @@ export function Chat() {
   const streamContentRef = useRef('')
   const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const scrollToBottom = useCallback(() => {
+  const scrollToBottom = useCallback((force = false) => {
+    if (!force && !stickToBottomRef.current) return
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    setShowJumpLatest(false)
+  }, [])
+
+  const onChatScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget
+    const dist = el.scrollHeight - el.scrollTop - el.clientHeight
+    const nearBottom = dist < 80
+    stickToBottomRef.current = nearBottom
+    setShowJumpLatest(!nearBottom && el.scrollHeight > el.clientHeight + 40)
   }, [])
 
 
@@ -173,7 +200,7 @@ export function Chat() {
       const msgs = await loadConversationMessages(userId, c.id)
       setMessages(msgs)
     }
-    setTimeout(scrollToBottom, 50)
+    setTimeout(() => scrollToBottom(true), 50)
   }
 
 
@@ -484,6 +511,8 @@ export function Chat() {
                       isThinking: false,
                       isStreaming: false,
                       activityState: 'error' as ActivityState,
+                  // mark for retry UI
+
                       activityDetail: undefined,
                     }
                   : m
@@ -650,6 +679,15 @@ export function Chat() {
 
   return (
     <div className="h-full flex relative">
+            {!online && (
+        <div
+          role="status"
+          className="absolute top-0 inset-x-0 z-40 px-3 py-2 text-center text-xs sm:text-sm bg-amber-500/15 text-amber-100 border-b border-amber-500/20"
+        >
+          You appear to be offline. Messages may not send until connection returns.
+        </div>
+      )}
+
       {feedbackToast && (
         <div
           role="status"
@@ -660,18 +698,38 @@ export function Chat() {
       )}
 
       {/* Main chat area */}
-      <div className="flex-1 flex flex-col min-w-0 min-h-0">
-        <div className="flex-1 overflow-y-auto px-3 sm:px-6 py-6">
+      <div className="flex-1 flex flex-col min-w-0 min-h-0 max-w-full">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 sm:px-6 py-6 min-h-0 min-w-0" onScroll={onChatScroll}>
           <div className="max-w-3xl mx-auto space-y-6">
             {messages.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-20 text-center">
+              <div className="flex flex-col items-center justify-center py-12 sm:py-20 text-center px-2 min-w-0">
                 <NIdentity state="white" size={48} className="mb-5 opacity-80" />
                 <h2 className="font-display text-xl font-medium mb-2">
-                  Start a conversation
+                  How can NYVEN help?
                 </h2>
-                <p className="text-nyven-text-secondary text-sm max-w-sm">
+                <p className="text-nyven-text-secondary text-sm max-w-sm mb-6">
                   Ask anything. Build ideas. Write code. Explore what&apos;s next.
                 </p>
+                <div className="flex flex-wrap justify-center gap-2 max-w-md">
+                  {[
+                    'Explain a concept simply',
+                    'Help me write clearer code',
+                    'Summarize the latest on AI',
+                    'Plan a product feature',
+                  ].map((chip) => (
+                    <button
+                      key={chip}
+                      type="button"
+                      disabled={isGenerating}
+                      onClick={() => {
+                        void handleSend({ text: chip, attachments: [] })
+                      }}
+                      className="text-sm px-3 py-2.5 rounded-full border border-white/[0.1] bg-nyven-surface/80 text-nyven-text hover:border-nyven-cyan/40 hover:text-nyven-cyan transition-colors min-h-[44px]"
+                    >
+                      {chip}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -712,36 +770,71 @@ export function Chat() {
                 }
               />
             ))}
+            
+            {messages.length > 0 &&
+              messages[messages.length - 1]?.role === 'nyven' &&
+              messages[messages.length - 1]?.activityState === 'error' &&
+              !isGenerating && (
+                <div className="flex flex-col items-center gap-2 py-2">
+                  <p className="text-sm text-nyven-text-secondary text-center">
+                    Something went wrong while generating the response.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void handleRegenerate()}
+                    className="min-h-[44px] px-4 py-2 rounded-xl bg-nyven-surface border border-white/10 text-sm font-medium text-nyven-text hover:border-nyven-cyan/40"
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
+
             <div ref={bottomRef} />
           </div>
         </div>
 
+        {showJumpLatest && (
+          <div className="flex justify-center pb-2">
+            <button
+              type="button"
+              onClick={() => {
+                stickToBottomRef.current = true
+                scrollToBottom(true)
+              }}
+              className="text-xs font-medium px-3 py-2 rounded-full bg-nyven-surface border border-white/10 text-nyven-text shadow-lg min-h-[44px]"
+            >
+              Jump to latest
+            </button>
+          </div>
+        )}
         {/* Dictation wave lives on the composer mic (MicWaveCircle). Full Liquid Voice is Voice Chat only. */}
         {voiceError && !voiceChatOpen && (
           <p className="text-center text-xs text-red-300 px-4 py-1 max-w-xl mx-auto">{voiceError}</p>
         )}
-        <MessageComposer
-          onSend={handleSend}
-          isGenerating={isGenerating}
-          onStop={handleStop}
-          autoFocus
-          onVoiceToggle={() => void voiceRef.current?.toggleListen()}
-          voicePhase={voicePhase}
-          voiceEnergy={voiceEnergy}
-          liquidMode={
-            voicePhase === 'speaking'
-              ? 'speaking'
-              : voicePhase === 'listening'
-                ? 'listening'
-                : voicePhase === 'transcribing' || isGenerating
-                  ? 'thinking'
-                  : 'idle'
-          }
-          onOpenVoiceChat={() => {
-            setVoiceChatOpen(true)
-            voiceChatOpenRef.current = true
-          }}
-        />
+        <div className="shrink-0 w-full max-w-3xl mx-auto px-2 sm:px-4 pt-1 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] min-w-0">
+          <MessageComposer
+            onSend={handleSend}
+            isGenerating={isGenerating}
+            onStop={handleStop}
+            autoFocus
+            onVoiceToggle={() => void voiceRef.current?.toggleListen()}
+            voicePhase={voicePhase}
+            voiceEnergy={voiceEnergy}
+            liquidMode={
+              voicePhase === 'speaking'
+                ? 'speaking'
+                : voicePhase === 'listening'
+                  ? 'listening'
+                  : voicePhase === 'transcribing' || isGenerating
+                    ? 'thinking'
+                    : 'idle'
+            }
+            onOpenVoiceChat={() => {
+              setVoiceChatOpen(true)
+              voiceChatOpenRef.current = true
+            }}
+          />
+        </div>
       </div>
 
       <VoiceChatScreen

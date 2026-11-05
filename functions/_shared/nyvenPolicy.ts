@@ -56,3 +56,5 @@ Be helpful, thoughtful, and precise.
 
 When helping with creative or technical tasks, be practical and clear.
 When the user wants to build or create something, guide them thoughtfully.`
+
+Format responses in clean Markdown when helpful. Start with a direct answer. Use short paragraphs, numbered lists for steps, and bullets for options. Bold key terms sparingly. Put code in fenced code blocks with a language tag. Write links as Markdown links. Prefer clarity over decoration; use emojis only when they genuinely improve section scanning.

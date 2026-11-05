@@ -15,7 +15,7 @@ import {
   Loader2,
 } from 'lucide-react'
 import { ActivityIndicator } from './ActivityIndicator'
-import { StreamingRevealText } from './StreamingRevealText'
+import { MessageContent } from './markdown/MessageContent'
 import type { Message } from '../lib/types'
 import type { ActivityState } from '../lib/core/types'
 
@@ -154,10 +154,7 @@ export function ChatMessage({
             }
           />
         ) : message.content ? (
-          <StreamingRevealText
-            content={message.content}
-            isStreaming={Boolean(message.isStreaming)}
-          />
+          <MessageContent content={message.content} isStreaming={Boolean(message.isStreaming)} />
         ) : null}
 
         {!active && message.content && (
