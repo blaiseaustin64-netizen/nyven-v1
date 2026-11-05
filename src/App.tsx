@@ -75,7 +75,7 @@ export default function App() {
   return (
     <AuthProvider>
     <ConversationHistoryProvider>
-    <div className="h-full flex flex-col lg:flex-row">
+    <div className="h-full max-h-[100dvh] flex flex-col lg:flex-row min-w-0 overflow-hidden">
       <NyvenBackground />
 
       <Sidebar
