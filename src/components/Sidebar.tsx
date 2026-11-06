@@ -7,7 +7,6 @@ import {
   Code2,
   Sparkles,
   Settings,
-  User,
   Plus,
   Menu,
   X,
@@ -15,6 +14,8 @@ import {
   MoreHorizontal,
   Pencil,
   Trash2,
+  PanelLeftClose,
+  PanelLeft,
 } from 'lucide-react'
 import clsx from 'clsx'
 import { NIdentity } from './NIdentity'
@@ -22,6 +23,7 @@ import { useAuth } from '../lib/auth/AuthContext'
 import { useConversationHistory } from '../lib/chat/ConversationHistoryContext'
 import type { Conversation } from '../lib/types'
 
+/** Real NYVEN routes only — no Agents / demo bot */
 const mainNav = [
   { to: '/', label: 'Home', icon: Home },
   { to: '/chat', label: 'Chat', icon: MessageSquare },
@@ -64,6 +66,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const [menuId, setMenuId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editTitle, setEditTitle] = useState('')
+  const [collapsed, setCollapsed] = useState(false)
 
   const onChatRoute = location.pathname.startsWith('/chat')
 
@@ -88,14 +91,6 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
     }))
   }, [filtered])
 
-  const linkClass = ({ isActive }: { isActive: boolean }) =>
-    clsx(
-      'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors duration-200',
-      isActive
-        ? 'bg-nyven-surface text-nyven-cyan'
-        : 'text-nyven-text-secondary hover:text-nyven-text hover:bg-white/[0.03]'
-    )
-
   const handleNewChat = () => {
     startNewChat()
     onMobileClose?.()
@@ -115,273 +110,299 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
     setMenuId(null)
   }
 
-  const content = (
-    <div className="flex flex-col h-full min-h-0">
-      {/* ══════ TOP: branding, New Chat, navigation, settings ══════ */}
-      <div className="shrink-0">
-        <div className="px-4 pt-[max(1.25rem,env(safe-area-inset-top))] pb-3 flex items-center gap-3">
-          <NIdentity state="white" size={28} />
-          <span className="font-display font-semibold text-lg tracking-tight">NYVEN</span>
-        </div>
+  const linkClass = ({ isActive }: { isActive: boolean }) =>
+    clsx(
+      'relative flex items-center gap-3 w-full px-3 rounded-xl text-sm font-medium transition-colors min-h-[44px]',
+      collapsed && 'lg:justify-center lg:px-0',
+      isActive
+        ? 'bg-white/[0.08] text-[#e9edf5]'
+        : 'text-[#6f7a90] hover:text-[#e9edf5] hover:bg-white/[0.05]'
+    )
 
-        <div className="px-3 mb-2">
+  const initial =
+    (profile?.display_name || user?.displayName || user?.email || 'G')
+      .trim()
+      .charAt(0)
+      .toUpperCase() || 'G'
+
+  const content = (
+    <div className="flex flex-col h-full min-h-0 bg-[#0b0e15]">
+      {/* Header */}
+      <div className="shrink-0 flex items-center gap-2 px-3 pt-[max(0.875rem,env(safe-area-inset-top))] pb-3">
+        <div className="flex items-center gap-2.5 flex-1 min-w-0">
+          <NIdentity state="white" size={28} />
+          {!collapsed && (
+            <span
+              className="font-display font-semibold text-[15px] tracking-[0.2em] bg-gradient-to-r from-white via-[#9fdcff] to-[#8fa4ff] bg-clip-text text-transparent truncate"
+            >
+              NYVEN
+            </span>
+          )}
+        </div>
+        <button
+          type="button"
+          className="hidden lg:grid place-items-center w-9 h-9 rounded-[10px] text-[#6f7a90] hover:bg-white/[0.07] hover:text-[#e9edf5]"
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          title={collapsed ? 'Expand' : 'Collapse'}
+          onClick={() => setCollapsed((c) => !c)}
+        >
+          {collapsed ? <PanelLeft size={18} /> : <PanelLeftClose size={18} />}
+        </button>
+        {onMobileClose && (
           <button
             type="button"
-            onClick={handleNewChat}
-            className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-nyven-surface/80 border border-white/[0.06] text-sm font-medium text-nyven-text hover:bg-nyven-surface hover:border-nyven-cyan/20 transition-all duration-200 min-h-[44px]"
+            className="lg:hidden grid place-items-center w-9 h-9 rounded-[10px] text-[#6f7a90] hover:bg-white/[0.07]"
+            aria-label="Close menu"
+            onClick={onMobileClose}
           >
-            <Plus size={16} className="text-nyven-cyan" />
-            New Chat
+            <X size={18} />
           </button>
-        </div>
-
-        <nav className="px-3 space-y-0.5 pb-2">
-          {mainNav.map(({ to, label, icon: Icon }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={to === '/'}
-              className={linkClass}
-              onClick={onMobileClose}
-            >
-              <Icon size={18} strokeWidth={1.75} />
-              {label}
-            </NavLink>
-          ))}
-          <NavLink to="/nyven-plus" className={linkClass} onClick={onMobileClose}>
-            <Sparkles size={18} strokeWidth={1.75} />
-            NYVEN+
-          </NavLink>
-          <NavLink to="/settings" className={linkClass} onClick={onMobileClose}>
-            <Settings size={18} strokeWidth={1.75} />
-            Settings
-          </NavLink>
-          <NavLink to="/profile" className={linkClass} onClick={onMobileClose}>
-            <User size={18} strokeWidth={1.75} />
-            Profile
-          </NavLink>
-          {configured && (
-            <div className="pt-1 px-1">
-              {user ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    navigate('/settings')
-                    onMobileClose?.()
-                  }}
-                  className="w-full text-left px-2 py-1.5 rounded-lg text-xs text-nyven-text-secondary hover:text-nyven-text truncate"
-                >
-                  {user.email}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    navigate('/auth')
-                    onMobileClose?.()
-                  }}
-                  className="w-full px-2 py-1.5 rounded-lg text-xs font-medium text-nyven-cyan hover:bg-nyven-cyan/10 text-left"
-                >
-                  Sign in
-                </button>
-              )}
-            </div>
-          )}
-        </nav>
+        )}
       </div>
 
-      {/* ══════ BOTTOM: Chat History (fills remaining space, scrolls alone) ══════ */}
-      <div className="flex-1 min-h-0 flex flex-col border-t border-white/[0.06]">
-        <div className="shrink-0 px-3 pt-3 pb-2">
-          <p className="px-1 text-[11px] font-medium uppercase tracking-wider text-nyven-text-secondary/80 mb-2">
-            Chat History
-          </p>
-          <div className="relative">
-            <Search
-              size={14}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-nyven-text-secondary pointer-events-none"
-            />
+      {/* New chat + search */}
+      <div className="shrink-0 px-3 space-y-2.5">
+        <button
+          type="button"
+          onClick={handleNewChat}
+          className={clsx(
+            'w-full flex items-center gap-2.5 h-11 rounded-xl font-semibold text-[#04101a] bg-gradient-to-br from-[#3de0ff] to-[#4f6bff] hover:brightness-110 active:scale-[0.98] transition-all min-h-[44px]',
+            collapsed ? 'lg:justify-center lg:px-0' : 'px-3.5'
+          )}
+          title="New chat"
+        >
+          <Plus size={18} strokeWidth={2.25} />
+          {!collapsed && <span>New chat</span>}
+        </button>
+
+        {!collapsed && (
+          <label className="relative flex items-center gap-2 h-[42px] px-3 rounded-xl bg-white/[0.04] border border-white/[0.07] text-[#6f7a90] focus-within:border-[#3de0ff]/35">
+            <Search size={16} className="shrink-0" />
             <input
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search conversations"
-              className="w-full pl-9 pr-3 py-2 rounded-xl bg-white/[0.04] border border-white/[0.06] text-sm text-nyven-text placeholder:text-nyven-text-secondary/70 outline-none focus:border-nyven-cyan/30"
-              aria-label="Search conversations"
+              placeholder="Search chats"
+              className="flex-1 min-w-0 bg-transparent border-0 outline-none text-sm text-[#e9edf5] placeholder:text-[#6f7a90]"
+              aria-label="Search chats"
             />
-          </div>
-        </div>
+          </label>
+        )}
+      </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-          {loading && (
-            <p className="text-xs text-nyven-text-secondary px-3 py-3">Loading…</p>
+      {/* Workspace nav */}
+      <nav
+        className="shrink-0 px-3 pt-3 pb-2 space-y-0.5"
+        aria-label="Workspace"
+      >
+        {mainNav.map(({ to, label, icon: Icon }) => (
+          <NavLink
+            key={to}
+            to={to}
+            end={to === '/'}
+            className={linkClass}
+            onClick={onMobileClose}
+            title={label}
+          >
+            <Icon size={18} strokeWidth={1.85} className="shrink-0" />
+            {!collapsed && <span className="truncate">{label}</span>}
+          </NavLink>
+        ))}
+        <NavLink
+          to="/nyven-plus"
+          className={linkClass}
+          onClick={onMobileClose}
+          title="NYVEN+"
+        >
+          <Sparkles size={18} strokeWidth={1.85} className="shrink-0" />
+          {!collapsed && <span className="truncate">NYVEN+</span>}
+        </NavLink>
+        <NavLink
+          to="/settings"
+          className={linkClass}
+          onClick={onMobileClose}
+          title="Settings"
+        >
+          <Settings size={18} strokeWidth={1.85} className="shrink-0" />
+          {!collapsed && <span className="truncate">Settings</span>}
+        </NavLink>
+      </nav>
+
+      {/* Chat history */}
+      <div className="flex-1 min-h-0 flex flex-col border-t border-white/[0.07] mt-1">
+        {!collapsed && (
+          <p className="px-4 pt-3 pb-1.5 text-[11px] font-medium uppercase tracking-wider text-[#6f7a90]/90">
+            Recents
+          </p>
+        )}
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-2 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {loading && !collapsed && (
+            <p className="text-xs text-[#6f7a90] px-3 py-3">Loading…</p>
           )}
-          {!query.trim() && !loading && filtered.length > 0 && (
-            <p className="px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-nyven-text-secondary/80">
-              Recents
-            </p>
-          )}
-          {!loading && filtered.length === 0 && (
-            <p className="text-xs text-nyven-text-secondary px-3 py-3">
+          {!loading && filtered.length === 0 && !collapsed && (
+            <p className="text-xs text-[#6f7a90] px-3 py-3">
               {query.trim() ? 'No matching chats' : 'No conversations yet'}
             </p>
           )}
-          {groups.map(({ label, items }) => (
-            <div key={label} className="mb-2">
-              <p className="px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-nyven-text-secondary/80">
-                {label}
-              </p>
-              <div className="space-y-0.5">
-                {items.map((c) => (
-                  <div
-                    key={c.id}
-                    className={clsx(
-                      'group relative flex items-center rounded-xl',
-                      onChatRoute && c.id === activeId
-                        ? 'bg-white/[0.08] text-nyven-text'
-                        : 'text-nyven-text-secondary hover:bg-white/[0.04] hover:text-nyven-text'
-                    )}
-                  >
-                    {editingId === c.id ? (
-                      <input
-                        autoFocus
-                        value={editTitle}
-                        onChange={(e) => setEditTitle(e.target.value)}
-                        onBlur={commitEdit}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') commitEdit()
-                          if (e.key === 'Escape') setEditingId(null)
-                        }}
-                        className="flex-1 mx-1 my-1 px-2.5 py-2 rounded-lg bg-nyven-bg border border-nyven-cyan/30 text-sm outline-none min-w-0"
-                        aria-label="Rename conversation"
-                      />
-                    ) : (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => handleSelect(c)}
-                          onContextMenu={(e) => {
-                            e.preventDefault()
-                            setMenuId(c.id)
+          {!collapsed &&
+            groups.map(({ label, items }) => (
+              <div key={label} className="mb-2">
+                <p className="px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-[#6f7a90]/80">
+                  {label}
+                </p>
+                <div className="space-y-0.5">
+                  {items.map((c) => (
+                    <div
+                      key={c.id}
+                      className={clsx(
+                        'group relative flex items-center rounded-xl',
+                        onChatRoute && c.id === activeId
+                          ? 'bg-white/[0.08] text-[#e9edf5]'
+                          : 'text-[#6f7a90] hover:bg-white/[0.04] hover:text-[#e9edf5]'
+                      )}
+                    >
+                      {editingId === c.id ? (
+                        <input
+                          autoFocus
+                          value={editTitle}
+                          onChange={(e) => setEditTitle(e.target.value)}
+                          onBlur={commitEdit}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') commitEdit()
+                            if (e.key === 'Escape') setEditingId(null)
                           }}
-                          onTouchStart={() => {
-                            const id = window.setTimeout(() => setMenuId(c.id), 480)
-                            ;(window as unknown as { __nyvenLp?: number }).__nyvenLp = id
-                          }}
-                          onTouchEnd={() => {
-                            const id = (window as unknown as { __nyvenLp?: number }).__nyvenLp
-                            if (id) window.clearTimeout(id)
-                          }}
-                          onTouchMove={() => {
-                            const id = (window as unknown as { __nyvenLp?: number }).__nyvenLp
-                            if (id) window.clearTimeout(id)
-                          }}
-                          className="flex-1 text-left px-3 py-2.5 text-sm truncate min-w-0 min-h-[44px]"
-                          title={c.title}
-                        >
-                          {c.title || 'Untitled'}
-                        </button>
-                        <div className="relative shrink-0 pr-0.5">
+                          className="flex-1 mx-1 my-1 px-2.5 py-2 rounded-lg bg-[#07090D] border border-[#3de0ff]/30 text-sm outline-none min-w-0"
+                          aria-label="Rename conversation"
+                        />
+                      ) : (
+                        <>
                           <button
                             type="button"
-                            aria-label="Conversation actions"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setMenuId((id) => (id === c.id ? null : c.id))
+                            onClick={() => handleSelect(c)}
+                            onContextMenu={(e) => {
+                              e.preventDefault()
+                              setMenuId(c.id)
                             }}
-                            className={clsx(
-                              'p-2 rounded-lg text-nyven-text-secondary hover:bg-white/[0.06] hover:text-nyven-text',
-                              'opacity-100 sm:opacity-0 sm:group-hover:opacity-100',
-                              menuId === c.id && 'opacity-100'
-                            )}
+                            onTouchStart={() => {
+                              const id = window.setTimeout(() => setMenuId(c.id), 480)
+                              ;(window as unknown as { __nyvenLp?: number }).__nyvenLp = id
+                            }}
+                            onTouchEnd={() => {
+                              const id = (window as unknown as { __nyvenLp?: number }).__nyvenLp
+                              if (id) window.clearTimeout(id)
+                            }}
+                            onTouchMove={() => {
+                              const id = (window as unknown as { __nyvenLp?: number }).__nyvenLp
+                              if (id) window.clearTimeout(id)
+                            }}
+                            className="flex-1 text-left px-3 py-2.5 text-sm truncate min-w-0 min-h-[44px]"
+                            title={c.title}
                           >
-                            <MoreHorizontal size={16} />
+                            {c.title || 'Untitled'}
                           </button>
-                          {menuId === c.id && (
-                            <>
-                              <button
-                                type="button"
-                                className="fixed inset-0 z-40"
-                                aria-label="Close menu"
-                                onClick={() => setMenuId(null)}
-                              />
-                              <div className="absolute right-0 top-full z-50 mt-1 w-36 rounded-xl border border-white/[0.08] bg-nyven-surface shadow-xl py-1">
+                          <div className="relative shrink-0 pr-0.5">
+                            <button
+                              type="button"
+                              aria-label="Conversation actions"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setMenuId((id) => (id === c.id ? null : c.id))
+                              }}
+                              className="p-2 rounded-lg opacity-100 sm:opacity-0 sm:group-hover:opacity-100 text-[#6f7a90] hover:text-[#e9edf5] hover:bg-white/[0.06] min-h-[36px] min-w-[36px] flex items-center justify-center"
+                            >
+                              <MoreHorizontal size={16} />
+                            </button>
+                            {menuId === c.id && (
+                              <>
                                 <button
                                   type="button"
-                                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-nyven-text hover:bg-white/[0.05]"
-                                  onClick={() => {
-                                    setEditingId(c.id)
-                                    setEditTitle(c.title || '')
-                                    setMenuId(null)
-                                  }}
-                                >
-                                  <Pencil size={14} />
-                                  Rename
-                                </button>
-                                <button
-                                  type="button"
-                                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-300 hover:bg-white/[0.05]"
-                                  onClick={() => {
-                                    deleteConversation(c.id)
-                                    setMenuId(null)
-                                  }}
-                                >
-                                  <Trash2 size={14} />
-                                  Delete
-                                </button>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                ))}
+                                  className="fixed inset-0 z-40"
+                                  aria-label="Close menu"
+                                  onClick={() => setMenuId(null)}
+                                />
+                                <div className="absolute right-0 top-full z-50 mt-1 w-36 rounded-xl border border-white/[0.08] bg-[#0c1018] shadow-xl py-1">
+                                  <button
+                                    type="button"
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[#e9edf5] hover:bg-white/[0.05]"
+                                    onClick={() => {
+                                      setEditingId(c.id)
+                                      setEditTitle(c.title || '')
+                                      setMenuId(null)
+                                    }}
+                                  >
+                                    <Pencil size={13} /> Rename
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-white/[0.05]"
+                                    onClick={() => {
+                                      deleteConversation(c.id)
+                                      setMenuId(null)
+                                    }}
+                                  >
+                                    <Trash2 size={13} /> Delete
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
         </div>
       </div>
 
-        {/* Account + New chat footer (phones & desktop rail) */}
-        <div className="shrink-0 border-t border-white/[0.06] px-3 py-2.5 flex items-center gap-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-          <button
-            type="button"
-            onClick={() => {
-              onMobileClose?.()
-              navigate('/settings')
-            }}
-            className="w-10 h-10 rounded-full bg-nyven-cyan/15 text-nyven-cyan flex items-center justify-center text-sm font-semibold shrink-0 min-h-[44px] min-w-[44px]"
-            aria-label="Open settings"
-            title={user?.email || 'Settings'}
-          >
-            {(profile?.display_name || user?.displayName || user?.email || 'G')
-              .trim()
-              .charAt(0)
-              .toUpperCase()}
-          </button>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs text-nyven-text truncate">
-              {profile?.display_name || user?.displayName || (user ? 'Signed in' : 'Guest')}
-            </p>
-            <p className="text-[11px] text-nyven-text-secondary truncate">
-              {user?.email || 'Not signed in'}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={handleNewChat}
-            className="shrink-0 px-3 h-10 rounded-full bg-nyven-surface border border-white/[0.08] text-xs font-medium text-nyven-text hover:border-nyven-cyan/30 min-h-[44px]"
-          >
-            New chat
-          </button>
-        </div>
+      {/* Account footer */}
+      <div className="shrink-0 border-t border-white/[0.07] px-3 py-2.5 flex items-center gap-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <button
+          type="button"
+          onClick={() => {
+            onMobileClose?.()
+            navigate('/settings')
+          }}
+          className="w-10 h-10 rounded-full bg-[#3de0ff]/15 text-[#3de0ff] flex items-center justify-center text-sm font-semibold shrink-0 min-h-[44px] min-w-[44px]"
+          aria-label="Open settings"
+          title={user?.email || 'Settings'}
+        >
+          {initial}
+        </button>
+        {!collapsed && (
+          <>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-[#e9edf5] truncate">
+                {profile?.display_name ||
+                  user?.displayName ||
+                  (user ? 'Signed in' : 'Guest')}
+              </p>
+              <p className="text-[11px] text-[#6f7a90] truncate">
+                {user?.email || (configured ? 'Not signed in' : 'Guest')}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleNewChat}
+              className="shrink-0 px-3 h-10 rounded-full bg-white/[0.04] border border-white/[0.08] text-xs font-medium text-[#e9edf5] hover:border-[#3de0ff]/30 min-h-[44px]"
+            >
+              New chat
+            </button>
+          </>
+        )}
+      </div>
     </div>
   )
 
   return (
     <>
-      <aside className="hidden lg:flex flex-col w-[260px] xl:w-[280px] shrink-0 border-r border-white/[0.05] bg-nyven-bg-secondary/40 h-full min-h-0">
+      <aside
+        className={clsx(
+          'hidden lg:flex flex-col shrink-0 border-r border-white/[0.07] h-full min-h-0 transition-[width] duration-300',
+          collapsed ? 'w-[72px]' : 'w-[280px] xl:w-[292px]'
+        )}
+      >
         {content}
       </aside>
 
@@ -389,21 +410,11 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         <div className="fixed inset-0 z-40 lg:hidden">
           <button
             type="button"
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/55 backdrop-blur-sm"
             aria-label="Close menu"
             onClick={onMobileClose}
           />
-          <aside className="absolute left-0 top-0 bottom-0 w-[min(100vw,320px)] bg-nyven-bg-secondary border-r border-white/[0.06] shadow-2xl flex flex-col min-h-0">
-            <div className="absolute top-3 right-3 z-10">
-              <button
-                type="button"
-                onClick={onMobileClose}
-                className="p-2 rounded-lg text-nyven-text-secondary hover:text-nyven-text hover:bg-white/[0.05] min-h-[40px] min-w-[40px] flex items-center justify-center"
-                aria-label="Close menu"
-              >
-                <X size={20} />
-              </button>
-            </div>
+          <aside className="absolute left-0 top-0 bottom-0 w-[min(86vw,330px)] bg-[#0b0e15] border-r border-white/[0.07] shadow-2xl flex flex-col min-h-0 animate-in slide-in-from-left duration-300">
             {content}
           </aside>
         </div>
@@ -414,18 +425,18 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
 
 export function MobileNavBar({ onMenuOpen }: { onMenuOpen: () => void }) {
   return (
-    <header className="lg:hidden flex items-center justify-between px-3 h-12 border-b border-white/[0.05] shrink-0 bg-nyven-bg/80 backdrop-blur-md pt-[env(safe-area-inset-top)]">
+    <header className="lg:hidden flex items-center justify-between px-3 h-12 border-b border-white/[0.05] shrink-0 bg-[#07090D]/90 backdrop-blur-md pt-[env(safe-area-inset-top)]">
       <button
         type="button"
         onClick={onMenuOpen}
-        className="p-2 -ml-2 rounded-lg text-nyven-text-secondary hover:text-nyven-text min-h-[44px] min-w-[44px] flex items-center justify-center"
+        className="p-2 -ml-2 rounded-lg text-[#6f7a90] hover:text-[#e9edf5] min-h-[44px] min-w-[44px] flex items-center justify-center"
         aria-label="Open menu"
       >
         <Menu size={22} />
       </button>
       <div className="flex items-center gap-2">
         <NIdentity state="white" size={22} />
-        <span className="font-display font-semibold text-base">NYVEN</span>
+        <span className="font-display font-semibold text-base tracking-wide">NYVEN</span>
       </div>
       <div className="w-10" />
     </header>
@@ -441,17 +452,16 @@ export function MobileBottomNav() {
   ]
 
   return (
-    <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-30 border-t border-white/[0.06] bg-nyven-bg/95 backdrop-blur-md safe-bottom">
+    <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-30 border-t border-white/[0.06] bg-[#07090D]/95 backdrop-blur-md">
       <div className="flex items-center justify-around h-14 px-2 pb-[env(safe-area-inset-bottom)]">
         {items.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}
-            end={to === '/'}
             className={({ isActive }) =>
               clsx(
-                'flex flex-col items-center justify-center gap-0.5 flex-1 h-full text-[11px] font-medium transition-colors',
-                isActive ? 'text-nyven-cyan' : 'text-nyven-text-secondary'
+                'flex flex-col items-center justify-center gap-0.5 flex-1 min-h-[44px] h-full text-[11px] font-medium transition-colors',
+                isActive ? 'text-[#3de0ff]' : 'text-[#6f7a90]'
               )
             }
           >

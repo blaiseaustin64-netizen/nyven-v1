@@ -778,7 +778,7 @@ export function Chat() {
         </div>
 
         {showJumpLatest && (
-          <div className="pointer-events-none absolute bottom-[calc(5.5rem+env(safe-area-inset-bottom,0px))] right-3 sm:right-6 z-20">
+          <div className="pointer-events-none absolute bottom-[calc(5.5rem+env(safe-area-inset-bottom,0px))] left-1/2 -translate-x-1/2 z-20">
             <button
               type="button"
               onClick={() => {
