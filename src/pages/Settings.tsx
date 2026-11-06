@@ -42,8 +42,8 @@ import {
   deleteMemory,
   setMemoryEnabled,
 } from '../lib/memoryStore'
-import type { MemoryRow } from '../lib/types/dbRows'
-import type { ConnectionPublicRow } from '../lib/types/dbRows'
+import type { MemoryItem } from '../lib/memoryStore'
+import type { ConnectionPublicRow } from '../lib/settings/connectionsUi'
 import { setVoicePreferences } from '../lib/voice/preferences'
 import { VoiceSpeechSettings } from '../components/voice/VoiceSpeechSettings'
 import { resolveFishVoiceId } from '../lib/voice/catalog'
@@ -124,7 +124,7 @@ export function Settings() {
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const [usage, setUsage] = useState<UsageSummary | null>(null)
-  const [memories, setMemories] = useState<MemoryRow[]>([])
+  const [memories, setMemories] = useState<MemoryItem[]>([])
   const [connections, setConnections] = useState<ConnectionPublicRow[]>([])
   const [githubBusy, setGithubBusy] = useState(false)
   const [githubMsg, setGithubMsg] = useState<string | null>(null)
@@ -1101,21 +1101,11 @@ function BugReportCard() {
     }
     setBusy(true)
     try {
-      let accessToken: string | undefined
-      try {
-        const { data } = (await null?.auth.getSession()) ?? {
-          data: { session: null },
-        }
-        accessToken = data.session?.access_token
-      } catch {
-        /* guest */
-      }
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-      if (accessToken) headers.Authorization = `Bearer ${accessToken}`
-
+      // Session is HttpOnly cookie (nyven_session); browser sends it with credentials.
       const res = await fetch('/api/bug-report', {
         method: 'POST',
-        headers,
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           summary: summary.trim(),
           category,

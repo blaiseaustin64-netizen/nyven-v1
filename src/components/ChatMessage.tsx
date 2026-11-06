@@ -162,6 +162,7 @@ export function ChatMessage({
   }
 
   return (
+    <>
     <div className="group pl-0.5 min-w-0">
       <div className="min-w-0 max-w-3xl">
         {showActivity ? (
@@ -331,5 +332,6 @@ export function ChatMessage({
           </div>
         </div>
       )}
+    </>
   )
 }

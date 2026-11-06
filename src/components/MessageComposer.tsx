@@ -421,6 +421,7 @@ export function MessageComposer({
   const visibleAttachments = attachments.filter((a) => a.status !== 'cancelled')
 
   const retryUpload = (a: PendingAttachment) => {
+    if (!a.file) return
     removeAttachment(a.id)
     void uploadFile(a.file)
   }

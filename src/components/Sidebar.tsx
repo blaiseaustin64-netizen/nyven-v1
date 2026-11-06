@@ -49,7 +49,7 @@ interface SidebarProps {
 export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const navigate = useNavigate()
   const location = useLocation()
-  const { user, profile, configured, signOut } = useAuth()
+  const { user, profile, configured } = useAuth()
   const {
     conversations,
     loading,
@@ -342,7 +342,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
           ))}
         </div>
       </div>
-    </div>
+
         {/* Account + New chat footer (phones & desktop rail) */}
         <div className="shrink-0 border-t border-white/[0.06] px-3 py-2.5 flex items-center gap-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <button
@@ -376,7 +376,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
             New chat
           </button>
         </div>
-
+    </div>
   )
 
   return (
