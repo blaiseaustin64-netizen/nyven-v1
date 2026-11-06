@@ -18,6 +18,8 @@
 
 html, body, #root {
   height: 100%;
+  height: 100dvh;
+  max-width: 100%;
   margin: 0;
   padding: 0;
 }
@@ -31,20 +33,44 @@ body {
   overflow-x: hidden;
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+/* Scrollbars: hide on phones / coarse pointers (removes the side "line") */
+@media (max-width: 1023px), (pointer: coarse) {
+  * {
+    scrollbar-width: none;
+  }
+  *::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
 }
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: rgba(137, 147, 164, 0.3);
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(137, 147, 164, 0.5);
+
+/* Desktop: thin scrollbar, visible on hover */
+@media (min-width: 1024px) and (pointer: fine) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+  *:hover {
+    scrollbar-color: rgba(137, 147, 164, 0.35) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 3px;
+  }
+  *:hover::-webkit-scrollbar-thumb {
+    background: rgba(137, 147, 164, 0.35);
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: rgba(137, 147, 164, 0.5);
+  }
 }
 
 /* Focus styles */
@@ -176,22 +202,49 @@ input:focus-visible {
   max-width: 100%;
 }
 
-/* highlight.js — NYVEN dark tokens (no external CSS file required) */
+
+/* Mobile spacing scale helpers */
+.nyven-page-px {
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+/* highlight.js — VS Code Dark+ tokens for NYVEN code blocks */
 .nyven-code-pre .hljs {
   background: transparent;
-  color: #e8ecf5;
+  color: #D4D4D4;
   padding: 0;
 }
 .nyven-code-pre .hljs-keyword,
-.nyven-code-pre .hljs-selector-tag { color: #b794f6; }
-.nyven-code-pre .hljs-string,
-.nyven-code-pre .hljs-attr { color: #f6ad55; }
-.nyven-code-pre .hljs-number,
-.nyven-code-pre .hljs-literal { color: #63b3ed; }
-.nyven-code-pre .hljs-comment { color: #68d391; font-style: italic; }
-.nyven-code-pre .hljs-function .hljs-title,
-.nyven-code-pre .hljs-title.function_ { color: #f6e05e; }
+.nyven-code-pre .hljs-selector-tag,
+.nyven-code-pre .hljs-literal { color: #C586C0; }
+.nyven-code-pre .hljs-title.function_,
+.nyven-code-pre .hljs-title.function,
+.nyven-code-pre .hljs-function .hljs-title { color: #DCDCAA; }
+.nyven-code-pre .hljs-string { color: #CE9178; }
+.nyven-code-pre .hljs-number { color: #B5CEA8; }
+.nyven-code-pre .hljs-comment { color: #6A9955; font-style: italic; }
+.nyven-code-pre .hljs-name,
+.nyven-code-pre .hljs-tag { color: #569CD6; }
+.nyven-code-pre .hljs-attr,
+.nyven-code-pre .hljs-attribute,
+.nyven-code-pre .hljs-property,
+.nyven-code-pre .hljs-variable { color: #9CDCFE; }
+.nyven-code-pre .hljs-selector-class,
+.nyven-code-pre .hljs-selector-id,
+.nyven-code-pre .hljs-selector-tag { color: #D7BA7D; }
+.nyven-code-pre .hljs-type,
 .nyven-code-pre .hljs-built_in,
-.nyven-code-pre .hljs-type { color: #76e4f7; }
-.nyven-code-pre .hljs-params { color: #e8ecf5; }
-.nyven-code-pre .hljs-meta { color: #a0aec0; }
+.nyven-code-pre .hljs-title.class_,
+.nyven-code-pre .hljs-class .hljs-title { color: #4EC9B0; }
+.nyven-code-pre .hljs-punctuation,
+.nyven-code-pre .hljs-operator,
+.nyven-code-pre .hljs-params { color: #D4D4D4; }
+.nyven-code-pre .hljs-meta,
+.nyven-code-pre .hljs-subst { color: #D4D4D4; }
+.nyven-code-pre .hljs-regexp,
+.nyven-code-pre .hljs-symbol { color: #D16969; }
+.nyven-code-pre .hljs-section { color: #569CD6; font-weight: 600; }
+.nyven-code-pre .hljs-bullet { color: #D4D4D4; }
+.nyven-code-pre .hljs-addition { color: #B5CEA8; }
+.nyven-code-pre .hljs-deletion { color: #CE9178; }

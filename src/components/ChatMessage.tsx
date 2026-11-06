@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import {
   Copy,
   Check,
@@ -82,6 +82,8 @@ export function ChatMessage({
   const [copied, setCopied] = useState(false)
   const [shareHint, setShareHint] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<'positive' | 'negative' | null>(null)
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const longPressTimer = useRef<number | null>(null)
   const isUser = message.role === 'user'
   const active = Boolean(message.isThinking || message.isStreaming)
   const showActivity = shouldShowActivity(message)
@@ -106,26 +108,44 @@ export function ChatMessage({
         <div className="max-w-[85%] sm:max-w-[75%] min-w-0">
           <div className="bg-nyven-surface border border-white/[0.06] rounded-2xl rounded-br-md px-4 py-3 text-[15px] leading-relaxed text-nyven-text break-words">
             {message.attachments && message.attachments.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mb-2">
+              <div className="flex gap-2 overflow-x-auto mb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {message.attachments.map((a) => (
-                  <span
+                  <a
                     key={a.id}
-                    className="inline-flex items-center gap-1.5 text-[11px] px-2 py-1 rounded-lg bg-white/[0.06] text-nyven-text-secondary max-w-[180px] truncate"
+                    href={a.previewDataUrl || undefined}
+                    target={a.previewDataUrl ? '_blank' : undefined}
+                    rel={a.previewDataUrl ? 'noopener noreferrer' : undefined}
+                    className="relative shrink-0 w-16 h-16 sm:w-20 sm:h-20 max-w-[160px] rounded-xl overflow-hidden border border-white/[0.08] bg-white/[0.04]"
                     title={a.name}
+                    onClick={(e) => {
+                      if (!a.previewDataUrl) e.preventDefault()
+                    }}
                   >
-                    {a.kind === 'image' ? (
-                      <ImageIcon size={12} className="shrink-0" />
+                    {a.kind === 'image' && a.previewDataUrl ? (
+                      <img
+                        src={a.previewDataUrl}
+                        alt={a.name}
+                        className="w-full h-full object-cover"
+                      />
                     ) : (
-                      <FileText size={12} className="shrink-0" />
+                      <div className="w-full h-full flex flex-col items-center justify-center gap-0.5 px-1">
+                        {a.kind === 'image' ? (
+                          <ImageIcon size={18} className="text-nyven-text-secondary" />
+                        ) : (
+                          <FileText size={18} className="text-nyven-text-secondary" />
+                        )}
+                        <span className="text-[9px] text-nyven-text-secondary truncate max-w-full px-0.5">
+                          {a.name}
+                        </span>
+                      </div>
                     )}
-                    <span className="truncate">{a.name}</span>
-                  </span>
+                  </a>
                 ))}
               </div>
             )}
             {message.content}
           </div>
-          <div className="flex justify-end gap-1 mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="flex justify-end gap-1 mt-1.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
             {onEdit && (
               <button
                 onClick={onEdit}
@@ -154,7 +174,24 @@ export function ChatMessage({
             }
           />
         ) : message.content ? (
-          <MessageContent content={message.content} isStreaming={Boolean(message.isStreaming)} />
+          <div
+            onContextMenu={(e) => {
+              e.preventDefault()
+              if (!active) setSheetOpen(true)
+            }}
+            onTouchStart={() => {
+              if (active) return
+              longPressTimer.current = window.setTimeout(() => setSheetOpen(true), 500)
+            }}
+            onTouchEnd={() => {
+              if (longPressTimer.current) window.clearTimeout(longPressTimer.current)
+            }}
+            onTouchMove={() => {
+              if (longPressTimer.current) window.clearTimeout(longPressTimer.current)
+            }}
+          >
+            <MessageContent content={message.content} isStreaming={Boolean(message.isStreaming)} />
+          </div>
         ) : null}
 
         {!active && message.content && (
@@ -276,5 +313,23 @@ export function ChatMessage({
         )}
       </div>
     </div>
+
+      {sheetOpen && (
+        <div className="fixed inset-0 z-[90] lg:hidden" role="dialog" aria-modal="true">
+          <button type="button" className="absolute inset-0 bg-black/50" aria-label="Close" onClick={() => setSheetOpen(false)} />
+          <div className="absolute left-0 right-0 bottom-0 rounded-t-[24px] border-t border-white/10 bg-[#0C1018]/95 backdrop-blur-xl p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <div className="w-10 h-1 rounded-full bg-white/20 mx-auto mb-4" />
+            <p className="text-sm text-nyven-text-secondary mb-3 text-center">Message actions</p>
+            <div className="space-y-1">
+              <button type="button" className="w-full min-h-[48px] rounded-xl text-left px-4 text-nyven-text active:bg-nyven-cyan/10" onClick={() => { void handleCopy(); setSheetOpen(false) }}>Copy</button>
+              {onRegenerate && (
+                <button type="button" className="w-full min-h-[48px] rounded-xl text-left px-4 text-nyven-text active:bg-nyven-cyan/10" onClick={() => { onRegenerate(); setSheetOpen(false) }}>Regenerate</button>
+              )}
+              <button type="button" className="w-full min-h-[48px] rounded-xl text-left px-4 text-nyven-text active:bg-nyven-cyan/10" onClick={() => { void handleShare(); setSheetOpen(false) }}>Share</button>
+              <button type="button" className="w-full min-h-[48px] rounded-xl text-left px-4 text-nyven-text-secondary" onClick={() => setSheetOpen(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
   )
 }

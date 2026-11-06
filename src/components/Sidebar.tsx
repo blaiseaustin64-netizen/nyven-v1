@@ -4,7 +4,7 @@ import {
   Home,
   MessageSquare,
   FolderOpen,
-  Bot,
+  Code2,
   Sparkles,
   Settings,
   User,
@@ -26,7 +26,7 @@ const mainNav = [
   { to: '/', label: 'Home', icon: Home },
   { to: '/chat', label: 'Chat', icon: MessageSquare },
   { to: '/projects', label: 'Projects', icon: FolderOpen },
-  { to: '/agents', label: 'Agents', icon: Bot },
+  { to: '/code', label: 'Code', icon: Code2 },
 ]
 
 const GROUP_ORDER = ['Today', 'Yesterday', 'Previous 7 days', 'Older'] as const
@@ -49,7 +49,7 @@ interface SidebarProps {
 export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const navigate = useNavigate()
   const location = useLocation()
-  const { user, configured } = useAuth()
+  const { user, profile, configured, signOut } = useAuth()
   const {
     conversations,
     loading,
@@ -216,6 +216,11 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
           {loading && (
             <p className="text-xs text-nyven-text-secondary px-3 py-3">Loading…</p>
           )}
+          {!query.trim() && !loading && filtered.length > 0 && (
+            <p className="px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-nyven-text-secondary/80">
+              Recents
+            </p>
+          )}
           {!loading && filtered.length === 0 && (
             <p className="text-xs text-nyven-text-secondary px-3 py-3">
               {query.trim() ? 'No matching chats' : 'No conversations yet'}
@@ -255,7 +260,23 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
                         <button
                           type="button"
                           onClick={() => handleSelect(c)}
-                          className="flex-1 text-left px-3 py-2.5 text-sm truncate min-w-0 min-h-[40px]"
+                          onContextMenu={(e) => {
+                            e.preventDefault()
+                            setMenuId(c.id)
+                          }}
+                          onTouchStart={() => {
+                            const id = window.setTimeout(() => setMenuId(c.id), 480)
+                            ;(window as unknown as { __nyvenLp?: number }).__nyvenLp = id
+                          }}
+                          onTouchEnd={() => {
+                            const id = (window as unknown as { __nyvenLp?: number }).__nyvenLp
+                            if (id) window.clearTimeout(id)
+                          }}
+                          onTouchMove={() => {
+                            const id = (window as unknown as { __nyvenLp?: number }).__nyvenLp
+                            if (id) window.clearTimeout(id)
+                          }}
+                          className="flex-1 text-left px-3 py-2.5 text-sm truncate min-w-0 min-h-[44px]"
                           title={c.title}
                         >
                           {c.title || 'Untitled'}
@@ -322,6 +343,40 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         </div>
       </div>
     </div>
+        {/* Account + New chat footer (phones & desktop rail) */}
+        <div className="shrink-0 border-t border-white/[0.06] px-3 py-2.5 flex items-center gap-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <button
+            type="button"
+            onClick={() => {
+              onMobileClose?.()
+              navigate('/settings')
+            }}
+            className="w-10 h-10 rounded-full bg-nyven-cyan/15 text-nyven-cyan flex items-center justify-center text-sm font-semibold shrink-0 min-h-[44px] min-w-[44px]"
+            aria-label="Open settings"
+            title={user?.email || 'Settings'}
+          >
+            {(profile?.display_name || user?.displayName || user?.email || 'G')
+              .trim()
+              .charAt(0)
+              .toUpperCase()}
+          </button>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-nyven-text truncate">
+              {profile?.display_name || user?.displayName || (user ? 'Signed in' : 'Guest')}
+            </p>
+            <p className="text-[11px] text-nyven-text-secondary truncate">
+              {user?.email || 'Not signed in'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleNewChat}
+            className="shrink-0 px-3 h-10 rounded-full bg-nyven-surface border border-white/[0.08] text-xs font-medium text-nyven-text hover:border-nyven-cyan/30 min-h-[44px]"
+          >
+            New chat
+          </button>
+        </div>
+
   )
 
   return (
@@ -338,7 +393,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
             aria-label="Close menu"
             onClick={onMobileClose}
           />
-          <aside className="absolute left-0 top-0 bottom-0 w-[min(100vw,300px)] bg-nyven-bg-secondary border-r border-white/[0.06] shadow-2xl flex flex-col min-h-0">
+          <aside className="absolute left-0 top-0 bottom-0 w-[min(100vw,320px)] bg-nyven-bg-secondary border-r border-white/[0.06] shadow-2xl flex flex-col min-h-0">
             <div className="absolute top-3 right-3 z-10">
               <button
                 type="button"
@@ -379,9 +434,10 @@ export function MobileNavBar({ onMenuOpen }: { onMenuOpen: () => void }) {
 
 export function MobileBottomNav() {
   const items = [
-    { to: '/', label: 'Home', icon: Home },
     { to: '/chat', label: 'Chat', icon: MessageSquare },
     { to: '/projects', label: 'Projects', icon: FolderOpen },
+    { to: '/code', label: 'Code', icon: Code2 },
+    { to: '/settings', label: 'Settings', icon: Settings },
   ]
 
   return (

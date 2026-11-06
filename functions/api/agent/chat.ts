@@ -18,8 +18,6 @@ interface Env {
   DB?: D1Database
   SUPABASE_URL?: string
   SUPABASE_ANON_KEY?: string
-  VITE_SUPABASE_URL?: string
-  VITE_SUPABASE_ANON_KEY?: string
   PROVIDER_BUDGET_GEMINI?: string
   GEMINI_API_KEY: string
   GEMINI_CHAT_MODEL?: string

@@ -27,6 +27,8 @@ export type PendingAttachment = AttachmentMeta & {
   extractedText?: string
   inlineBase64?: string
   abortController?: AbortController
+  /** Original file kept for retry after error */
+  file?: File
 }
 
 /** Payload sent to Core with a chat message */

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   User,
@@ -42,8 +42,8 @@ import {
   deleteMemory,
   setMemoryEnabled,
 } from '../lib/memoryStore'
-import type { MemoryRow } from '../lib/supabase/types'
-import type { ConnectionPublicRow } from '../lib/supabase/types'
+import type { MemoryRow } from '../lib/types/dbRows'
+import type { ConnectionPublicRow } from '../lib/types/dbRows'
 import { setVoicePreferences } from '../lib/voice/preferences'
 import { VoiceSpeechSettings } from '../components/voice/VoiceSpeechSettings'
 import { resolveFishVoiceId } from '../lib/voice/catalog'
@@ -83,6 +83,8 @@ export function Settings() {
     useAuth()
   const userId = user?.id ?? null
   const [params, setParams] = useSearchParams()
+  const routeParams = useParams<{ section?: string }>()
+  const navigate = useNavigate()
   // Declared before githubView reads them: the memo's deps array is evaluated during render.
   const [githubStatus, setGithubStatus] = useState<ConnectionStatusResponse | null>(null)
   const [githubStatusError, setGithubStatusError] = useState<string | null>(null)
@@ -109,9 +111,13 @@ export function Settings() {
       }),
     [authLoading, configured, userId, githubStatus, githubStatusError]
   )
-  const [mobileShowDetail, setMobileShowDetail] = useState(false)
-  const active = (params.get('section') as Section) || 'account'
-  const setActive = (s: Section) => setParams({ section: s })
+  const active = ((routeParams.section || params.get('section') || 'account') as Section)
+  const setActive = (s: Section) => {
+    // Prefer path segments so mobile Back works
+    navigate(`/settings/${s}`)
+    setParams({ section: s }, { replace: true })
+  }
+  const showMobileList = !routeParams.section && !params.get('section')
 
   const [prefs, setPrefs] = useState<NyvenPreferences>(DEFAULT_PREFERENCES)
   const [prefsLoading, setPrefsLoading] = useState(true)
@@ -227,70 +233,145 @@ export function Settings() {
       return
     }
     // Safe entry point: sign out and instruct; full server delete needs service role
-    showToast('Contact support or use Supabase dashboard for full account deletion.')
+    showToast('Account deletion is permanent. Use Report a Bug to request deletion of your account and associated data, or contact the site operator.')
     await signOut()
   }
 
+  const sectionMeta: Record<Section, { label: string; hint: string }> = {
+    account: { label: 'Account', hint: 'Profile and sign-in' },
+    ai: { label: 'AI', hint: 'Response style and memory' },
+    voice: { label: 'Voice', hint: 'Speech and Fish Audio voices' },
+    privacy: { label: 'Privacy & Security', hint: 'Memories and data' },
+    connections: { label: 'Connected services', hint: 'GitHub and more' },
+    usage: { label: 'Usage', hint: 'Limits and daily allowance' },
+    sessions: { label: 'Sessions', hint: 'This device' },
+    support: { label: 'Report a Bug', hint: 'Send feedback to the team' },
+  }
+
+  const mobileGroups: { title: string; ids: Section[] }[] = [
+    { title: 'You', ids: ['account'] },
+    { title: 'Experience', ids: ['ai', 'voice', 'connections'] },
+    { title: 'Data', ids: ['privacy', 'usage', 'sessions'] },
+    { title: 'Help', ids: ['support'] },
+  ]
+
   const sectionNav = (
-    <nav className="sm:w-52 shrink-0 flex sm:flex-col gap-1 overflow-x-auto pb-2 sm:pb-0 -mx-1 px-1 scrollbar-thin">
+    <nav className="hidden lg:flex lg:w-52 shrink-0 flex-col gap-1">
       {sections.map(({ id, label, icon: Icon }) => (
         <button
           key={id}
           type="button"
-          onClick={() => {
-            setActive(id)
-            setMobileShowDetail(true)
-          }}
-          className={`flex items-center gap-2 px-3 py-3 sm:py-2 rounded-xl text-sm font-medium text-left whitespace-nowrap transition-colors min-h-[44px] ${
+          onClick={() => setActive(id)}
+          className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium text-left transition-colors min-h-[44px] ${
             active === id
               ? 'bg-nyven-surface text-nyven-cyan'
               : 'text-nyven-text-secondary hover:text-nyven-text hover:bg-white/[0.03]'
           }`}
         >
           <Icon size={16} strokeWidth={1.75} />
-          <span className="flex-1">{label}</span>
-          <span className="sm:hidden text-nyven-text-secondary/60">›</span>
+          {label}
         </button>
       ))}
     </nav>
   )
 
+  const initial =
+    (profile?.display_name || user?.displayName || user?.email || '?')
+      .trim()
+      .charAt(0)
+      .toUpperCase() || '?'
+
   return (
     <div className="h-full overflow-y-auto overscroll-contain">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
-        <div className="flex items-center gap-3 mb-8">
+        <div className="flex items-center gap-3 mb-6 lg:mb-8">
           <Link
-            to="/chat"
-            className="lg:hidden p-2 rounded-xl hover:bg-white/[0.04] text-nyven-text-secondary"
+            to={routeParams.section || params.get('section') ? '/settings' : '/chat'}
+            className="lg:hidden p-2 rounded-xl hover:bg-white/[0.04] text-nyven-text-secondary min-h-[44px] min-w-[44px] flex items-center justify-center"
+            aria-label="Back"
           >
             <ChevronLeft size={18} />
           </Link>
-          <h1 className="font-display text-2xl sm:text-3xl font-medium">Settings</h1>
+          <h1 className="font-display text-2xl sm:text-3xl font-medium">
+            {routeParams.section || params.get('section')
+              ? sectionMeta[active]?.label || 'Settings'
+              : 'Settings'}
+          </h1>
           {saving && (
             <Loader2 size={16} className="animate-spin text-nyven-text-secondary" />
           )}
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-6 sm:gap-8 min-w-0">
-          <div className={`min-w-0 ${mobileShowDetail ? 'hidden sm:block' : 'block'}`}>
-            {sectionNav}
+        {/* Mobile: vertical settings list */}
+        <div className={`lg:hidden space-y-5 ${showMobileList ? 'block' : 'hidden'}`}>
+          <div className="flex items-center gap-3 p-4 rounded-2xl border border-white/[0.08] bg-nyven-surface/80">
+            <div className="w-12 h-12 rounded-full bg-nyven-cyan/15 text-nyven-cyan flex items-center justify-center text-lg font-semibold shrink-0">
+              {initial}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[16px] font-medium text-nyven-text truncate">
+                {profile?.display_name || user?.displayName || 'Guest'}
+              </p>
+              <p className="text-sm text-nyven-text-secondary truncate">
+                {user?.email || 'Not signed in'}
+              </p>
+            </div>
+            <span className="text-[11px] px-2 py-1 rounded-full border border-white/10 text-nyven-text-secondary shrink-0">
+              Free
+            </span>
           </div>
+
+          {mobileGroups.map((g) => (
+            <div key={g.title}>
+              <p className="text-xs uppercase tracking-wide text-nyven-text-secondary/80 px-1 mb-2">
+                {g.title}
+              </p>
+              <div className="rounded-2xl border border-white/[0.08] bg-nyven-surface/60 overflow-hidden divide-y divide-white/[0.05]">
+                {g.ids.map((id) => {
+                  const Icon = sections.find((s) => s.id === id)!.icon
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setActive(id)}
+                      className="w-full flex items-center gap-3 px-3 py-3 min-h-[56px] text-left active:bg-nyven-cyan/10"
+                    >
+                      <span className="w-10 h-10 rounded-xl bg-white/[0.06] flex items-center justify-center text-nyven-text-secondary shrink-0">
+                        <Icon size={18} strokeWidth={1.75} />
+                      </span>
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-[16px] text-nyven-text">{sectionMeta[id].label}</span>
+                        <span className="block text-xs text-nyven-text-secondary truncate">
+                          {sectionMeta[id].hint}
+                        </span>
+                      </span>
+                      <ChevronLeft size={18} className="rotate-180 text-nyven-text-secondary/50 shrink-0" />
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+
+          <button
+            type="button"
+            onClick={() => void signOut()}
+            className="w-full min-h-[56px] rounded-2xl border border-red-400/20 text-red-300 text-[16px] font-medium active:bg-red-400/10"
+          >
+            Sign out
+          </button>
+        </div>
+
+        <div className={`flex flex-col lg:flex-row gap-6 lg:gap-8 min-w-0 ${showMobileList ? 'hidden lg:flex' : 'flex'}`}>
+          {sectionNav}
 
           <motion.div
             key={active}
             initial={{ opacity: 0, x: 8 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.2 }}
-            className={`flex-1 min-w-0 space-y-6 ${mobileShowDetail ? 'block' : 'hidden sm:block'}`}
+            className="flex-1 min-w-0 space-y-6"
           >
-            <button
-              type="button"
-              className="sm:hidden inline-flex items-center gap-1 text-sm text-nyven-text-secondary mb-2 min-h-[44px] px-1"
-              onClick={() => setMobileShowDetail(false)}
-            >
-              <ChevronLeft size={18} />
-              Settings
-            </button>
             {prefsLoading && (
               <p className="text-sm text-nyven-text-secondary">Loading preferences…</p>
             )}
@@ -302,8 +383,9 @@ export function Settings() {
                 {!configured && (
                   <Card>
                     <p className="text-sm text-nyven-text-secondary">
-                      Supabase is not configured. Set VITE_SUPABASE_URL and
-                      VITE_SUPABASE_ANON_KEY to enable accounts.
+                      Sign-in is handled by NYVEN&apos;s Cloudflare authentication.
+                      If accounts seem unavailable, check that the app is deployed with
+                      its D1 database and auth secrets configured.
                     </p>
                   </Card>
                 )}
@@ -607,7 +689,7 @@ export function Settings() {
                   {userId && (
                     <p className="text-sm text-nyven-text-secondary">
                       Delete individual chats from the chat history panel. Account data is
-                      protected by Supabase RLS.
+                      stored in NYVEN's Cloudflare D1 database with server-side access checks.
                     </p>
                   )}
                 </Card>
@@ -854,7 +936,7 @@ export function Settings() {
               <>
                 <SectionTitle
                   title="Sessions"
-                  desc="Supabase Auth session for this browser."
+                  desc="Signed-in session for this browser (Cloudflare auth cookie)."
                 />
                 <Card>
                   {!user && (
@@ -881,7 +963,7 @@ export function Settings() {
                         Sign out this device
                       </button>
                       <p className="text-xs text-nyven-text-secondary mt-3">
-                        Sign out of all devices is available when using Supabase Auth admin
+                        Sign out clears this device session. Other devices keep their sessions until they expire or you sign out there.
                         or a dedicated server endpoint — not simulated with fake device
                         rows.
                       </p>

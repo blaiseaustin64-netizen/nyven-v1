@@ -32,6 +32,8 @@ export interface Message {
     mimeType: string
     size: number
     kind: 'image' | 'document' | 'text'
+    /** Session-only preview (not required in persistence) */
+    previewDataUrl?: string
   }>
   citations?: Array<{ id: string; title: string; url: string; source?: string }>
   toolSummary?: string

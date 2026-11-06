@@ -1,52 +1,95 @@
 /**
  * POST /api/attachments
  * Validate + process a single file upload. Returns model-ready payload (ephemeral).
- * No persistent object storage (R2 not configured) — client holds content until send.
+ * Rate-limited via D1 burst buckets when DB is bound; CORS via shared helper.
  */
 
 import { ATTACHMENT_LIMITS } from '../_shared/attachmentLimits'
 import { processFileBytes } from '../_shared/attachmentProcess'
+import { resolveIdentity } from '../_shared/auth'
+import { corsHeaders, optionsResponse, jsonWithCors } from '../_shared/cors'
+import type { D1Database } from '../_shared/db/types'
+import { resolveUsageSubject } from '../_shared/db/guestKey'
+import { checkBurst } from '../_shared/db/usage'
 
 interface Env {
   GEMINI_API_KEY?: string
+  APP_URL?: string
+  ALLOWED_ORIGINS?: string
+  DB?: D1Database
+  SESSION_SECRET?: string
+  JWT_SECRET?: string
 }
 
-function jsonResponse(body: unknown, status: number) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: {
-      'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    },
-  })
-}
-
-export const onRequestOptions: PagesFunction<Env> = async () =>
-  jsonResponse({}, 204)
+export const onRequestOptions: PagesFunction<Env> = async (context) =>
+  optionsResponse(context.request, context.env, 'POST, OPTIONS')
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {
+  const { request, env } = context
+
   try {
-    const contentType = context.request.headers.get('content-type') || ''
+    const identityResult = await resolveIdentity(request, env, request.signal)
+    if (!identityResult.ok && identityResult.code === 'AUTH_INVALID') {
+      return jsonWithCors(
+        request,
+        env,
+        { success: false, code: identityResult.code, error: identityResult.message },
+        401,
+        'POST, OPTIONS'
+      )
+    }
+    if (!identityResult.ok && identityResult.code === 'AUTH_CONFIG') {
+      return jsonWithCors(
+        request,
+        env,
+        { success: false, code: identityResult.code, error: identityResult.message },
+        503,
+        'POST, OPTIONS'
+      )
+    }
+
+    const userId =
+      identityResult.ok && identityResult.identity.authenticated
+        ? identityResult.identity.userId
+        : undefined
+    const usageSubject = await resolveUsageSubject(request, userId)
+    const subject = usageSubject.subject
+    const burstOk = await checkBurst(env.DB, `attachments:${subject.type}:${subject.id}`)
+    if (!burstOk.ok) {
+      return jsonWithCors(
+        request,
+        env,
+        { success: false, code: burstOk.code, error: burstOk.message },
+        burstOk.httpStatus,
+        'POST, OPTIONS'
+      )
+    }
+
+    const contentType = request.headers.get('content-type') || ''
     if (!contentType.includes('multipart/form-data')) {
-      return jsonResponse(
+      return jsonWithCors(
+        request,
+        env,
         {
           success: false,
           code: 'INVALID_REQUEST',
           error: 'Expected multipart form upload.',
         },
-        400
+        400,
+        'POST, OPTIONS'
       )
     }
 
-    const form = await context.request.formData()
+    const form = await request.formData()
     const file = form.get('file')
 
     if (!file || typeof file === 'string') {
-      return jsonResponse(
+      return jsonWithCors(
+        request,
+        env,
         { success: false, code: 'INVALID_REQUEST', error: 'No file provided.' },
-        400
+        400,
+        'POST, OPTIONS'
       )
     }
 
@@ -55,13 +98,16 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     const size = blob.size
 
     if (size > ATTACHMENT_LIMITS.MAX_FILE_SIZE) {
-      return jsonResponse(
+      return jsonWithCors(
+        request,
+        env,
         {
           success: false,
           code: 'FILE_TOO_LARGE',
           error: `Each file must be under ${Math.round(ATTACHMENT_LIMITS.MAX_FILE_SIZE / (1024 * 1024))} MB.`,
         },
-        400
+        400,
+        'POST, OPTIONS'
       )
     }
 
@@ -69,13 +115,18 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     const result = processFileBytes(filename, blob.type, buffer)
 
     if (!result.ok) {
-      return jsonResponse(
+      return jsonWithCors(
+        request,
+        env,
         { success: false, code: result.code, error: result.message },
-        400
+        400,
+        'POST, OPTIONS'
       )
     }
 
-    return jsonResponse(
+    return jsonWithCors(
+      request,
+      env,
       {
         success: true,
         attachment: {
@@ -83,17 +134,17 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
           status: 'ready',
         },
       },
-      200
+      200,
+      'POST, OPTIONS'
     )
   } catch (err) {
-    console.error('NYVEN /api/attachments error:', err)
-    return jsonResponse(
-      {
-        success: false,
-        code: 'PROCESS_FAILED',
-        error: 'Could not process that file. Please try again.',
-      },
-      500
+    console.error('[attachments]', err instanceof Error ? err.message : 'error')
+    return jsonWithCors(
+      request,
+      env,
+      { success: false, code: 'INTERNAL', error: 'Could not process attachment.' },
+      500,
+      'POST, OPTIONS'
     )
   }
 }

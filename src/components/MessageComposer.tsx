@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Send,
   Plus,
@@ -10,6 +11,11 @@ import {
   File,
   Loader2,
   AudioLines,
+  Camera,
+  Code2,
+  FolderOpen,
+  Github,
+  ChevronRight,
 } from 'lucide-react'
 import { MicWaveCircle } from './MicWaveCircle'
 import clsx from 'clsx'
@@ -42,6 +48,41 @@ function formatSize(n: number) {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`
 }
 
+/** Resize/compress images client-side before upload (longest side 1600, JPEG 0.82). */
+async function compressImage(file: File): Promise<File> {
+  if (!file.type.startsWith('image/') || file.type === 'image/gif') return file
+  try {
+    const bitmap = await createImageBitmap(file)
+    const max = 1600
+    let { width, height } = bitmap
+    if (width <= max && height <= max && file.size < 900_000) {
+      bitmap.close()
+      return file
+    }
+    const scale = Math.min(1, max / Math.max(width, height))
+    width = Math.round(width * scale)
+    height = Math.round(height * scale)
+    const canvas = document.createElement('canvas')
+    canvas.width = width
+    canvas.height = height
+    const ctx = canvas.getContext('2d')
+    if (!ctx) {
+      bitmap.close()
+      return file
+    }
+    ctx.drawImage(bitmap, 0, 0, width, height)
+    bitmap.close()
+    const blob: Blob | null = await new Promise((resolve) =>
+      canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.82)
+    )
+    if (!blob) return file
+    const name = file.name.replace(/\.(png|webp|jpeg|jpg)$/i, '.jpg')
+    return new File([blob], name, { type: 'image/jpeg', lastModified: Date.now() })
+  } catch {
+    return file
+  }
+}
+
 function isAllowedFile(file: File): boolean {
   const ext = extensionOf(file.name)
   return Boolean(ALLOWED_EXTENSIONS[ext])
@@ -72,6 +113,11 @@ export function MessageComposer({
   const [dragOver, setDragOver] = useState(false)
   const [composerError, setComposerError] = useState<string | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [sheetDragY, setSheetDragY] = useState(0)
+  const [isNarrow, setIsNarrow] = useState(false)
+  const navigate = useNavigate()
+  const cameraInputRef = useRef<HTMLInputElement>(null)
+  const sheetDragStartY = useRef<number | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -100,9 +146,13 @@ export function MessageComposer({
       const t = e.target as Node
       if (menuRef.current?.contains(t) || plusRef.current?.contains(t)) return
       setMenuOpen(false)
+      setSheetDragY(0)
     }
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setMenuOpen(false)
+      if (e.key === 'Escape') {
+        setMenuOpen(false)
+        setSheetDragY(0)
+      }
     }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
@@ -111,6 +161,26 @@ export function MessageComposer({
       document.removeEventListener('keydown', onKey)
     }
   }, [menuOpen])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const mq = window.matchMedia('(max-width: 767px)')
+    const apply = () => setIsNarrow(mq.matches)
+    apply()
+    mq.addEventListener('change', apply)
+    return () => mq.removeEventListener('change', apply)
+  }, [])
+
+  // Lock body scroll while mobile sheet is open
+  useEffect(() => {
+    if (!menuOpen || !isNarrow) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prev
+    }
+  }, [menuOpen, isNarrow])
+
 
   const updateAttachment = useCallback((id: string, patch: Partial<PendingAttachment>) => {
     setAttachments((prev) => prev.map((a) => (a.id === id ? { ...a, ...patch } : a)))
@@ -137,81 +207,94 @@ export function MessageComposer({
         return
       }
 
+      // Limit check outside the state updater (no network in setState)
+      let blocked = false
       setAttachments((prev) => {
         if (prev.length >= ATTACHMENT_LIMITS.MAX_FILES_PER_MESSAGE) {
-          setComposerError(`You can attach up to ${ATTACHMENT_LIMITS.MAX_FILES_PER_MESSAGE} files.`)
+          blocked = true
           return prev
         }
-        const id = `att-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
-        const kind = kindForMime(file.type || ALLOWED_EXTENSIONS[extensionOf(file.name)] || "")
-        const previewUrl = kind === 'image' ? URL.createObjectURL(file) : undefined
-        const abortController = new AbortController()
-        const pending: PendingAttachment = {
-          id,
-          file,
-          name: file.name,
-          mimeType: file.type || 'application/octet-stream',
-          size: file.size,
-          kind,
-          status: 'uploading',
-          previewUrl,
-          abortController,
-        }
+        return prev
+      })
+      if (blocked) {
+        setComposerError(`You can attach up to ${ATTACHMENT_LIMITS.MAX_FILES_PER_MESSAGE} files.`)
+        return
+      }
 
-        void (async () => {
-          try {
-            updateAttachment(id, { status: 'processing' })
-            const form = new FormData()
-            form.append('file', file)
-            const res = await fetch('/api/attachments', {
-              method: 'POST',
-              body: form,
-              signal: abortController.signal,
-            })
-            const data = (await res.json().catch(() => ({}))) as {
-              success?: boolean
-              error?: string
-              attachment?: {
-                extractedText?: string
-                inlineBase64?: string
-                mimeType?: string
-                kind?: PendingAttachment['kind']
-              }
-              extractedText?: string
-              inlineBase64?: string
-              mimeType?: string
-              kind?: PendingAttachment['kind']
-            }
-            if (!res.ok || !data.success) {
-              updateAttachment(id, {
-                status: 'error',
-                error: data.error || 'Could not process this file.',
-              })
-              return
-            }
-            const att = data.attachment || data
-            updateAttachment(id, {
-              status: 'ready',
-              extractedText: att.extractedText,
-              inlineBase64: att.inlineBase64,
-              mimeType: att.mimeType || file.type,
-              kind: att.kind || kind,
-              error: undefined,
-            })
-          } catch (err: unknown) {
-            if ((err as { name?: string })?.name === 'AbortError') {
-              updateAttachment(id, { status: 'cancelled' })
-              return
-            }
-            updateAttachment(id, {
-              status: 'error',
-              error: 'Could not process this file.',
-            })
-          }
-        })()
-
+      const id = `att-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+      const kind = kindForMime(file.type || ALLOWED_EXTENSIONS[extensionOf(file.name)] || '')
+      const previewUrl = kind === 'image' ? URL.createObjectURL(file) : undefined
+      const abortController = new AbortController()
+      const pending: PendingAttachment = {
+        id,
+        file,
+        name: file.name,
+        mimeType: file.type || 'application/octet-stream',
+        size: file.size,
+        kind,
+        status: 'uploading',
+        previewUrl,
+        abortController,
+      }
+      setAttachments((prev) => {
+        if (prev.length >= ATTACHMENT_LIMITS.MAX_FILES_PER_MESSAGE) return prev
         return [...prev, pending]
       })
+
+      try {
+        const toUpload = kind === 'image' ? await compressImage(file) : file
+        updateAttachment(id, {
+          status: 'processing',
+          size: toUpload.size,
+          mimeType: toUpload.type || file.type,
+          name: toUpload.name || file.name,
+        })
+        const form = new FormData()
+        form.append('file', toUpload)
+        const res = await fetch('/api/attachments', {
+          method: 'POST',
+          body: form,
+          signal: abortController.signal,
+        })
+        const data = (await res.json().catch(() => ({}))) as {
+          success?: boolean
+          error?: string
+          attachment?: {
+            extractedText?: string
+            inlineBase64?: string
+            mimeType?: string
+            kind?: PendingAttachment['kind']
+          }
+          extractedText?: string
+          inlineBase64?: string
+          mimeType?: string
+          kind?: PendingAttachment['kind']
+        }
+        if (!res.ok || !data.success) {
+          updateAttachment(id, {
+            status: 'error',
+            error: data.error || 'Could not process file.',
+          })
+          return
+        }
+        const att = data.attachment || data
+        updateAttachment(id, {
+          status: 'ready',
+          extractedText: att.extractedText,
+          inlineBase64: att.inlineBase64,
+          mimeType: att.mimeType || toUpload.type,
+          kind: (att.kind as PendingAttachment['kind']) || kind,
+        })
+      } catch (err: unknown) {
+        if ((err as { name?: string })?.name === 'AbortError') {
+          updateAttachment(id, { status: 'cancelled' })
+          return
+        }
+        updateAttachment(id, {
+          status: 'error',
+          error: 'Upload failed. Tap to retry.',
+        })
+      }
     },
     [updateAttachment]
   )
@@ -226,13 +309,26 @@ export function MessageComposer({
   const openPicker = (kind: MenuKind) => {
     acceptRef.current = kind
     setMenuOpen(false)
-    // Update accept then open
+    setSheetDragY(0)
     requestAnimationFrame(() => {
       if (fileInputRef.current) {
         fileInputRef.current.accept = ACCEPT[kind]
         fileInputRef.current.click()
       }
     })
+  }
+
+  const openCamera = () => {
+    setMenuOpen(false)
+    setSheetDragY(0)
+    requestAnimationFrame(() => {
+      cameraInputRef.current?.click()
+    })
+  }
+
+  const closeMenu = () => {
+    setMenuOpen(false)
+    setSheetDragY(0)
   }
 
   const handleSubmit = () => {
@@ -279,7 +375,11 @@ export function MessageComposer({
     const el = textareaRef.current
     if (el) {
       el.style.height = 'auto'
-      el.style.height = `${Math.min(el.scrollHeight, 168)}px`
+      const maxPx =
+        typeof window !== 'undefined'
+          ? Math.round(window.innerHeight * 0.4)
+          : 240
+      el.style.height = `${Math.min(el.scrollHeight, maxPx)}px`
     }
   }
 
@@ -320,97 +420,261 @@ export function MessageComposer({
 
   const visibleAttachments = attachments.filter((a) => a.status !== 'cancelled')
 
+  const retryUpload = (a: PendingAttachment) => {
+    removeAttachment(a.id)
+    void uploadFile(a.file)
+  }
+
   return (
-    <div className="w-full max-w-3xl mx-auto px-3 sm:px-4 pb-3 sm:pb-4">
+    <div className="w-full max-w-3xl mx-auto px-4 sm:px-4 pb-3 sm:pb-4 min-w-0">
       {composerError && (
         <p className="text-xs text-red-300/90 mb-2 px-1" role="alert">
           {composerError}
         </p>
       )}
 
-      {visibleAttachments.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-2">
-          {visibleAttachments.map((a) => (
-            <div
-              key={a.id}
-              className="group relative flex items-center gap-2 max-w-[220px] rounded-xl border border-white/[0.08] bg-nyven-surface/80 pl-2 pr-1.5 py-1.5"
-            >
-              {a.kind === 'image' && a.previewUrl ? (
-                <img
-                  src={a.previewUrl}
-                  alt=""
-                  className="h-9 w-9 rounded-lg object-cover shrink-0"
-                />
-              ) : a.name.toLowerCase().endsWith('.pdf') ? (
-                <div className="h-9 w-9 rounded-lg bg-white/[0.04] flex items-center justify-center shrink-0">
-                  <FileText size={16} className="text-nyven-cyan/80" />
-                </div>
-              ) : (
-                <div className="h-9 w-9 rounded-lg bg-white/[0.04] flex items-center justify-center shrink-0">
-                  <File size={16} className="text-nyven-text-secondary" />
-                </div>
-              )}
-              <div className="min-w-0 flex-1">
-                <p className="text-[12px] text-nyven-text truncate leading-tight">{a.name}</p>
-                <p className="text-[10px] text-nyven-text-secondary/70">
-                  {a.status === 'ready'
-                    ? formatSize(a.size)
-                    : a.status === 'error'
-                      ? a.error || 'Error'
-                      : a.status === 'processing' || a.status === 'uploading'
-                        ? 'Processing…'
-                        : formatSize(a.size)}
-                </p>
-              </div>
-              {(a.status === 'uploading' || a.status === 'processing') && (
-                <Loader2 size={14} className="animate-spin text-nyven-text-secondary shrink-0" />
-              )}
-              <button
-                type="button"
-                onClick={() => removeAttachment(a.id)}
-                className="p-1 rounded-lg text-nyven-text-secondary hover:text-nyven-text hover:bg-white/[0.06] shrink-0"
-                aria-label={`Remove ${a.name}`}
-              >
-                <X size={14} />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
       <div
-        ref={dropRef}
-        onDragOver={onDragOver}
-        onDragLeave={onDragLeave}
-        onDrop={onDrop}
+        onDragOver={(e) => {
+          e.preventDefault()
+          setDragOver(true)
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => {
+          e.preventDefault()
+          setDragOver(false)
+          if (e.dataTransfer.files?.length) addFiles(e.dataTransfer.files)
+        }}
         className={clsx(
-          'relative rounded-2xl border bg-nyven-surface/90 backdrop-blur-sm transition-colors',
+          'relative rounded-[24px] border bg-nyven-surface/95 backdrop-blur-sm transition-colors p-3',
           dragOver
             ? 'border-nyven-cyan/40 bg-nyven-cyan/[0.04]'
             : 'border-white/[0.08] focus-within:border-white/[0.14]'
         )}
       >
-        {/* Attachment menu */}
-        {menuOpen && (
+        {/* Row 1 — attachment tiles */}
+        {visibleAttachments.length > 0 && (
+          <div className="flex gap-2 overflow-x-auto mb-2 pb-1 -mx-0.5 px-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {visibleAttachments.map((a) => {
+              const ext = extensionOf(a.name).toUpperCase() || 'FILE'
+              return (
+                <div
+                  key={a.id}
+                  className={clsx(
+                    'relative shrink-0 w-16 h-16 rounded-xl overflow-hidden border bg-white/[0.04]',
+                    a.status === 'error'
+                      ? 'border-red-400/60'
+                      : 'border-white/[0.08]'
+                  )}
+                >
+                  {a.kind === 'image' && a.previewUrl ? (
+                    <img
+                      src={a.previewUrl}
+                      alt=""
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center gap-0.5 px-1">
+                      {a.name.toLowerCase().endsWith('.pdf') ? (
+                        <FileText size={20} className="text-nyven-cyan/80" />
+                      ) : a.kind === 'image' ? (
+                        <ImageIcon size={20} className="text-nyven-text-secondary" />
+                      ) : (
+                        <File size={20} className="text-nyven-text-secondary" />
+                      )}
+                      <span className="text-[9px] text-nyven-text-secondary truncate max-w-full">
+                        {ext}
+                      </span>
+                    </div>
+                  )}
+                  {(a.status === 'uploading' || a.status === 'processing') && (
+                    <div className="absolute inset-0 bg-black/45 flex items-center justify-center">
+                      <Loader2 size={18} className="animate-spin text-white" />
+                    </div>
+                  )}
+                  {a.status === 'error' && (
+                    <button
+                      type="button"
+                      onClick={() => retryUpload(a)}
+                      className="absolute inset-0 bg-black/50 flex items-center justify-center text-[10px] text-red-200 font-medium"
+                      aria-label={`Retry ${a.name}`}
+                    >
+                      Retry
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => removeAttachment(a.id)}
+                    className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-[#0c1018] border border-white/20 text-nyven-text flex items-center justify-center shadow"
+                    aria-label={`Remove ${a.name}`}
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="hidden"
+          multiple
+          accept={ACCEPT.any}
+          onChange={(e) => {
+            if (e.target.files) addFiles(e.target.files)
+            e.target.value = ''
+          }}
+        />
+
+        {/* Camera capture (mobile sheet) */}
+        <input
+          ref={cameraInputRef}
+          type="file"
+          className="hidden"
+          accept="image/*"
+          capture="environment"
+          onChange={(e) => {
+            if (e.target.files) addFiles(e.target.files)
+            e.target.value = ''
+          }}
+        />
+
+        {/* Plus menu: mobile bottom sheet / desktop popover */}
+        {menuOpen && isNarrow && (
+          <div className="fixed inset-0 z-[80]" role="dialog" aria-modal="true" aria-label="Add to chat">
+            <button
+              type="button"
+              className="absolute inset-0 bg-black/55 backdrop-blur-[2px]"
+              aria-label="Close"
+              onClick={closeMenu}
+            />
+            <div
+              ref={menuRef}
+              className="absolute left-0 right-0 bottom-0 max-h-[min(88vh,640px)] flex flex-col rounded-t-[28px] border-t border-white/10 bg-[#0C1018]/95 backdrop-blur-xl shadow-[0_-12px_40px_rgba(0,0,0,0.45)] pb-[max(1rem,env(safe-area-inset-bottom))]"
+              style={{
+                transform: `translateY(${sheetDragY}px)`,
+                transition:
+                  sheetDragStartY.current == null &&
+                  !(typeof window !== 'undefined' &&
+                    window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+                    ? 'transform 240ms cubic-bezier(0.22, 1, 0.36, 1)'
+                    : undefined,
+                backgroundImage:
+                  'linear-gradient(180deg, rgba(98,230,255,0.08) 0%, rgba(139,124,255,0.04) 28px, transparent 72px)',
+              }}
+              onTouchStart={(e) => {
+                sheetDragStartY.current = e.touches[0].clientY
+              }}
+              onTouchMove={(e) => {
+                if (sheetDragStartY.current == null) return
+                const dy = e.touches[0].clientY - sheetDragStartY.current
+                if (dy > 0) setSheetDragY(dy)
+              }}
+              onTouchEnd={() => {
+                if (sheetDragY > 90) closeMenu()
+                else setSheetDragY(0)
+                sheetDragStartY.current = null
+              }}
+            >
+              <div className="flex justify-center pt-3 pb-1">
+                <div className="w-10 h-1 rounded-full bg-white/20" />
+              </div>
+              <div className="relative flex items-center justify-center px-4 pb-3">
+                <button
+                  type="button"
+                  onClick={closeMenu}
+                  className="absolute left-3 w-10 h-10 rounded-full flex items-center justify-center text-nyven-text-secondary hover:bg-white/[0.06] active:bg-nyven-cyan/10"
+                  aria-label="Close"
+                >
+                  <X size={20} />
+                </button>
+                <h2 className="font-display text-base font-medium text-nyven-text">Add to chat</h2>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 px-4 pb-4">
+                {[
+                  { label: 'Camera', icon: Camera, action: openCamera },
+                  { label: 'Photos', icon: ImageIcon, action: () => openPicker('image') },
+                  { label: 'Files', icon: File, action: () => openPicker('any') },
+                ].map((tile) => (
+                  <button
+                    key={tile.label}
+                    type="button"
+                    onClick={tile.action}
+                    className="h-24 rounded-2xl border border-white/[0.08] bg-white/[0.03] flex flex-col items-center justify-center gap-2 active:bg-nyven-cyan/10 transition-colors"
+                  >
+                    <span className="w-12 h-12 rounded-full bg-white/[0.06] flex items-center justify-center text-nyven-cyan">
+                      <tile.icon size={22} />
+                    </span>
+                    <span className="text-sm text-nyven-text">{tile.label}</span>
+                  </button>
+                ))}
+              </div>
+
+              <div className="px-3 pb-2 space-y-0.5">
+                {[
+                  {
+                    label: 'Nyven Code',
+                    hint: 'Repos and coding workspace',
+                    icon: Code2,
+                    onClick: () => {
+                      closeMenu()
+                      navigate('/code')
+                    },
+                  },
+                  {
+                    label: 'Projects',
+                    hint: 'Your workspaces',
+                    icon: FolderOpen,
+                    onClick: () => {
+                      closeMenu()
+                      navigate('/projects')
+                    },
+                  },
+                  {
+                    label: 'Connected services',
+                    hint: 'GitHub and more',
+                    icon: Github,
+                    onClick: () => {
+                      closeMenu()
+                      navigate('/settings?section=connections')
+                    },
+                  },
+                ].map((row) => (
+                  <button
+                    key={row.label}
+                    type="button"
+                    onClick={row.onClick}
+                    className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left min-h-[56px] active:bg-nyven-cyan/10 hover:bg-white/[0.04] transition-colors"
+                  >
+                    <span className="w-10 h-10 rounded-xl bg-white/[0.06] flex items-center justify-center text-nyven-text-secondary shrink-0">
+                      <row.icon size={18} />
+                    </span>
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-[15px] text-nyven-text">{row.label}</span>
+                      <span className="block text-xs text-nyven-text-secondary truncate">{row.hint}</span>
+                    </span>
+                    <ChevronRight size={18} className="text-nyven-text-secondary/50 shrink-0" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {menuOpen && !isNarrow && (
           <div
             ref={menuRef}
-            className="absolute left-2 bottom-full mb-2 z-30 w-52 origin-bottom-left rounded-xl border border-white/[0.1] bg-[#0c1018]/95 backdrop-blur-md shadow-xl shadow-black/40 p-1.5 animate-in fade-in zoom-in-95"
-            style={{
-              animation: 'nyvenMenuIn 160ms ease-out',
-            }}
+            className="absolute left-3 bottom-full mb-2 z-30 w-56 origin-bottom-left rounded-xl border border-white/[0.1] bg-[#0c1018]/95 backdrop-blur-md shadow-xl shadow-black/40 p-1.5"
             role="menu"
-            aria-label="Attach"
+            aria-label="Add to chat"
           >
-            <style>{`
-              @keyframes nyvenMenuIn {
-                from { opacity: 0; transform: scale(0.96) translateY(4px); }
-                to { opacity: 1; transform: scale(1) translateY(0); }
-              }
-            `}</style>
             {(
               [
-                { kind: 'any' as MenuKind, label: 'Upload file', icon: File },
                 { kind: 'image' as MenuKind, label: 'Upload image', icon: ImageIcon },
+                { kind: 'any' as MenuKind, label: 'Upload file', icon: File },
                 { kind: 'document' as MenuKind, label: 'Document', icon: FileText },
                 { kind: 'pdf' as MenuKind, label: 'PDF', icon: FileText },
               ] as const
@@ -420,7 +684,7 @@ export function MessageComposer({
                 type="button"
                 role="menuitem"
                 onClick={() => openPicker(item.kind)}
-                className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-nyven-text hover:bg-white/[0.06] transition-colors text-left"
+                className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-nyven-text hover:bg-white/[0.06] transition-colors text-left min-h-[44px]"
               >
                 <item.icon size={16} className="text-nyven-text-secondary shrink-0" />
                 {item.label}
@@ -429,54 +693,41 @@ export function MessageComposer({
           </div>
         )}
 
-        <div className="flex items-end gap-1 px-2 py-2 sm:px-2.5 sm:py-2.5">
-          <input
-            ref={fileInputRef}
-            type="file"
-            className="hidden"
-            multiple
-            accept={ACCEPT.any}
-            onChange={(e) => {
-              if (e.target.files) addFiles(e.target.files)
-              e.target.value = ''
-            }}
-          />
+        {/* Row 2 — full-width textarea */}
+        <textarea
+          ref={textareaRef}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onInput={handleInput}
+          onPaste={handlePaste}
+          placeholder={placeholder}
+          rows={1}
+          className="w-full min-w-0 bg-transparent border-0 outline-none resize-none text-base leading-[1.65] text-nyven-text placeholder:text-nyven-text-secondary/70 max-h-[40vh] overflow-y-auto py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          style={{ minHeight: '48px' }}
+        />
 
+        {/* Row 3 — controls */}
+        <div className="flex items-center gap-1 mt-1">
           <button
             ref={plusRef}
             type="button"
             onClick={() => setMenuOpen((o) => !o)}
-            disabled={isGenerating}
             className={clsx(
-              'shrink-0 p-2 rounded-xl transition-colors disabled:opacity-40',
+              'w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-colors',
               menuOpen
-                ? 'text-nyven-cyan bg-nyven-cyan/10'
-                : 'text-nyven-text-secondary hover:text-nyven-text hover:bg-white/[0.05]'
+                ? 'bg-nyven-cyan/15 text-nyven-cyan'
+                : 'text-nyven-text-secondary hover:text-nyven-text hover:bg-white/[0.06]'
             )}
-            aria-label="Attach"
+            aria-label="Add to chat"
             aria-expanded={menuOpen}
-            aria-haspopup="menu"
-            title="Attach"
           >
-            <Plus size={18} />
+            <Plus size={20} />
           </button>
 
-          <textarea
-            ref={textareaRef}
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-            onInput={handleInput}
-            onPaste={handlePaste}
-            placeholder={placeholder}
-            rows={1}
-            disabled={isGenerating}
-            className="flex-1 bg-transparent border-0 outline-none resize-none text-[15px] leading-relaxed text-nyven-text placeholder:text-nyven-text-secondary/70 max-h-40 py-1.5"
-            style={{ minHeight: '24px' }}
-          />
+          <div className="flex-1 min-w-0" />
 
           <div className="flex items-center gap-0.5 shrink-0">
-            {/* Dictation mic — circular wave when listening (not full Liquid Voice) */}
             {voicePhase === 'listening' ? (
               <MicWaveCircle
                 active
@@ -489,16 +740,16 @@ export function MessageComposer({
               <button
                 type="button"
                 onClick={onVoiceToggle}
-                disabled={!onVoiceToggle || isGenerating}
+                disabled={!onVoiceToggle}
                 className={clsx(
-              'p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl transition-colors',
+                  'w-10 h-10 rounded-full flex items-center justify-center transition-colors',
                   voicePhase === 'speaking' && 'text-nyven-cyan bg-nyven-cyan/10',
                   voicePhase === 'transcribing' && 'text-nyven-text-secondary',
                   (voicePhase === 'idle' ||
                     voicePhase === 'error' ||
                     voicePhase === 'requesting_permission') &&
                     'text-nyven-text-secondary hover:text-nyven-text hover:bg-white/[0.05]',
-                  (!onVoiceToggle || isGenerating) && 'opacity-40 cursor-not-allowed'
+                  !onVoiceToggle && 'opacity-40 cursor-not-allowed'
                 )}
                 aria-label={
                   voicePhase === 'speaking'
@@ -506,13 +757,6 @@ export function MessageComposer({
                     : voicePhase === 'transcribing'
                       ? 'Transcribing'
                       : 'Dictate'
-                }
-                title={
-                  voicePhase === 'speaking'
-                    ? 'Stop speaking'
-                    : voicePhase === 'transcribing'
-                      ? 'Transcribing…'
-                      : 'Dictate into chat'
                 }
               >
                 {voicePhase === 'transcribing' ? (
@@ -523,26 +767,27 @@ export function MessageComposer({
               </button>
             )}
 
-            {/* Full-screen Voice Chat */}
-            <button
-              type="button"
-              onClick={onOpenVoiceChat}
-              disabled={!onOpenVoiceChat || isGenerating}
-              className={clsx(
-              'p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl transition-colors text-nyven-text-secondary hover:text-nyven-text hover:bg-white/[0.05]',
-                (!onOpenVoiceChat || isGenerating) && 'opacity-40 cursor-not-allowed'
-              )}
-              aria-label="Open voice chat"
-              title="Voice chat"
-            >
-              <AudioLines size={18} />
-            </button>
+            {onOpenVoiceChat && (
+              <button
+                type="button"
+                onClick={onOpenVoiceChat}
+                disabled={isGenerating}
+                className={clsx(
+                  'w-10 h-10 rounded-full flex items-center justify-center text-nyven-text-secondary hover:text-nyven-text hover:bg-white/[0.05] transition-colors',
+                  isGenerating && 'opacity-40 cursor-not-allowed'
+                )}
+                aria-label="Voice chat"
+                title="Voice chat"
+              >
+                <AudioLines size={18} />
+              </button>
+            )}
 
             {isGenerating ? (
               <button
                 type="button"
                 onClick={onStop}
-                className="p-2 rounded-xl bg-nyven-surface text-nyven-text hover:bg-white/[0.08] transition-colors"
+                className="w-10 h-10 rounded-full flex items-center justify-center bg-white/[0.08] text-nyven-text hover:bg-white/[0.12] transition-colors"
                 aria-label="Stop generating"
               >
                 <Square size={16} fill="currentColor" />
@@ -553,20 +798,20 @@ export function MessageComposer({
                 onClick={handleSubmit}
                 disabled={!canSend}
                 className={clsx(
-              'p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl transition-all duration-200',
+                  'w-10 h-10 rounded-full flex items-center justify-center transition-colors',
                   canSend
                     ? 'bg-nyven-cyan text-nyven-bg hover:bg-nyven-cyan/90'
-                    : 'bg-white/[0.06] text-nyven-text-secondary cursor-not-allowed'
+                    : 'bg-white/[0.06] text-nyven-text-secondary opacity-50 cursor-not-allowed'
                 )}
                 aria-label="Send message"
               >
-                <Send size={16} />
+                <Send size={18} />
               </button>
             )}
           </div>
         </div>
       </div>
-      <p className="text-center text-[11px] text-nyven-text-secondary/50 mt-2">NYVEN</p>
     </div>
   )
 }
+

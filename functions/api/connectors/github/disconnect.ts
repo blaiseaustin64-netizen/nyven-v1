@@ -2,6 +2,7 @@
  * POST /api/connectors/github/disconnect
  */
 import { resolveIdentity } from '../../../_shared/auth'
+import { corsHeaders, optionsResponse } from '../../../_shared/cors'
 import { disconnectGitHub, type GitHubEnv } from '../../../_shared/github/service'
 import {
   clearPreAccountGitHubCookie,
@@ -10,24 +11,19 @@ import {
 
 interface Env extends GitHubEnv {}
 
-export const onRequestOptions: PagesFunction<Env> = async () =>
-  new Response(null, {
-    status: 204,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    },
-  })
+export const onRequestOptions: PagesFunction<Env> = async (context) =>
+  optionsResponse(context.request, context.env, 'POST, OPTIONS')
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {
   const { request, env } = context
   const secure = request.url.startsWith('https')
   const headers = new Headers({
     'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
     'Cache-Control': 'no-store',
   })
+  for (const [k, v] of Object.entries(corsHeaders(request, env, 'POST, OPTIONS'))) {
+    headers.set(k, v)
+  }
 
   const identity = await resolveIdentity(request, env, request.signal)
   if (!identity.ok && identity.code === 'AUTH_INVALID') {

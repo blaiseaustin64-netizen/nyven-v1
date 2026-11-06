@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useKeyboardOpen } from './hooks/useKeyboardOpen'
 import { Routes, Route, Navigate, useLocation, useSearchParams } from 'react-router-dom'
 import { NyvenBackground } from './components/NyvenBackground'
 import { Sidebar, MobileNavBar, MobileBottomNav } from './components/Sidebar'
@@ -29,6 +30,7 @@ function CreateAgentRoute() {
 }
 
 export default function App() {
+  const keyboardOpen = useKeyboardOpen()
   const [showIntro, setShowIntro] = useState(true)
   const [isFirstVisit, setIsFirstVisit] = useState(true)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -49,6 +51,43 @@ export default function App() {
   useEffect(() => {
     setMobileMenuOpen(false)
   }, [location.pathname])
+
+  // Phase 7: swipe from left edge to open the mobile drawer
+  useEffect(() => {
+    let startX = 0
+    let startY = 0
+    let tracking = false
+    const onStart = (e: TouchEvent) => {
+      if (window.matchMedia('(min-width: 1024px)').matches) return
+      const t = e.touches[0]
+      if (t.clientX <= 24) {
+        startX = t.clientX
+        startY = t.clientY
+        tracking = true
+      }
+    }
+    const onMove = (e: TouchEvent) => {
+      if (!tracking) return
+      const t = e.touches[0]
+      const dx = t.clientX - startX
+      const dy = Math.abs(t.clientY - startY)
+      if (dx > 56 && dy < 40) {
+        setMobileMenuOpen(true)
+        tracking = false
+      }
+    }
+    const onEnd = () => {
+      tracking = false
+    }
+    document.addEventListener('touchstart', onStart, { passive: true })
+    document.addEventListener('touchmove', onMove, { passive: true })
+    document.addEventListener('touchend', onEnd)
+    return () => {
+      document.removeEventListener('touchstart', onStart)
+      document.removeEventListener('touchmove', onMove)
+      document.removeEventListener('touchend', onEnd)
+    }
+  }, [])
 
   const hideBottomNav = location.pathname === '/builder' || location.pathname.startsWith('/preview')
 
@@ -86,7 +125,7 @@ export default function App() {
       <div className="flex-1 flex flex-col min-w-0 min-h-0 relative">
         <MobileNavBar onMenuOpen={() => setMobileMenuOpen(true)} />
 
-        <main className={`flex-1 min-h-0 overflow-hidden ${hideBottomNav ? '' : 'pb-14 lg:pb-0'}`}>
+        <main className={`flex-1 min-h-0 overflow-hidden ${hideBottomNav || keyboardOpen ? '' : 'pb-14 lg:pb-0'}`}>
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/chat" element={<Chat />} />
@@ -99,12 +138,13 @@ export default function App() {
             <Route path="/agents/:id" element={<AgentEditor />} />
             <Route path="/nyven-plus" element={<NyvenPlus />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/settings/:section" element={<Settings />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/preview/:slug" element={<Preview />} />
           </Routes>
         </main>
 
-        {!hideBottomNav && <MobileBottomNav />}
+        {!hideBottomNav && !keyboardOpen && <MobileBottomNav />}
       </div>
     </div>
     </ConversationHistoryProvider>

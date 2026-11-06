@@ -44,29 +44,33 @@ export function Projects() {
           <div>
             <h1 className="font-display text-2xl sm:text-3xl font-medium">My Projects</h1>
             <p className="text-nyven-text-secondary text-sm mt-1">
-              Your creations with NYVEN
+              Your workspaces and creations with NYVEN
             </p>
           </div>
           <button
-            onClick={() => navigate('/build')}
-            className="px-4 py-2.5 rounded-xl bg-nyven-cyan text-nyven-bg text-sm font-medium hover:bg-nyven-cyan/90 transition-colors"
+            type="button"
+            onClick={() => navigate('/chat')}
+            className="px-4 py-2.5 rounded-xl bg-nyven-cyan text-nyven-bg text-sm font-medium hover:bg-nyven-cyan/90 transition-colors min-h-[44px]"
           >
-            New project
+            + New project
           </button>
         </div>
 
         {projects.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 text-center">
-            <FolderOpen size={40} className="text-nyven-text-secondary mb-4 opacity-50" />
-            <p className="text-nyven-text-secondary mb-2">No projects yet</p>
-            <p className="text-nyven-text-secondary/60 text-sm mb-4 max-w-sm">
-              Start a new project and tell NYVEN what you want to build. Your creations will appear here.
+          <div className="flex flex-col items-center justify-center py-20 sm:py-24 text-center px-4 min-w-0">
+            <div className="w-16 h-16 rounded-2xl bg-nyven-surface border border-white/[0.08] flex items-center justify-center mb-5">
+              <FolderOpen size={28} className="text-nyven-text-secondary opacity-70" />
+            </div>
+            <p className="text-nyven-text font-medium mb-2">No projects yet</p>
+            <p className="text-nyven-text-secondary text-sm mb-6 max-w-sm leading-relaxed">
+              Create a project to organize your conversations, ideas, files, and work with NYVEN.
             </p>
             <button
-              onClick={() => navigate('/build')}
-              className="text-nyven-cyan text-sm hover:underline"
+              type="button"
+              onClick={() => navigate('/chat')}
+              className="px-5 py-2.5 rounded-xl bg-nyven-cyan text-nyven-bg text-sm font-medium hover:bg-nyven-cyan/90 transition-colors min-h-[44px]"
             >
-              Build your first website
+              + New project
             </button>
           </div>
         ) : (

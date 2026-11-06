@@ -43,8 +43,6 @@ interface Env extends TTSEnv {
   DB?: D1Database
   SUPABASE_URL?: string
   SUPABASE_ANON_KEY?: string
-  VITE_SUPABASE_URL?: string
-  VITE_SUPABASE_ANON_KEY?: string
   PROVIDER_BUDGET_OPENROUTER_TTS?: string
 }
 

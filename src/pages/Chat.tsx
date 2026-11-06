@@ -1,3 +1,4 @@
+import { ChevronDown } from 'lucide-react'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useLocation } from 'react-router-dom'
 import { ChatMessage } from '../components/ChatMessage'
@@ -89,16 +90,16 @@ export function Chat() {
   const streamContentRef = useRef('')
   const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const scrollToBottom = useCallback((force = false) => {
+  const scrollToBottom = useCallback((force = false, smooth = false) => {
     if (!force && !stickToBottomRef.current) return
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    bottomRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' })
     setShowJumpLatest(false)
   }, [])
 
   const onChatScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     const el = e.currentTarget
     const dist = el.scrollHeight - el.scrollTop - el.clientHeight
-    const nearBottom = dist < 80
+    const nearBottom = dist < 120
     stickToBottomRef.current = nearBottom
     setShowJumpLatest(!nearBottom && el.scrollHeight > el.clientHeight + 40)
   }, [])
@@ -200,7 +201,7 @@ export function Chat() {
       const msgs = await loadConversationMessages(userId, c.id)
       setMessages(msgs)
     }
-    setTimeout(() => scrollToBottom(true), 50)
+    setTimeout(() => scrollToBottom(true, true), 50)
   }
 
 
@@ -337,6 +338,10 @@ export function Chat() {
         mimeType: a.mimeType,
         size: a.size,
         kind: a.kind,
+        previewDataUrl:
+          a.kind === 'image' && a.inlineBase64
+            ? `data:${a.mimeType};base64,${a.inlineBase64}`
+            : undefined,
       })),
     }
 
@@ -511,7 +516,6 @@ export function Chat() {
                       isThinking: false,
                       isStreaming: false,
                       activityState: 'error' as ActivityState,
-                  // mark for retry UI
 
                       activityDetail: undefined,
                     }
@@ -698,8 +702,8 @@ export function Chat() {
       )}
 
       {/* Main chat area */}
-      <div className="flex-1 flex flex-col min-w-0 min-h-0 max-w-full">
-        <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 sm:px-6 py-6 min-h-0 min-w-0" onScroll={onChatScroll}>
+      <div className="flex-1 flex flex-col min-w-0 min-h-0 max-w-full relative">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 sm:px-6 py-6 min-h-0 min-w-0" onScroll={onChatScroll}>
           <div className="max-w-3xl mx-auto space-y-6">
             {messages.length === 0 && (
               <div className="flex flex-col items-center justify-center py-12 sm:py-20 text-center px-2 min-w-0">
@@ -707,29 +711,9 @@ export function Chat() {
                 <h2 className="font-display text-xl font-medium mb-2">
                   How can NYVEN help?
                 </h2>
-                <p className="text-nyven-text-secondary text-sm max-w-sm mb-6">
+                <p className="text-nyven-text-secondary text-sm max-w-sm">
                   Ask anything. Build ideas. Write code. Explore what&apos;s next.
                 </p>
-                <div className="flex flex-wrap justify-center gap-2 max-w-md">
-                  {[
-                    'Explain a concept simply',
-                    'Help me write clearer code',
-                    'Summarize the latest on AI',
-                    'Plan a product feature',
-                  ].map((chip) => (
-                    <button
-                      key={chip}
-                      type="button"
-                      disabled={isGenerating}
-                      onClick={() => {
-                        void handleSend({ text: chip, attachments: [] })
-                      }}
-                      className="text-sm px-3 py-2.5 rounded-full border border-white/[0.1] bg-nyven-surface/80 text-nyven-text hover:border-nyven-cyan/40 hover:text-nyven-cyan transition-colors min-h-[44px]"
-                    >
-                      {chip}
-                    </button>
-                  ))}
-                </div>
               </div>
             )}
 
@@ -794,16 +778,18 @@ export function Chat() {
         </div>
 
         {showJumpLatest && (
-          <div className="flex justify-center pb-2">
+          <div className="pointer-events-none absolute bottom-[calc(5.5rem+env(safe-area-inset-bottom,0px))] right-3 sm:right-6 z-20">
             <button
               type="button"
               onClick={() => {
                 stickToBottomRef.current = true
-                scrollToBottom(true)
+                scrollToBottom(true, true)
               }}
-              className="text-xs font-medium px-3 py-2 rounded-full bg-nyven-surface border border-white/10 text-nyven-text shadow-lg min-h-[44px]"
+              className="pointer-events-auto inline-flex items-center justify-center w-10 h-10 rounded-full bg-nyven-surface/90 backdrop-blur-md border border-white/10 text-nyven-text shadow-lg shadow-black/30 hover:border-nyven-cyan/40 hover:text-nyven-cyan transition-colors"
+              aria-label="Jump to latest"
+              title="Jump to latest"
             >
-              Jump to latest
+              <ChevronDown size={20} strokeWidth={2} />
             </button>
           </div>
         )}
@@ -811,12 +797,12 @@ export function Chat() {
         {voiceError && !voiceChatOpen && (
           <p className="text-center text-xs text-red-300 px-4 py-1 max-w-xl mx-auto">{voiceError}</p>
         )}
-        <div className="shrink-0 w-full max-w-3xl mx-auto px-2 sm:px-4 pt-1 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] min-w-0">
+        <div className="shrink-0 w-full max-w-3xl mx-auto px-0 sm:px-4 pt-1 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] min-w-0">
           <MessageComposer
             onSend={handleSend}
             isGenerating={isGenerating}
             onStop={handleStop}
-            autoFocus
+            autoFocus={typeof window !== 'undefined' && window.matchMedia('(pointer: fine)').matches}
             onVoiceToggle={() => void voiceRef.current?.toggleListen()}
             voicePhase={voicePhase}
             voiceEnergy={voiceEnergy}
@@ -834,6 +820,9 @@ export function Chat() {
               voiceChatOpenRef.current = true
             }}
           />
+          <p className="text-center text-[11px] text-nyven-text-secondary/80 mt-2 px-2 leading-snug">
+            Nyven can make mistakes. Check important information.
+          </p>
         </div>
       </div>
 
