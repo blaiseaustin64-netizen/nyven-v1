@@ -992,7 +992,7 @@ export function AgentEditor() {
                   <div className="text-sm font-medium">{form.name || 'Agent'}</div>
                   <div className="text-[11px] text-nyven-text-secondary flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                    {form.agentType === 'inbox' ? 'Inbox · Gmail skills + Gemini' : 'Live · Gemini via NYVEN'}
+                    {form.agentType === 'inbox' ? 'Inbox · Gmail skills' : 'Live · Nyven'}
                   </div>
                 </div>
               </div>

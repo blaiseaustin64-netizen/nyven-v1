@@ -61,7 +61,7 @@ export async function fetchUsageSummary(
     if (!res.ok || !data.success || !data.chat || !data.voice) {
       return {
         ...EMPTY,
-        error: data.error || 'Usage data is unavailable (is D1 bound?).',
+        error: data.error || 'Usage data is unavailable (please try again).',
       }
     }
     return {

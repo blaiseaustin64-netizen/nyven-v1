@@ -489,7 +489,7 @@ export function MessageComposer({
                   )}
                   {(a.status === 'uploading' || a.status === 'processing') && (
                     <div className="absolute inset-0 bg-black/45 flex items-center justify-center">
-                      <Loader2 size={18} className="animate-spin text-white" />
+                      <Loader2 size={22} className="animate-spin text-white" />
                     </div>
                   )}
                   {a.status === 'error' && (
@@ -651,13 +651,13 @@ export function MessageComposer({
                     className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left min-h-[56px] active:bg-nyven-cyan/10 hover:bg-white/[0.04] transition-colors"
                   >
                     <span className="w-10 h-10 rounded-xl bg-white/[0.06] flex items-center justify-center text-nyven-text-secondary shrink-0">
-                      <row.icon size={18} />
+                      <row.icon size={22} />
                     </span>
                     <span className="flex-1 min-w-0">
                       <span className="block text-[15px] text-nyven-text">{row.label}</span>
                       <span className="block text-xs text-nyven-text-secondary truncate">{row.hint}</span>
                     </span>
-                    <ChevronRight size={18} className="text-nyven-text-secondary/50 shrink-0" />
+                    <ChevronRight size={22} className="text-nyven-text-secondary/50 shrink-0" />
                   </button>
                 ))}
               </div>
@@ -761,9 +761,9 @@ export function MessageComposer({
                 }
               >
                 {voicePhase === 'transcribing' ? (
-                  <Loader2 size={18} className="animate-spin" />
+                  <Loader2 size={22} className="animate-spin" />
                 ) : (
-                  <Mic size={18} />
+                  <Mic size={22} />
                 )}
               </button>
             )}
@@ -780,7 +780,7 @@ export function MessageComposer({
                 aria-label="Voice chat"
                 title="Voice chat"
               >
-                <AudioLines size={18} />
+                <AudioLines size={22} />
               </button>
             )}
 
@@ -806,7 +806,7 @@ export function MessageComposer({
                 )}
                 aria-label="Send message"
               >
-                <Send size={18} />
+                <Send size={22} />
               </button>
             )}
           </div>

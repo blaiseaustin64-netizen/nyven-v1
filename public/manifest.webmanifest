@@ -1,6 +1,6 @@
 {
   "name": "NYVEN",
-  "short_name": "NYVEN",
+  "short_name": "Nyven",
   "description": "Intelligence, built for what's next.",
   "start_url": "/",
   "display": "standalone",
@@ -9,10 +9,22 @@
   "lang": "en",
   "icons": [
     {
-      "src": "/nyven-wordmark.png",
+      "src": "/nyven-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/nyven-icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
+    },
+    {
+      "src": "/nyven-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

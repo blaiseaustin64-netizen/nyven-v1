@@ -121,7 +121,7 @@ export function Auth() {
           <NIdentity state="white" size={48} className="mx-auto opacity-80" />
           <h1 className="font-display text-xl font-medium">Authentication unavailable</h1>
           <p className="text-sm text-nyven-text-secondary">
-            Cloudflare D1 auth is not configured. Bind the <code className="text-nyven-cyan">DB</code>{' '}
+            Accounts are temporarily unavailable. Please try again later. (ops: <code className="text-nyven-cyan">DB</code>{' '}
             database on Pages and apply migrations.
           </p>
           <Link to="/" className="text-sm text-nyven-cyan">
@@ -148,7 +148,7 @@ export function Auth() {
                   ? 'Choose new password'
                   : 'Sign in'}
           </h1>
-          <p className="text-sm text-nyven-text-secondary">{mode === 'verify' ? 'Enter the six-digit code sent to your inbox. It expires in 5 minutes.' : 'NYVEN account via Cloudflare Auth'}</p>
+          <p className="text-sm text-nyven-text-secondary">{mode === 'verify' ? 'Enter the six-digit code sent to your inbox. It expires in 5 minutes.' : 'Create or access your NYVEN account'}</p>
         </div>
 
         <form onSubmit={submit} className="space-y-4 rounded-2xl border border-white/10 bg-nyven-surface p-6">

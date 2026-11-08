@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react'
 import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import {
-  Home,
   MessageSquare,
   FolderOpen,
   Code2,
@@ -25,11 +24,31 @@ import type { Conversation } from '../lib/types'
 
 /** Real NYVEN routes only — no Agents / demo bot */
 const mainNav = [
-  { to: '/', label: 'Home', icon: Home },
-  { to: '/chat', label: 'Chat', icon: MessageSquare },
+  { to: '/chat', label: 'Chats', icon: MessageSquare },
   { to: '/projects', label: 'Projects', icon: FolderOpen },
   { to: '/code', label: 'Code', icon: Code2 },
 ]
+
+const PIN_KEY = 'nyven_pinned_chats_v1'
+
+function loadPinned(): Set<string> {
+  try {
+    const raw = localStorage.getItem(PIN_KEY)
+    if (!raw) return new Set()
+    const arr = JSON.parse(raw) as string[]
+    return new Set(Array.isArray(arr) ? arr : [])
+  } catch {
+    return new Set()
+  }
+}
+
+function savePinned(ids: Set<string>) {
+  try {
+    localStorage.setItem(PIN_KEY, JSON.stringify([...ids]))
+  } catch {
+    /* ignore */
+  }
+}
 
 const GROUP_ORDER = ['Today', 'Yesterday', 'Previous 7 days', 'Older'] as const
 
@@ -67,6 +86,17 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editTitle, setEditTitle] = useState('')
   const [collapsed, setCollapsed] = useState(false)
+  const [pinned, setPinned] = useState<Set<string>>(() => loadPinned())
+  const togglePin = (id: string) => {
+    setPinned((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      savePinned(next)
+      return next
+    })
+  }
+
 
   const onChatRoute = location.pathname.startsWith('/chat')
 
@@ -79,17 +109,21 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   }, [conversations, query])
 
   const groups = useMemo(() => {
+    const pinnedItems = filtered.filter((c) => pinned.has(c.id))
+    const rest = filtered.filter((c) => !pinned.has(c.id))
     const map = new Map<string, Conversation[]>()
-    for (const c of filtered) {
+    for (const c of rest) {
       const g = groupLabel(c.updatedAt || Date.now())
       if (!map.has(g)) map.set(g, [])
       map.get(g)!.push(c)
     }
-    return GROUP_ORDER.filter((g) => map.has(g)).map((g) => ({
-      label: g,
-      items: map.get(g)!,
-    }))
-  }, [filtered])
+    const out: { label: string; items: Conversation[] }[] = []
+    if (pinnedItems.length) out.push({ label: 'Pinned', items: pinnedItems })
+    for (const g of GROUP_ORDER) {
+      if (map.has(g)) out.push({ label: g, items: map.get(g)! })
+    }
+    return out
+  }, [filtered, pinned])
 
   const handleNewChat = () => {
     startNewChat()
@@ -208,16 +242,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
             {!collapsed && <span className="truncate">{label}</span>}
           </NavLink>
         ))}
-        <NavLink
-          to="/nyven-plus"
-          className={linkClass}
-          onClick={onMobileClose}
-          title="NYVEN+"
-        >
-          <Sparkles size={18} strokeWidth={1.85} className="shrink-0" />
-          {!collapsed && <span className="truncate">NYVEN+</span>}
-        </NavLink>
-        <NavLink
+<NavLink
           to="/settings"
           className={linkClass}
           onClick={onMobileClose}
@@ -284,7 +309,14 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
                               setMenuId(c.id)
                             }}
                             onTouchStart={() => {
-                              const id = window.setTimeout(() => setMenuId(c.id), 480)
+                              const id = window.setTimeout(() => {
+                                setMenuId(c.id)
+                                try {
+                                  navigator.vibrate?.(10)
+                                } catch {
+                                  /* */
+                                }
+                              }, 500)
                               ;(window as unknown as { __nyvenLp?: number }).__nyvenLp = id
                             }}
                             onTouchEnd={() => {
@@ -323,7 +355,22 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
                                 <div className="absolute right-0 top-full z-50 mt-1 w-36 rounded-xl border border-white/[0.08] bg-[#0c1018] shadow-xl py-1">
                                   <button
                                     type="button"
-                                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[#e9edf5] hover:bg-white/[0.05]"
+                                    className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-[#e9edf5] hover:bg-white/[0.05] min-h-[44px]"
+                                    onClick={() => {
+                                      togglePin(c.id)
+                                      setMenuId(null)
+                                      try {
+                                        navigator.vibrate?.(10)
+                                      } catch {
+                                        /* */
+                                      }
+                                    }}
+                                  >
+                                    {pinned.has(c.id) ? 'Unpin' : 'Pin'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-[#e9edf5] hover:bg-white/[0.05] min-h-[44px]"
                                     onClick={() => {
                                       setEditingId(c.id)
                                       setEditTitle(c.title || '')
@@ -414,7 +461,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
             aria-label="Close menu"
             onClick={onMobileClose}
           />
-          <aside className="absolute left-0 top-0 bottom-0 w-[min(86vw,330px)] bg-[#0b0e15] border-r border-white/[0.07] shadow-2xl flex flex-col min-h-0 animate-in slide-in-from-left duration-300">
+          <aside className="absolute left-0 top-0 bottom-0 w-[min(85vw,320px)] bg-[#0b0e15] border-r border-white/[0.07] shadow-2xl flex flex-col min-h-0 animate-in slide-in-from-left duration-300">
             {content}
           </aside>
         </div>
@@ -423,53 +470,31 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   )
 }
 
-export function MobileNavBar({ onMenuOpen }: { onMenuOpen: () => void }) {
+export function MobileNavBar({
+  onMenuOpen,
+  title,
+}: {
+  onMenuOpen: () => void
+  title?: string | null
+}) {
   return (
-    <header className="lg:hidden flex items-center justify-between px-3 h-12 border-b border-white/[0.05] shrink-0 bg-[#07090D]/90 backdrop-blur-md pt-[env(safe-area-inset-top)]">
+    <header className="lg:hidden flex items-center gap-2 px-2 h-12 shrink-0 bg-transparent">
       <button
         type="button"
         onClick={onMenuOpen}
-        className="p-2 -ml-2 rounded-lg text-[#6f7a90] hover:text-[#e9edf5] min-h-[44px] min-w-[44px] flex items-center justify-center"
+        className="p-2 rounded-lg text-nyven-text-secondary hover:text-nyven-text min-h-[44px] min-w-[44px] flex items-center justify-center"
         aria-label="Open menu"
       >
         <Menu size={22} />
       </button>
-      <div className="flex items-center gap-2">
-        <NIdentity state="white" size={22} />
-        <span className="font-display font-semibold text-base tracking-wide">NYVEN</span>
-      </div>
-      <div className="w-10" />
+      {title ? (
+        <h1 className="flex-1 text-center text-[15px] font-medium text-nyven-text truncate pr-11">
+          {title}
+        </h1>
+      ) : (
+        <div className="flex-1" />
+      )}
     </header>
   )
 }
 
-export function MobileBottomNav() {
-  const items = [
-    { to: '/chat', label: 'Chat', icon: MessageSquare },
-    { to: '/projects', label: 'Projects', icon: FolderOpen },
-    { to: '/code', label: 'Code', icon: Code2 },
-    { to: '/settings', label: 'Settings', icon: Settings },
-  ]
-
-  return (
-    <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-30 border-t border-white/[0.06] bg-[#07090D]/95 backdrop-blur-md">
-      <div className="flex items-center justify-around h-14 px-2 pb-[env(safe-area-inset-bottom)]">
-        {items.map(({ to, label, icon: Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            className={({ isActive }) =>
-              clsx(
-                'flex flex-col items-center justify-center gap-0.5 flex-1 min-h-[44px] h-full text-[11px] font-medium transition-colors',
-                isActive ? 'text-[#3de0ff]' : 'text-[#6f7a90]'
-              )
-            }
-          >
-            <Icon size={20} strokeWidth={1.75} />
-            {label}
-          </NavLink>
-        ))}
-      </div>
-    </nav>
-  )
-}

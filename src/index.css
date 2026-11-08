@@ -248,3 +248,15 @@ input:focus-visible {
 .nyven-code-pre .hljs-bullet { color: #D4D4D4; }
 .nyven-code-pre .hljs-addition { color: #B5CEA8; }
 .nyven-code-pre .hljs-deletion { color: #CE9178; }
+
+/* Tables: never letter-break; scroll inside own box */
+.nyven-md table {
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+}
+.nyven-md table th,
+.nyven-md table td {
+  overflow-wrap: normal;
+  word-break: normal;
+}

@@ -1,4 +1,4 @@
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Menu } from 'lucide-react'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useLocation } from 'react-router-dom'
 import { ChatMessage } from '../components/ChatMessage'
@@ -21,9 +21,24 @@ import { buildMemoryContext } from '../lib/memoryStore'
 import { recordUsage } from '../lib/usageTracking'
 
 
+
+function timeGreeting(firstName: string | null): string {
+  const h = new Date().getHours()
+  const name = firstName?.trim()
+  if (!name) return 'Hello'
+  if (h >= 5 && h <= 11) return `Good morning, ${name}`
+  if (h >= 12 && h <= 16) return `Good afternoon, ${name}`
+  if (h >= 17 && h <= 21) return `Good evening, ${name}`
+  return `Hello, ${name}`
+}
+
 export function Chat() {
+  const { user, profile } = useAuth()
+  const firstName =
+    (profile?.display_name || user?.displayName || '')
+      .trim()
+      .split(/\s+/)[0] || null
   const location = useLocation()
-  const { user } = useAuth()
   const userId = user?.id ?? null
   const {
     conversations,
@@ -703,17 +718,51 @@ export function Chat() {
 
       {/* Main chat area */}
       <div className="flex-1 flex flex-col min-w-0 min-h-0 max-w-full relative">
+        {/* Mobile chat top bar — hamburger only, title when chat has messages */}
+        <header className="lg:hidden flex items-center gap-2 px-2 h-12 shrink-0 bg-transparent">
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new Event('nyven-open-menu'))}
+            className="p-2 rounded-lg text-nyven-text-secondary hover:text-nyven-text min-h-[44px] min-w-[44px] flex items-center justify-center"
+            aria-label="Open menu"
+          >
+            <Menu size={22} />
+          </button>
+          {messages.length > 0 && (
+            <h1 className="flex-1 text-center text-[15px] font-medium truncate pr-11 text-nyven-text">
+              {messages.find((m) => m.role === 'user')?.content?.slice(0, 48) || 'Chat'}
+            </h1>
+          )}
+        </header>
         <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 sm:px-6 py-6 min-h-0 min-w-0" onScroll={onChatScroll}>
           <div className="max-w-3xl mx-auto space-y-6">
             {messages.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-12 sm:py-20 text-center px-2 min-w-0">
-                <NIdentity state="white" size={48} className="mb-5 opacity-80" />
-                <h2 className="font-display text-xl font-medium mb-2">
-                  How can NYVEN help?
+              <div className="flex flex-col items-center justify-center min-h-[50vh] py-16 sm:py-24 text-center px-4">
+                <NIdentity state="white" size={56} className="mb-6 opacity-90 drop-shadow-[0_0_24px_rgba(98,230,255,0.25)]" />
+                <h2 className="font-display text-2xl sm:text-[1.75rem] font-medium text-nyven-text mb-3">
+                  {timeGreeting(firstName)}
                 </h2>
-                <p className="text-nyven-text-secondary text-sm max-w-sm">
-                  Ask anything. Build ideas. Write code. Explore what&apos;s next.
-                </p>
+                <div className="flex flex-wrap justify-center gap-2 mt-6 max-w-sm">
+                  {[
+                    { label: 'Ask', path: null, text: 'Explain a concept simply' },
+                    { label: 'Build', path: '/build', text: null },
+                    { label: 'Create', path: null, text: 'Help me draft something creative' },
+                    { label: 'Code', path: '/code', text: null },
+                  ].map((chip) => (
+                    <button
+                      key={chip.label}
+                      type="button"
+                      className="px-3.5 py-2 rounded-full border border-white/10 bg-white/[0.04] text-sm text-nyven-text-secondary hover:text-nyven-text hover:border-nyven-cyan/30 min-h-[40px]"
+                      onClick={() => {
+                        if (chip.path) window.location.assign(chip.path)
+                        else if (chip.text)
+                          void handleSend({ text: chip.text, attachments: [] })
+                      }}
+                    >
+                      {chip.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -777,27 +826,27 @@ export function Chat() {
           </div>
         </div>
 
-        {showJumpLatest && (
-          <div className="pointer-events-none absolute bottom-[calc(5.5rem+env(safe-area-inset-bottom,0px))] left-1/2 -translate-x-1/2 z-20">
-            <button
-              type="button"
-              onClick={() => {
-                stickToBottomRef.current = true
-                scrollToBottom(true, true)
-              }}
-              className="pointer-events-auto inline-flex items-center justify-center w-10 h-10 rounded-full bg-nyven-surface/90 backdrop-blur-md border border-white/10 text-nyven-text shadow-lg shadow-black/30 hover:border-nyven-cyan/40 hover:text-nyven-cyan transition-colors"
-              aria-label="Jump to latest"
-              title="Jump to latest"
-            >
-              <ChevronDown size={20} strokeWidth={2} />
-            </button>
-          </div>
-        )}
         {/* Dictation wave lives on the composer mic (MicWaveCircle). Full Liquid Voice is Voice Chat only. */}
         {voiceError && !voiceChatOpen && (
           <p className="text-center text-xs text-red-300 px-4 py-1 max-w-xl mx-auto">{voiceError}</p>
         )}
-        <div className="shrink-0 w-full max-w-3xl mx-auto px-0 sm:px-4 pt-1 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] min-w-0">
+        <div className="relative shrink-0 w-full max-w-3xl mx-auto px-0 sm:px-4 pt-1 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] min-w-0">
+          {showJumpLatest && (
+            <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-3 z-20">
+              <button
+                type="button"
+                onClick={() => {
+                  stickToBottomRef.current = true
+                  scrollToBottom(true, true)
+                }}
+                className="pointer-events-auto inline-flex items-center justify-center w-10 h-10 rounded-full bg-nyven-surface/90 backdrop-blur-md border border-white/10 text-nyven-text shadow-lg shadow-black/30 hover:border-nyven-cyan/40 hover:text-nyven-cyan transition-colors"
+                aria-label="Jump to latest"
+                title="Jump to latest"
+              >
+                <ChevronDown size={20} strokeWidth={2} />
+              </button>
+            </div>
+          )}
           <MessageComposer
             onSend={handleSend}
             isGenerating={isGenerating}

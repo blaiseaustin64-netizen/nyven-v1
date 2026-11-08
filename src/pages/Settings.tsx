@@ -240,7 +240,7 @@ export function Settings() {
   const sectionMeta: Record<Section, { label: string; hint: string }> = {
     account: { label: 'Account', hint: 'Profile and sign-in' },
     ai: { label: 'AI', hint: 'Response style and memory' },
-    voice: { label: 'Voice', hint: 'Speech and Fish Audio voices' },
+    voice: { label: 'Voice', hint: 'Speech and voice options' },
     privacy: { label: 'Privacy & Security', hint: 'Memories and data' },
     connections: { label: 'Connected services', hint: 'GitHub and more' },
     usage: { label: 'Usage', hint: 'Limits and daily allowance' },
@@ -383,9 +383,9 @@ export function Settings() {
                 {!configured && (
                   <Card>
                     <p className="text-sm text-nyven-text-secondary">
-                      Sign-in is handled by NYVEN&apos;s Cloudflare authentication.
+                      Sign-in is handled by NYVEN authentication.
                       If accounts seem unavailable, check that the app is deployed with
-                      its D1 database and auth secrets configured.
+                      account services configured.
                     </p>
                   </Card>
                 )}
@@ -545,7 +545,7 @@ export function Settings() {
                     />
                   </Field>
                   <p className="text-xs text-nyven-text-secondary mt-2">
-                    Chat model routing remains server-side (Gemini). Preferences do not
+                    Chat model selection is managed for you. Preferences do not
                     expose API keys or switch providers from the browser.
                   </p>
                 </Card>
@@ -557,7 +557,7 @@ export function Settings() {
               <>
                 <SectionTitle
                   title="Voice & Speech"
-                  desc="Choose how NYVEN sounds. Previews use real Fish Audio via OpenRouter; keys stay server-side."
+                  desc="Choose how Nyven sounds."
                 />
                 <Card>
                   <VoiceSpeechSettings
@@ -689,7 +689,7 @@ export function Settings() {
                   {userId && (
                     <p className="text-sm text-nyven-text-secondary">
                       Delete individual chats from the chat history panel. Account data is
-                      stored in NYVEN's Cloudflare D1 database with server-side access checks.
+                      stored securely with access checks on your account.
                     </p>
                   )}
                 </Card>
@@ -936,7 +936,7 @@ export function Settings() {
               <>
                 <SectionTitle
                   title="Sessions"
-                  desc="Signed-in session for this browser (Cloudflare auth cookie)."
+                  desc="Signed-in session for this browser."
                 />
                 <Card>
                   {!user && (

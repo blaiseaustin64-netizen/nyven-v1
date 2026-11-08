@@ -279,18 +279,20 @@ export function MessageContent({ content, isStreaming, className }: Props) {
         )
       },
       table: ({ children }) => (
-        <div className="my-3 max-w-full overflow-x-auto rounded-xl border border-white/[0.08] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <table className="min-w-full text-sm text-left">{children}</table>
+        <div className="my-3 max-w-full overflow-x-auto rounded-2xl border border-white/10 [overflow-wrap:normal]">
+          <table className="w-full text-left text-[14px] leading-normal [min-width:max-content] [overflow-wrap:normal] [word-break:normal] [hyphens:none]">
+            {children}
+          </table>
         </div>
       ),
-      thead: ({ children }) => <thead className="bg-white/[0.04]">{children}</thead>,
+      thead: ({ children }) => <thead className="bg-white/[0.05]">{children}</thead>,
       th: ({ children }) => (
-        <th className="px-3 py-2 font-medium text-nyven-text border-b border-white/[0.06]">
+        <th className="px-4 py-3 font-semibold text-nyven-text border-b border-white/[0.08] whitespace-nowrap align-top first:min-w-[130px]">
           {children}
         </th>
       ),
       td: ({ children }) => (
-        <td className="px-3 py-2 text-nyven-text-secondary border-b border-white/[0.04] align-top">
+        <td className="px-4 py-3 text-nyven-text-secondary border-b border-white/[0.08] align-top [overflow-wrap:normal] [word-break:normal] min-w-[90px]">
           {children}
         </td>
       ),
@@ -343,7 +345,7 @@ export function MessageContent({ content, isStreaming, className }: Props) {
   return (
     <div
       className={clsx(
-        'nyven-md min-w-0 max-w-full text-[16px] leading-[1.65] text-nyven-text',
+        'nyven-md min-w-0 max-w-full text-[16px] leading-[1.65] text-nyven-text [&_p]:[overflow-wrap:anywhere]',
         className
       )}
     >

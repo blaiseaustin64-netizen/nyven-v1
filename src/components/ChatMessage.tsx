@@ -115,7 +115,7 @@ export function ChatMessage({
                     href={a.previewDataUrl || undefined}
                     target={a.previewDataUrl ? '_blank' : undefined}
                     rel={a.previewDataUrl ? 'noopener noreferrer' : undefined}
-                    className="relative shrink-0 w-16 h-16 sm:w-20 sm:h-20 max-w-[160px] rounded-xl overflow-hidden border border-white/[0.08] bg-white/[0.04]"
+                    className="relative shrink-0 w-[104px] h-[104px] max-w-[104px] rounded-xl overflow-hidden border border-white/[0.08] bg-white/[0.04]"
                     title={a.name}
                     onClick={(e) => {
                       if (!a.previewDataUrl) e.preventDefault()

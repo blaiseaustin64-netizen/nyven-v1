@@ -63,7 +63,7 @@ export function ConnectionBar({ view, busy, onConnect, onDisconnect, onRetry }: 
       {view.kind === 'unconfigured' && <div className="mt-4"><ErrorNotice message={view.message} /></div>}
       {view.kind === 'unavailable' && <div className="mt-4"><ErrorNotice message={view.message} /></div>}
       {view.kind === 'auth_unavailable' && (
-        <div className="mt-4"><ErrorNotice message="Account sign-in is not available yet. Confirm NYVEN Cloudflare auth and D1 are configured for this deployment. GitHub cannot be connected until you can sign in." /></div>
+        <div className="mt-4"><ErrorNotice message="Sign-in is not available yet. Connect GitHub after you sign in." /></div>
       )}
     </Panel>
   )
