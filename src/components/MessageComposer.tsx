@@ -101,7 +101,7 @@ export function MessageComposer({
   onSend,
   isGenerating = false,
   onStop,
-  placeholder = 'Message NYVEN...',
+  placeholder = 'Message NYVEN',
   autoFocus = false,
   onVoiceToggle,
   voicePhase = 'idle',
@@ -419,6 +419,8 @@ export function MessageComposer({
     !attachments.some((a) => a.status === 'uploading' || a.status === 'processing')
 
   const visibleAttachments = attachments.filter((a) => a.status !== 'cancelled')
+  const lineCount = Math.max(1, (value.match(/\n/g) || []).length + 1)
+  const isExpanded = visibleAttachments.length > 0 || lineCount > 1 || value.length > 80
 
   const retryUpload = (a: PendingAttachment) => {
     if (!a.file) return
@@ -446,7 +448,7 @@ export function MessageComposer({
           if (e.dataTransfer.files?.length) addFiles(e.dataTransfer.files)
         }}
         className={clsx(
-          'relative rounded-[24px] border bg-nyven-surface/95 backdrop-blur-sm transition-colors p-3',
+          'relative rounded-[24px] border bg-nyven-surface/95 backdrop-blur-sm transition-colors', isExpanded ? 'p-3' : 'px-2 py-1.5 sm:p-3',
           dragOver
             ? 'border-nyven-cyan/40 bg-nyven-cyan/[0.04]'
             : 'border-white/[0.08] focus-within:border-white/[0.14]'
@@ -461,7 +463,7 @@ export function MessageComposer({
                 <div
                   key={a.id}
                   className={clsx(
-                    'relative shrink-0 w-16 h-16 rounded-xl overflow-hidden border bg-white/[0.04]',
+                    'relative shrink-0 w-[104px] h-[104px] rounded-2xl overflow-hidden border bg-white/[0.04]',
                     a.status === 'error'
                       ? 'border-red-400/60'
                       : 'border-white/[0.08]'
@@ -505,7 +507,7 @@ export function MessageComposer({
                   <button
                     type="button"
                     onClick={() => removeAttachment(a.id)}
-                    className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-[#0c1018] border border-white/20 text-nyven-text flex items-center justify-center shadow"
+                    className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-[#0c1018] border border-white/20 text-nyven-text flex items-center justify-center shadow"
                     aria-label={`Remove ${a.name}`}
                   >
                     <X size={12} />

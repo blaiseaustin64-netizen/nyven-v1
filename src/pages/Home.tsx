@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../lib/auth/AuthContext'
 import { motion } from 'framer-motion'
 import { MessageSquare, Hammer, Sparkles, Code2, ArrowRight } from 'lucide-react'
 import wordmark from '../assets/nyven-wordmark.png'
-import { MessageComposer } from '../components/MessageComposer'
 
 const quickActions = [
   { id: 'ask', label: 'Ask', icon: MessageSquare, path: '/chat', prompt: '' },
@@ -14,6 +14,13 @@ const quickActions = [
 
 export function Home() {
   const navigate = useNavigate()
+  const { user, loading: authLoading } = useAuth()
+  useEffect(() => {
+    if (authLoading) return
+    if (!user) return
+    const mobile = typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches
+    if (mobile) navigate('/chat', { replace: true })
+  }, [user, authLoading, navigate])
   const [input, setInput] = useState('')
 
   const handleSend = (text: string) => {

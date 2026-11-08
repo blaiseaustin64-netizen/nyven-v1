@@ -260,3 +260,14 @@ input:focus-visible {
   overflow-wrap: normal;
   word-break: normal;
 }
+
+@keyframes nyvenDrawerIn {
+  from { transform: translateX(-102%); }
+  to { transform: translateX(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  @keyframes nyvenDrawerIn {
+    from { transform: none; opacity: 0; }
+    to { transform: none; opacity: 1; }
+  }
+}

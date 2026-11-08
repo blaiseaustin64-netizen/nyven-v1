@@ -98,6 +98,8 @@ export function Chat() {
   const voiceSubmitInFlightRef = useRef(false)
   const stickToBottomRef = useRef(true)
   const [showJumpLatest, setShowJumpLatest] = useState(false)
+  const [composerPad, setComposerPad] = useState(96)
+  const composerWrapRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
   const streamMsgIdRef = useRef<string | null>(null)
@@ -696,6 +698,18 @@ export function Chat() {
     }
   }
 
+  useEffect(() => {
+    const el = composerWrapRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver((entries) => {
+      const h = entries[0]?.contentRect?.height
+      if (typeof h === 'number' && h > 0) setComposerPad(Math.ceil(h) + 8)
+    })
+    ro.observe(el)
+    setComposerPad(el.offsetHeight + 8)
+    return () => ro.disconnect()
+  }, [messages.length, isGenerating])
+
   return (
     <div className="h-full flex relative">
             {!online && (
@@ -734,7 +748,7 @@ export function Chat() {
             </h1>
           )}
         </header>
-        <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 sm:px-6 py-6 min-h-0 min-w-0" onScroll={onChatScroll}>
+        <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 sm:px-6 py-6 min-h-0 min-w-0" style={{ paddingBottom: composerPad }} onScroll={onChatScroll}>
           <div className="max-w-3xl mx-auto space-y-6">
             {messages.length === 0 && (
               <div className="flex flex-col items-center justify-center min-h-[50vh] py-16 sm:py-24 text-center px-4">
@@ -830,7 +844,7 @@ export function Chat() {
         {voiceError && !voiceChatOpen && (
           <p className="text-center text-xs text-red-300 px-4 py-1 max-w-xl mx-auto">{voiceError}</p>
         )}
-        <div className="relative shrink-0 w-full max-w-3xl mx-auto px-0 sm:px-4 pt-1 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] min-w-0">
+        <div ref={composerWrapRef} className="relative shrink-0 w-full max-w-3xl mx-auto px-0 sm:px-4 pt-1 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] min-w-0">
           {showJumpLatest && (
             <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-3 z-20">
               <button

@@ -457,7 +457,7 @@ export function Settings() {
                         Delete account
                       </h3>
                       <p className="text-xs text-nyven-text-secondary mb-3">
-                        Type DELETE to confirm. Full server-side erasure may require
+                        Type DELETE to confirm. Full account erasure may require
                         dashboard support until a dedicated delete endpoint ships.
                       </p>
                       <input
@@ -546,7 +546,7 @@ export function Settings() {
                   </Field>
                   <p className="text-xs text-nyven-text-secondary mt-2">
                     Chat model selection is managed for you. Preferences do not
-                    expose API keys or switch providers from the browser.
+                    change model routing from the browser.
                   </p>
                 </Card>
               </>
@@ -706,7 +706,7 @@ export function Settings() {
                 <Card>
                   <p className="text-sm text-nyven-text-secondary">
                     GitHub can be connected now for development (pre-account phase). Tokens stay
-                    server-side (encrypted cookie or database). Full NYVEN accounts will attach
+                    secure session storage. Full NYVEN accounts will attach
                     connections to each user later.
                   </p>
                 </Card>
@@ -869,7 +869,7 @@ export function Settings() {
               <>
                 <SectionTitle
                   title="Usage"
-                  desc="Server-enforced daily limits when D1 is bound; otherwise historical event counts."
+                  desc="Daily usage limits for your account."
                 />
                 {!usage && (
                   <p className="text-sm text-nyven-text-secondary">Loading…</p>
