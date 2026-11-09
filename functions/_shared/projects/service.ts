@@ -213,6 +213,47 @@ export async function recordActivity(
     .run()
 }
 
+
+/** Ensure conversations supports project_id (migration 0004 may not be applied). */
+export async function ensureConversationProjectSupport(db: D1Database): Promise<void> {
+  await db
+    .prepare(
+      `CREATE TABLE IF NOT EXISTS conversations (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        title TEXT NOT NULL DEFAULT 'New chat',
+        metadata_json TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )`
+    )
+    .run()
+  for (const sql of [
+    `ALTER TABLE conversations ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE conversations ADD COLUMN project_id TEXT`,
+    `ALTER TABLE conversations ADD COLUMN deleted_at TEXT`,
+  ]) {
+    try {
+      await db.prepare(sql).run()
+    } catch {
+      /* already exists */
+    }
+  }
+  await db
+    .prepare(
+      `CREATE TABLE IF NOT EXISTS messages (
+        id TEXT PRIMARY KEY,
+        conversation_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        role TEXT NOT NULL,
+        content TEXT NOT NULL DEFAULT '',
+        metadata_json TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT NOT NULL
+      )`
+    )
+    .run()
+}
+
 export async function listProjectsForUser(db: D1Database, userId: string, includeArchived = false) {
   await ensureProjectsSchema(db)
   const sql = includeArchived
@@ -646,26 +687,68 @@ export async function createProjectChat(
   projectId: string,
   title?: string
 ) {
+  await ensureProjectsSchema(db)
+  await ensureConversationProjectSupport(db)
   if (!(await assertProjectOwner(db, projectId, userId))) return null
   const id = crypto.randomUUID()
   const now = nowIso()
   const t = (title || 'New chat').trim().slice(0, 120) || 'New chat'
-  await db
-    .prepare(
-      `INSERT INTO conversations (id, user_id, title, pinned, project_id, created_at, updated_at)
-       VALUES (?, ?, ?, 0, ?, ?, ?)`
-    )
-    .bind(id, userId, t, projectId, now, now)
-    .run()
+
+  let inserted = false
+  try {
+    const r = await db
+      .prepare(
+        `INSERT INTO conversations (id, user_id, title, pinned, project_id, created_at, updated_at)
+         VALUES (?, ?, ?, 0, ?, ?, ?)`
+      )
+      .bind(id, userId, t, projectId, now, now)
+      .run()
+    inserted = !(r && r.success === false)
+  } catch (e) {
+    console.error('createProjectChat insert with project_id failed', e instanceof Error ? e.message : e)
+  }
+
+  if (!inserted) {
+    try {
+      const r = await db
+        .prepare(
+          `INSERT INTO conversations (id, user_id, title, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?)`
+        )
+        .bind(id, userId, t, now, now)
+        .run()
+      inserted = !(r && r.success === false)
+      if (inserted) {
+        try {
+          await db
+            .prepare(`UPDATE conversations SET project_id = ?, pinned = 0 WHERE id = ? AND user_id = ?`)
+            .bind(projectId, id, userId)
+            .run()
+        } catch {
+          /* project_id column still missing */
+        }
+      }
+    } catch (e) {
+      console.error('createProjectChat fallback insert failed', e instanceof Error ? e.message : e)
+      return null
+    }
+  }
+
+  if (!inserted) return null
+
   try {
     await recordActivity(db, projectId, userId, 'chat_created', { conversationId: id, title: t })
   } catch {
     /* */
   }
-  await db
-    .prepare(`UPDATE projects SET updated_at = ? WHERE id = ? AND user_id = ?`)
-    .bind(now, projectId, userId)
-    .run()
+  try {
+    await db
+      .prepare(`UPDATE projects SET updated_at = ? WHERE id = ? AND user_id = ?`)
+      .bind(now, projectId, userId)
+      .run()
+  } catch {
+    /* */
+  }
   return { id, title: t, pinned: false, messageCount: 0, updatedAt: now, createdAt: now }
 }
 

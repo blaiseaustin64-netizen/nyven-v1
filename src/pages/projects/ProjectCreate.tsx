@@ -48,7 +48,7 @@ export function ProjectCreate() {
         setError(result.error || 'Could not create project. Please try again.')
         return
       }
-      navigate(`/projects/${result.project.id}`, { replace: true })
+      navigate(`/projects/${result.project.id}?tab=chat`, { replace: true })
     } catch {
       setError('Could not create project. Please try again.')
     } finally {

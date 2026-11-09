@@ -65,6 +65,8 @@ export function ProjectWorkspace() {
   const [activeChatId, setActiveChatId] = useState<string | null>(search.get('c'))
   const [messages, setMessages] = useState<Message[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
+  const [chatBusy, setChatBusy] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const [instrDraft, setInstrDraft] = useState('')
   const [nameDraft, setNameDraft] = useState('')
@@ -129,6 +131,7 @@ export function ProjectWorkspace() {
 
   const openChat = (id: string) => {
     setActiveChatId(id)
+    setActionError(null)
     const next = new URLSearchParams(search)
     next.set('tab', 'chat')
     next.set('c', id)
@@ -136,11 +139,29 @@ export function ProjectWorkspace() {
   }
 
   const handleNewChat = async () => {
-    if (!projectId) return
-    const chat = await createProjectChat(projectId)
-    if (chat) {
-      setChats((prev) => [chat, ...prev])
-      openChat(chat.id)
+    if (!projectId || projectId === 'new') {
+      setActionError('Invalid project.')
+      return
+    }
+    if (chatBusy) return
+    setChatBusy(true)
+    setActionError(null)
+    // Always switch to chat tab so the user sees progress / errors
+    const next = new URLSearchParams(search)
+    next.set('tab', 'chat')
+    setSearch(next, { replace: true })
+    try {
+      const result = await createProjectChat(projectId)
+      if (!result.chat) {
+        setActionError(result.error || 'Could not start project chat. Please try again.')
+        return
+      }
+      setChats((prev) => [result.chat!, ...prev.filter((c) => c.id !== result.chat!.id)])
+      openChat(result.chat.id)
+    } catch {
+      setActionError('Could not start project chat. Please try again.')
+    } finally {
+      setChatBusy(false)
     }
   }
 
@@ -336,6 +357,11 @@ export function ProjectWorkspace() {
     )
   }
 
+  if (projectId === 'new') {
+    navigate('/projects/new', { replace: true })
+    return null
+  }
+
   if (error || !project) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-3 p-6">
@@ -491,14 +517,19 @@ export function ProjectWorkspace() {
 
             <button
               type="button"
+              disabled={chatBusy}
               onClick={() => {
-                setTab('chat')
-                if (!activeChatId && chats[0]) openChat(chats[0].id)
-                else if (!activeChatId) void handleNewChat()
+                if (activeChatId) {
+                  openChat(activeChatId)
+                } else if (chats[0]) {
+                  openChat(chats[0].id)
+                } else {
+                  void handleNewChat()
+                }
               }}
-              className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-nyven-cyan text-nyven-bg text-sm font-medium min-h-[44px]"
+              className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-nyven-cyan text-nyven-bg text-sm font-medium min-h-[44px] disabled:opacity-50"
             >
-              Continue working
+              {chatBusy ? 'Starting…' : activeChatId || chats[0] ? 'Continue working' : 'Start Project Chat'}
             </button>
           </div>
         )}
@@ -512,8 +543,9 @@ export function ProjectWorkspace() {
                 </span>
                 <button
                   type="button"
+                  disabled={chatBusy}
                   onClick={() => void handleNewChat()}
-                  className="p-2 rounded-lg text-nyven-cyan hover:bg-white/[0.05]"
+                  className="p-2 rounded-lg text-nyven-cyan hover:bg-white/[0.05] disabled:opacity-50"
                   aria-label="New project chat"
                 >
                   <Plus size={16} />
@@ -545,13 +577,17 @@ export function ProjectWorkspace() {
             </aside>
             <div className="flex-1 min-h-0 flex flex-col">
               {!activeChatId ? (
-                <div className="flex-1 flex items-center justify-center p-6">
+                <div className="flex-1 flex flex-col items-center justify-center gap-3 p-6">
+                  {actionError && (
+                    <p className="text-sm text-red-300/90 text-center max-w-sm">{actionError}</p>
+                  )}
                   <button
                     type="button"
+                    disabled={chatBusy}
                     onClick={() => void handleNewChat()}
-                    className="px-4 py-2.5 rounded-xl bg-nyven-cyan text-nyven-bg text-sm font-medium min-h-[44px]"
+                    className="px-4 py-2.5 rounded-xl bg-nyven-cyan text-nyven-bg text-sm font-medium min-h-[44px] disabled:opacity-50"
                   >
-                    Start project chat
+                    {chatBusy ? 'Starting…' : 'Start Project Chat'}
                   </button>
                 </div>
               ) : (

@@ -143,15 +143,24 @@ export async function deleteProject(id: string): Promise<boolean> {
 export async function createProjectChat(
   projectId: string,
   title?: string
-): Promise<ProjectChat | null> {
-  const r = await jsonFetch<{ success?: boolean; chat?: ProjectChat }>(
+): Promise<{ chat: ProjectChat | null; error?: string }> {
+  const r = await jsonFetch<{ success?: boolean; chat?: ProjectChat; error?: string; code?: string }>(
     `/api/projects/${projectId}/chats`,
     {
       method: 'POST',
       body: JSON.stringify({ title }),
     }
   )
-  return r.ok && r.data.chat ? r.data.chat : null
+  if (r.status === 401 || r.data?.code === 'UNAUTHORIZED') {
+    return { chat: null, error: 'Please sign in to use Project chat.' }
+  }
+  if ((r.ok || r.status === 201) && r.data?.chat) {
+    return { chat: r.data.chat }
+  }
+  return {
+    chat: null,
+    error: r.data?.error || (r.status === 0 ? 'Network error. Please try again.' : 'Could not start project chat. Please try again.'),
+  }
 }
 
 export async function fetchProjectChats(projectId: string): Promise<ProjectChat[]> {
