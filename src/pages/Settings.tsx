@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
@@ -6,17 +6,11 @@ import {
   Sparkles,
   Mic,
   Shield,
-  Link2,
   BarChart3,
   Monitor,
   Bug,
   ChevronLeft,
   Loader2,
-  Github,
-  Mail,
-  Calendar,
-  Activity,
-  Table2,
 } from 'lucide-react'
 import { useAuth } from '../lib/auth/AuthContext'
 import {
@@ -26,24 +20,12 @@ import {
   type NyvenPreferences,
 } from '../lib/settings/preferences'
 import { fetchUsageSummary, type UsageSummary } from '../lib/settings/usageSummary'
-import { INTEGRATIONS, listConnections } from '../lib/settings/connectionsUi'
-import {
-  GENERIC_STATUS_ERROR,
-  deriveConnectionView,
-  type ConnectionStatusResponse,
-} from '../lib/code/codeState'
-import {
-  startGitHubOAuth,
-  disconnectGitHub,
-  fetchGitHubStatus,
-} from '../lib/connectors/githubApi'
 import {
   listMemories,
   deleteMemory,
   setMemoryEnabled,
 } from '../lib/memoryStore'
 import type { MemoryItem } from '../lib/memoryStore'
-import type { ConnectionPublicRow } from '../lib/settings/connectionsUi'
 import { setVoicePreferences } from '../lib/voice/preferences'
 import { VoiceSpeechSettings } from '../components/voice/VoiceSpeechSettings'
 import { resolveFishVoiceId } from '../lib/voice/catalog'
@@ -53,7 +35,6 @@ type Section =
   | 'ai'
   | 'voice'
   | 'privacy'
-  | 'connections'
   | 'usage'
   | 'sessions'
   | 'support'
@@ -63,7 +44,6 @@ const sections: { id: Section; label: string; icon: typeof User }[] = [
   { id: 'ai', label: 'AI', icon: Sparkles },
   { id: 'voice', label: 'Voice', icon: Mic },
   { id: 'privacy', label: 'Privacy & Security', icon: Shield },
-  { id: 'connections', label: 'Connected services', icon: Link2 },
   { id: 'usage', label: 'Usage', icon: BarChart3 },
   { id: 'sessions', label: 'Sessions', icon: Monitor },
   { id: 'support', label: 'Report a Bug', icon: Bug },
@@ -85,33 +65,9 @@ export function Settings() {
   const [params, setParams] = useSearchParams()
   const routeParams = useParams<{ section?: string }>()
   const navigate = useNavigate()
-  // Declared before githubView reads them: the memo's deps array is evaluated during render.
-  const [githubStatus, setGithubStatus] = useState<ConnectionStatusResponse | null>(null)
-  const [githubStatusError, setGithubStatusError] = useState<string | null>(null)
-
-  const loadGithubStatus = useCallback(async () => {
-    try {
-      setGithubStatus((await fetchGitHubStatus()) as ConnectionStatusResponse)
-      setGithubStatusError(null)
-    } catch {
-      setGithubStatusError(GENERIC_STATUS_ERROR)
-    }
-  }, [])
-
-  // Same derivation as NYVEN Code, so both pages always show the same GitHub state.
-  const githubView = useMemo(
-    () =>
-      deriveConnectionView({
-        authLoading,
-        supabaseConfigured: configured,
-        signedIn: !!userId,
-        status: githubStatus,
-        statusError: githubStatusError,
-        allowPreAccountConnectors: true,
-      }),
-    [authLoading, configured, userId, githubStatus, githubStatusError]
-  )
-  const active = ((routeParams.section || params.get('section') || 'account') as Section)
+  const rawSection = (routeParams.section || params.get('section') || 'account') as string
+  // Connected services temporarily removed — redirect old links to account.
+  const active = (rawSection === 'connections' ? 'account' : rawSection) as Section
   const setActive = (s: Section) => {
     // Prefer path segments so mobile Back works
     navigate(`/settings/${s}`)
@@ -125,9 +81,6 @@ export function Settings() {
   const [toast, setToast] = useState<string | null>(null)
   const [usage, setUsage] = useState<UsageSummary | null>(null)
   const [memories, setMemories] = useState<MemoryItem[]>([])
-  const [connections, setConnections] = useState<ConnectionPublicRow[]>([])
-  const [githubBusy, setGithubBusy] = useState(false)
-  const [githubMsg, setGithubMsg] = useState<string | null>(null)
   const [displayName, setDisplayName] = useState('')
   const [password, setPassword] = useState('')
   const [password2, setPassword2] = useState('')
@@ -165,20 +118,7 @@ export function Settings() {
     if (active === 'privacy' && userId) {
       void listMemories(userId, { includeDisabled: true }).then(setMemories)
     }
-    if (active === 'connections') {
-      void loadGithubStatus()
-      if (userId) void listConnections(userId).then(setConnections)
-    }
-    // OAuth return banners
-    if (active === 'connections') {
-      const gh = params.get('github')
-      if (gh === 'connected') setGithubMsg('GitHub connected successfully.')
-      if (gh === 'error') {
-        const reason = params.get('reason') || 'unknown'
-        setGithubMsg(`GitHub connection failed (${reason}).`)
-      }
-    }
-  }, [active, userId, params, loadGithubStatus])
+  }, [active, userId])
 
   const persistPrefs = useCallback(
     async (next: NyvenPreferences) => {
@@ -271,7 +211,6 @@ export function Settings() {
     ai: { label: 'AI', hint: 'Response style and memory' },
     voice: { label: 'Voice', hint: 'Speech and voice options' },
     privacy: { label: 'Privacy & Security', hint: 'Memories and data' },
-    connections: { label: 'Connected services', hint: 'GitHub and more' },
     usage: { label: 'Usage', hint: 'Limits and daily allowance' },
     sessions: { label: 'Sessions', hint: 'This device' },
     support: { label: 'Report a Bug', hint: 'Send feedback to the team' },
@@ -279,7 +218,7 @@ export function Settings() {
 
   const mobileGroups: { title: string; ids: Section[] }[] = [
     { title: 'You', ids: ['account'] },
-    { title: 'Experience', ids: ['ai', 'voice', 'connections'] },
+    { title: 'Experience', ids: ['ai', 'voice'] },
     { title: 'Data', ids: ['privacy', 'usage', 'sessions'] },
     { title: 'Help', ids: ['support'] },
   ]
@@ -719,173 +658,6 @@ export function Settings() {
                     </p>
                   )}
                 </Card>
-              </>
-            )}
-
-            {/* ── Connections ── */}
-            {active === 'connections' && (
-              <>
-                <SectionTitle
-                  title="Connected services"
-                  desc="Connector foundation for future agents. Status is real — never faked."
-                />
-                <Card>
-                  <p className="text-sm text-nyven-text-secondary">
-                    Connect your GitHub account to let NYVEN Code read your repositories, issues and
-                    pull requests. NYVEN never stores your password and only requests read access.
-                  </p>
-                </Card>
-                {INTEGRATIONS.map((integ) => {
-                  const row = connections.find((c) => c.provider === integ.id)
-                  const isGithub = integ.id === 'github'
-                  const status = isGithub
-                    ? githubView.kind === 'connected'
-                      ? 'connected'
-                      : githubView.kind === 'unconfigured'
-                        ? 'unconfigured'
-                        : githubView.kind === 'unavailable'
-                          ? 'error'
-                          : 'disconnected'
-                    : row?.status || 'disconnected'
-                  const label = !integ.oauthReady
-                    ? 'Coming soon'
-                    : status === 'connected'
-                      ? 'Connected'
-                      : status === 'unconfigured'
-                        ? 'Not configured on server'
-                        : status === 'error' || status === 'expired'
-                          ? 'Connection needs attention'
-                          : status === 'pending'
-                            ? 'Connecting…'
-                            : 'Not connected'
-                  const Icon =
-                    integ.iconKey === 'github'
-                      ? Github
-                      : integ.iconKey === 'mail'
-                        ? Mail
-                        : integ.iconKey === 'calendar'
-                          ? Calendar
-                          : integ.iconKey === 'activity'
-                            ? Activity
-                            : integ.iconKey === 'table'
-                              ? Table2
-                              : Link2
-                  return (
-                    <Card key={integ.id}>
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-start gap-3 min-w-0">
-                          <div className="mt-0.5 p-2 rounded-xl bg-white/[0.04] border border-white/[0.06] shrink-0">
-                            <Icon size={16} className="text-nyven-cyan" />
-                          </div>
-                          <div className="min-w-0">
-                            <h3 className="text-sm font-medium">{integ.name}</h3>
-                            <p className="text-xs text-nyven-text-secondary mt-1 leading-relaxed">
-                              {integ.description}
-                            </p>
-                            {integ.permissionSummary?.length > 0 && (
-                              <ul className="mt-2 space-y-0.5">
-                                {integ.permissionSummary.slice(0, 3).map((p) => (
-                                  <li
-                                    key={p}
-                                    className="text-[11px] text-nyven-text-secondary/80 flex gap-1.5"
-                                  >
-                                    <Shield size={10} className="mt-0.5 shrink-0 opacity-70" />
-                                    <span>{p}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                            )}
-                            {(isGithub ? githubView.kind === 'connected' : !!row?.account_label && status === 'connected') && (
-                              <p className="text-[11px] text-nyven-text-secondary mt-2">
-                                {isGithub && githubView.kind === 'connected' ? githubView.account : row?.account_label}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                        <span
-                          className={
-                            'text-[10px] uppercase tracking-wider px-2 py-1 rounded-lg shrink-0 ' +
-                            (label === 'Connected'
-                              ? 'bg-emerald-400/10 text-emerald-400'
-                              : label === 'Coming soon'
-                                ? 'bg-white/[0.04] text-nyven-text-secondary'
-                                : label.includes('attention')
-                                  ? 'bg-red-400/10 text-red-300'
-                                  : 'bg-white/[0.04] text-nyven-text-secondary')
-                          }
-                        >
-                          {label}
-                        </span>
-                      </div>
-                      {!integ.oauthReady && (
-                        <p className="text-xs text-nyven-text-secondary mt-3 pt-2 border-t border-white/[0.04]">
-                          Connect path not implemented yet. Secure token storage and OAuth
-                          will be added before this can show Connected.
-                        </p>
-                      )}
-                      {integ.id === 'github' && integ.oauthReady && githubView.kind === 'unconfigured' && (
-                        <p className="text-xs text-nyven-text-secondary mt-3 pt-2 border-t border-white/[0.04]">
-                          {githubView.message}
-                        </p>
-                      )}
-                      {integ.id === 'github' && integ.oauthReady && githubView.kind !== 'unconfigured' && (
-                        <div className="mt-3 pt-2 border-t border-white/[0.04] space-y-2">
-                          {githubMsg && (
-                            <p className="text-xs text-nyven-text-secondary">{githubMsg}</p>
-                          )}
-                          <div className="flex flex-wrap gap-2">
-                            {status !== 'connected' ? (
-                              <button
-                                type="button"
-                                disabled={githubBusy || githubView.kind === 'loading'}
-                                onClick={() => {
-                                  setGithubBusy(true)
-                                  setGithubMsg(null)
-                                  void startGitHubOAuth('/settings?section=connections')
-                                    .then(({ authorizeUrl }) => {
-                                      window.location.href = authorizeUrl
-                                    })
-                                    .catch((e: Error) => {
-                                      setGithubMsg(e.message)
-                                      setGithubBusy(false)
-                                    })
-                                }}
-                                className="px-3 py-2 rounded-xl text-xs font-medium bg-nyven-cyan text-nyven-bg disabled:opacity-50 min-h-[40px]"
-                              >
-                                {githubBusy ? 'Starting…' : 'Connect GitHub'}
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                disabled={githubBusy}
-                                onClick={() => {
-                                  setGithubBusy(true)
-                                  void disconnectGitHub()
-                                    .then(() => {
-                                      setGithubMsg('GitHub disconnected.')
-                                      void loadGithubStatus()
-                                      if (userId) return listConnections(userId).then(setConnections)
-                                    })
-                                    .catch((e: Error) => setGithubMsg(e.message))
-                                    .finally(() => setGithubBusy(false))
-                                }}
-                                className="px-3 py-2 rounded-xl text-xs border border-white/[0.1] text-nyven-text-secondary min-h-[40px]"
-                              >
-                                Disconnect
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                      {integ.oauthReady && integ.id !== 'github' && status !== 'connected' && (
-                        <p className="text-xs text-nyven-text-secondary mt-3 pt-2 border-t border-white/[0.04]">
-                          Connect is available when the OAuth flow is enabled for your
-                          account.
-                        </p>
-                      )}
-                    </Card>
-                  )
-                })}
               </>
             )}
 

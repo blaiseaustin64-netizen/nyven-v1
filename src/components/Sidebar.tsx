@@ -4,7 +4,6 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import {
   MessageSquare,
   FolderOpen,
-  Code2,
   Settings,
   Plus,
   Menu,
@@ -28,7 +27,6 @@ import { listProjects } from '../lib/projectStore'
 const mainNav = [
   { to: '/chat', label: 'Chats', icon: MessageSquare },
   { to: '/projects', label: 'Projects', icon: FolderOpen },
-  { to: '/code', label: 'Code', icon: Code2 },
 ]
 
 const GROUP_ORDER = ['Today', 'Yesterday', 'Previous 7 days', 'Older'] as const

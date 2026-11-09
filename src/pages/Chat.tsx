@@ -772,7 +772,6 @@ export function Chat() {
                     { label: 'Ask', path: null, text: 'Explain a concept simply' },
                     { label: 'Build', path: '/build', text: null },
                     { label: 'Create', path: null, text: 'Help me draft something creative' },
-                    { label: 'Code', path: '/code', text: null },
                   ].map((chip) => (
                     <button
                       key={chip.label}

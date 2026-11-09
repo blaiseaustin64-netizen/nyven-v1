@@ -1160,7 +1160,7 @@ export function AgentEditor() {
                 <p className="leading-relaxed">
                   GitHub for NYVEN Code is managed in the dedicated NYVEN Code workspace, where you connect, browse repositories, and review issues and pull requests.
                 </p>
-                <a href="/code" className="inline-flex items-center gap-1.5 text-nyven-cyan hover:text-nyven-cyan/80 font-medium">
+                <a href="/projects" className="inline-flex items-center gap-1.5 text-nyven-cyan hover:text-nyven-cyan/80 font-medium">
                   Open NYVEN Code
                 </a>
               </div>

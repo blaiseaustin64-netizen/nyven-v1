@@ -2,14 +2,13 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth/AuthContext'
 import { motion } from 'framer-motion'
-import { MessageSquare, Hammer, Sparkles, Code2, ArrowRight } from 'lucide-react'
+import { MessageSquare, Hammer, Sparkles, ArrowRight } from 'lucide-react'
 import wordmark from '../assets/nyven-wordmark.png'
 
 const quickActions = [
   { id: 'ask', label: 'Ask', icon: MessageSquare, path: '/chat', prompt: '' },
   { id: 'build', label: 'Build', icon: Hammer, path: '/build', prompt: '' },
   { id: 'create', label: 'Create', icon: Sparkles, path: '/chat', prompt: 'Help me create something new' },
-  { id: 'code', label: 'Code', icon: Code2, path: '/code', prompt: '' },
 ]
 
 export function Home() {

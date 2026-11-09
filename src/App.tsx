@@ -15,7 +15,6 @@ import { Profile } from './pages/Profile'
 import { Preview } from './pages/Preview'
 import { Agents } from './pages/Agents'
 import { AgentEditor } from './pages/AgentEditor'
-import { Code } from './pages/Code'
 import { Auth } from './pages/Auth'
 import { AuthProvider } from './lib/auth/AuthContext'
 import { ConversationHistoryProvider } from './lib/chat/ConversationHistoryContext'
@@ -25,7 +24,7 @@ const INTRO_KEY = 'nyven_intro_seen'
 /** NYVEN Code has its own workspace; the generic Create Agent form redirects it there. */
 function CreateAgentRoute() {
   const [params] = useSearchParams()
-  if (params.get('type') === 'code') return <Navigate to="/code" replace />
+  if (params.get('type') === 'code') return <Navigate to="/projects" replace />
   return <AgentEditor />
 }
 
@@ -140,7 +139,7 @@ export default function App() {
             <Route path="/projects" element={<Projects />} />
             <Route path="/agents" element={<Agents />} />
             <Route path="/agents/create" element={<CreateAgentRoute />} />
-            <Route path="/code" element={<Code />} />
+            <Route path="/code" element={<Navigate to="/chat" replace />} />
             <Route path="/agents/:id" element={<AgentEditor />} />
             <Route path="/nyven-plus" element={<NyvenPlus />} />
             <Route path="/settings" element={<Settings />} />

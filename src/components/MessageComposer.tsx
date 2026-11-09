@@ -622,7 +622,7 @@ export function MessageComposer({
                     icon: Code2,
                     onClick: () => {
                       closeMenu()
-                      navigate('/code')
+                      navigate('/chat')
                     },
                   },
                   {

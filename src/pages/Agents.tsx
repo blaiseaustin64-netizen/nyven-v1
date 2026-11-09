@@ -256,7 +256,7 @@ export function Agents() {
                     </div>
                     <button
                       onClick={() =>
-                        navigate(type.id === 'code' ? '/code' : `/agents/create?type=${type.id}`)
+                        navigate(type.id === 'code' ? '/projects' : `/agents/create?type=${type.id}`)
                       }
                       className="mt-4 inline-flex items-center gap-1.5 text-sm text-nyven-cyan hover:text-nyven-cyan/80 font-medium transition-colors"
                     >
