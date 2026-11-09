@@ -1,3 +1,4 @@
+import { clearFileCacheForUser } from '../attachments/fileCache'
 import {
   createContext,
   useCallback,
@@ -130,6 +131,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     try {
+      const uid = user?.id
+      if (uid) void clearFileCacheForUser(uid)
       await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
     } catch {
       /* ignore */

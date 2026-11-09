@@ -1,9 +1,11 @@
 import { ChevronDown, Menu } from 'lucide-react'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useLocation } from 'react-router-dom'
-import { ChatMessage } from '../components/ChatMessage'
+import { ChatThread } from '../components/chat/ChatThread'
 import { MessageComposer, type ComposerSendPayload } from '../components/MessageComposer'
 import { NIdentity } from '../components/NIdentity'
+import { useHideOnScroll } from '../hooks/useHideOnScroll'
+import { useChatScroll } from '../hooks/useChatScroll'
 import { VoiceChatScreen } from '../components/voice/VoiceChatScreen'
 import type { Message, Conversation } from '../lib/types'
 import { streamCoreChat } from '../lib/core/streamClient'
@@ -17,7 +19,7 @@ import {
   ensureConversation,
   persistMessage,
 } from '../lib/chatPersistence'
-import { buildMemoryContext } from '../lib/memoryStore'
+import { extractMemoriesFromExchange } from '../lib/memoryStore'
 import { recordUsage } from '../lib/usageTracking'
 
 
@@ -96,30 +98,25 @@ export function Chat() {
   /** Voice-originated turn — ref so stream onDone sees the real flag */
   const fromVoiceRef = useRef(false)
   const voiceSubmitInFlightRef = useRef(false)
-  const stickToBottomRef = useRef(true)
-  const [showJumpLatest, setShowJumpLatest] = useState(false)
   const [composerPad, setComposerPad] = useState(96)
+  const [memoryChip, setMemoryChip] = useState<{ ids: string[] } | null>(null)
   const composerWrapRef = useRef<HTMLDivElement>(null)
-  const bottomRef = useRef<HTMLDivElement>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
   const streamMsgIdRef = useRef<string | null>(null)
   const tokenBufferRef = useRef('')
   const streamContentRef = useRef('')
   const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  const scrollToBottom = useCallback((force = false, smooth = false) => {
-    if (!force && !stickToBottomRef.current) return
-    bottomRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' })
-    setShowJumpLatest(false)
-  }, [])
-
-  const onChatScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    const el = e.currentTarget
-    const dist = el.scrollHeight - el.scrollTop - el.clientHeight
-    const nearBottom = dist < 120
-    stickToBottomRef.current = nearBottom
-    setShowJumpLatest(!nearBottom && el.scrollHeight > el.clientHeight + 40)
-  }, [])
+  const chatScroll = useChatScroll()
+  const {
+    stickToBottomRef,
+    showJumpLatest,
+    setShowJumpLatest,
+    bottomRef,
+    scrollRef,
+    scrollToBottom,
+    onChatScroll,
+  } = chatScroll
+  const hideHeader = useHideOnScroll(24)
 
 
   useEffect(() => {
@@ -407,10 +404,7 @@ export function Chat() {
     try {
       // Auth: the HttpOnly `nyven_session` cookie is sent automatically by
       // streamCoreChat (credentials: 'include'); no client-side token is needed.
-      const memoryCtx = await buildMemoryContext(userId)
-      const coreMessage = [memoryCtx, text || 'Please analyze the attached content.']
-        .filter(Boolean)
-        .join('\n\n')
+      const coreMessage = text || 'Please analyze the attached content.'
       await streamCoreChat(
         {
           message: coreMessage,
@@ -524,6 +518,13 @@ export function Chat() {
             fromVoiceRef.current = false
             voiceSubmitInFlightRef.current = false
             setFromVoice(false)
+            // Background memory extract (never blocks the reply)
+            const spokenForMem = streamContentRef.current
+            void extractMemoriesFromExchange(userId, text, spokenForMem, {
+              conversationId: activeIdRef.current,
+            }).then((r) => {
+              if (r.count > 0) setMemoryChip({ ids: r.ids })
+            })
           },
           onError: (_code, message) => {
             sawError = true
@@ -744,7 +745,11 @@ export function Chat() {
       {/* Main chat area */}
       <div className="flex-1 flex flex-col min-w-0 min-h-0 max-w-full relative">
         {/* Mobile chat top bar — hamburger only, title when chat has messages */}
-        <header className="lg:hidden flex items-center gap-2 px-2 h-12 shrink-0 bg-transparent">
+        <header
+          className={`lg:hidden flex items-center gap-2 px-2 h-12 shrink-0 bg-transparent transition-transform duration-200 ${
+            hideHeader.hidden ? '-translate-y-full opacity-0 pointer-events-none' : ''
+          }`}
+        >
           <button
             type="button"
             onClick={() => window.dispatchEvent(new Event('nyven-open-menu'))}
@@ -759,7 +764,7 @@ export function Chat() {
             </h1>
           )}
         </header>
-        <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 sm:px-6 py-6 min-h-0 min-w-0" style={{ paddingBottom: composerPad }} onScroll={onChatScroll}>
+        <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 sm:px-6 py-6 min-h-0 min-w-0" style={{ paddingBottom: composerPad }} onScroll={(e) => { onChatScroll(e); hideHeader.onScroll(e) }}>
           <div className="max-w-3xl mx-auto space-y-6">
             {messages.length === 0 && (
               <div className="flex flex-col items-center justify-center min-h-[50vh] py-16 sm:py-24 text-center px-4">
@@ -790,67 +795,50 @@ export function Chat() {
               </div>
             )}
 
-            {messages.map((msg, idx) => (
-              <ChatMessage
-                key={msg.id}
-                message={msg}
-                conversationId={activeId}
-                isLast={
-                  idx === messages.length - 1 &&
-                  msg.role === 'nyven' &&
-                  !msg.isThinking &&
-                  !msg.isStreaming
-                }
-                onRegenerate={
-                  idx === messages.length - 1 &&
-                  msg.role === 'nyven' &&
-                  !msg.isStreaming
-                    ? handleRegenerate
-                    : undefined
-                }
-                onFeedback={
-                  msg.role === 'nyven' && !msg.isStreaming && !msg.isThinking
-                    ? submitFeedback
-                    : undefined
-                }
-                onReadAloud={
-                  msg.role === 'nyven' && !msg.isStreaming && !msg.isThinking
-                    ? handleReadAloud
-                    : undefined
-                }
+            {messages.length > 0 && (
+              <ChatThread
+                messages={messages}
+                isGenerating={isGenerating}
+                onFeedback={(id, value) => {
+                  void submitFeedback(id, value)
+                }}
+                onReadAloud={(id, content) => void handleReadAloud(id, content)}
                 onStopReadAloud={stopReadAloud}
-                isReadingAloud={
-                  readingMessageId === msg.id && !readAloudLoading
-                }
-                isReadAloudLoading={
-                  readingMessageId === msg.id && readAloudLoading
-                }
+                readingMessageId={readingMessageId}
+                readAloudLoading={readAloudLoading}
+                onRegenerate={handleRegenerate}
+                className="contents"
               />
-            ))}
-            
-            {messages.length > 0 &&
-              messages[messages.length - 1]?.role === 'nyven' &&
-              messages[messages.length - 1]?.activityState === 'error' &&
-              !isGenerating && (
-                <div className="flex flex-col items-center gap-2 py-2">
-                  <p className="text-sm text-nyven-text-secondary text-center">
-                    Something went wrong while generating the response.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => void handleRegenerate()}
-                    className="min-h-[44px] px-4 py-2 rounded-xl bg-nyven-surface border border-white/10 text-sm font-medium text-nyven-text hover:border-nyven-cyan/40"
-                  >
-                    Retry
-                  </button>
-                </div>
-              )}
+            )}
 
             <div ref={bottomRef} />
           </div>
         </div>
 
         {/* Dictation wave lives on the composer mic (MicWaveCircle). Full Liquid Voice is Voice Chat only. */}
+        {memoryChip && (
+          <div className="flex justify-center py-1">
+            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-xs">
+              Memory updated
+              <button
+                type="button"
+                className="underline text-nyven-cyan"
+                onClick={() => {
+                  const ids = memoryChip.ids
+                  setMemoryChip(null)
+                  for (const id of ids) {
+                    void fetch(`/api/memories?id=${encodeURIComponent(id)}`, {
+                      method: 'DELETE',
+                      credentials: 'include',
+                    })
+                  }
+                }}
+              >
+                Undo
+              </button>
+            </span>
+          </div>
+        )}
         {voiceError && !voiceChatOpen && (
           <p className="text-center text-xs text-red-300 px-4 py-1 max-w-xl mx-auto">{voiceError}</p>
         )}

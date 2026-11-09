@@ -2,7 +2,8 @@ import { optionsResponse, jsonWithCors } from '../../../_shared/cors'
 import type { D1Database } from '../../../_shared/db/types'
 import { resolveSessionUser } from '../../../_shared/auth/service'
 import { assertProjectOwner, ensureProjectsSchema } from '../../../_shared/projects/service'
-import { ATTACHMENT_LIMITS, extensionOf, kindForMime, resolveMime } from '../../../_shared/attachmentLimits'
+import { ATTACHMENT_LIMITS, kindForMime, resolveMime } from '../../../_shared/attachmentLimits'
+import { processFileBytes } from '../../../_shared/attachmentProcess'
 
 interface Env {
   DB?: D1Database
@@ -31,22 +32,42 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, params })
     return jsonWithCors(request, env, { success: false, code: 'NOT_FOUND', error: 'Project not found' }, 404)
   }
   try {
-    const rows = await env.DB
-      .prepare(
-        `SELECT id, name, mime_type, size_bytes, kind, created_at, storage_key, r2_key
-         FROM project_files WHERE project_id = ? AND user_id = ? ORDER BY created_at DESC`
-      )
-      .bind(projectId, user.id)
-      .all()
-    const files = (rows.results || []).map((r: any) => ({
-      id: r.id,
-      name: r.name,
-      mimeType: r.mime_type,
-      size: Number(r.size_bytes || 0),
-      kind: r.kind || 'document',
-      createdAt: r.created_at,
-      stored: Boolean(r.r2_key || r.storage_key),
-    }))
+    let rows
+    try {
+      rows = await env.DB
+        .prepare(
+          `SELECT id, name, mime_type, size_bytes, kind, created_at, storage_key, r2_key
+           FROM project_files WHERE project_id = ? AND user_id = ? ORDER BY created_at DESC`
+        )
+        .bind(projectId, user.id)
+        .all()
+    } catch {
+      rows = await env.DB
+        .prepare(
+          `SELECT id, name, mime_type, size_bytes, created_at, storage_key, metadata_json
+           FROM project_files WHERE project_id = ? AND user_id = ? ORDER BY created_at DESC`
+        )
+        .bind(projectId, user.id)
+        .all()
+    }
+    const files = (rows.results || []).map((r: any) => {
+      let kind = r.kind || 'document'
+      if (!r.kind && r.metadata_json) {
+        try {
+          const m = JSON.parse(r.metadata_json)
+          if (m.kind) kind = m.kind
+        } catch { /* */ }
+      }
+      return {
+        id: r.id,
+        name: r.name,
+        mimeType: r.mime_type,
+        size: Number(r.size_bytes || 0),
+        kind,
+        createdAt: r.created_at,
+        stored: Boolean(r.r2_key || r.storage_key),
+      }
+    })
     return jsonWithCors(request, env, {
       success: true,
       files,
@@ -54,7 +75,17 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, params })
     })
   } catch (e) {
     console.error('list project files', e instanceof Error ? e.message : e)
-    return jsonWithCors(request, env, { success: true, files: [], durableStorage: Boolean(env.PROJECT_FILES) })
+    return jsonWithCors(
+      request,
+      env,
+      {
+        success: false,
+        error: 'Could not list project files.',
+        files: [],
+        durableStorage: Boolean(env.PROJECT_FILES),
+      },
+      500
+    )
   }
 }
 
@@ -88,14 +119,22 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
 
   const id = crypto.randomUUID()
   const now = new Date().toISOString()
-  const kind = kindForMime(mime)
-  let extractedText = ''
+  const clientExtracted = String(form.get('extractedText') || '').slice(0, ATTACHMENT_LIMITS.MAX_EXTRACTED_TEXT_CHARS)
+  const buffer = await file.arrayBuffer()
+  const processed = processFileBytes(file.name, file.type, buffer)
+  const kind =
+    processed.ok ? processed.attachment.kind : kindForMime(mime)
+  let extractedText =
+    clientExtracted ||
+    (processed.ok ? processed.attachment.extractedText || '' : '')
   let r2Key: string | null = null
 
-  // Extract text for text-like types
-  if (kind === 'text' || mime.startsWith('text/') || mime === 'application/json') {
+  // Fallback plain text read when processor returned nothing
+  if (!extractedText && (kind === 'text' || mime.startsWith('text/') || mime === 'application/json')) {
     try {
-      extractedText = (await file.text()).slice(0, ATTACHMENT_LIMITS.MAX_EXTRACTED_TEXT_CHARS)
+      extractedText = new TextDecoder('utf-8', { fatal: false })
+        .decode(new Uint8Array(buffer))
+        .slice(0, ATTACHMENT_LIMITS.MAX_EXTRACTED_TEXT_CHARS)
     } catch {
       /* */
     }
@@ -104,7 +143,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
   if (env.PROJECT_FILES) {
     try {
       r2Key = `projects/${user.id}/${projectId}/${id}/${file.name}`
-      await env.PROJECT_FILES.put(r2Key, await file.arrayBuffer(), {
+      await env.PROJECT_FILES.put(r2Key, buffer, {
         httpMetadata: { contentType: mime },
       })
     } catch (e) {

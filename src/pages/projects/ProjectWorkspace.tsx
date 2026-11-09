@@ -28,14 +28,20 @@ import {
   type ProjectTask,
 } from '../../lib/aiProjects/api'
 import { MessageComposer, type ComposerSendPayload } from '../../components/MessageComposer'
-import { ChatMessage } from '../../components/ChatMessage'
+import { ChatThread } from '../../components/chat/ChatThread'
 import { streamCoreChat } from '../../lib/core/streamClient'
 import type { Message } from '../../lib/types'
 import type { ActivityState } from '../../lib/core/types'
 import { useKeyboardOpen } from '../../hooks/useKeyboardOpen'
+import { useChatScroll } from '../../hooks/useChatScroll'
+import { useHideOnScroll } from '../../hooks/useHideOnScroll'
+import { extractAttachmentFile } from '../../lib/attachments/extract'
+import { cacheAttachmentBlob } from '../../lib/attachments/fileCache'
 import { useComposerVoice } from '../../hooks/useComposerVoice'
 import { VoiceChatScreen } from '../../components/voice/VoiceChatScreen'
-import { buildMemoryContext } from '../../lib/memoryStore'
+import { extractMemoriesFromExchange } from '../../lib/memoryStore'
+import { AttachmentCard } from '../../components/attachments/AttachmentCard'
+import { AttachmentViewer } from '../../components/attachments/AttachmentViewer'
 
 type Tab = 'chat' | 'files' | 'details'
 
@@ -92,7 +98,9 @@ export function ProjectWorkspace() {
   const [deleteConfirm, setDeleteConfirm] = useState('')
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const [fileSheetOpen, setFileSheetOpen] = useState(false)
-  const [uploadBusy, setUploadBusy] = useState(false)
+  const [busyKind, setBusyKind] = useState<'photos' | 'files' | 'zip' | null>(null)
+  const [viewerItem, setViewerItem] = useState<import('../../components/attachments/AttachmentCard').AttachmentCardData | null>(null)
+
   const [activityOpen, setActivityOpen] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -100,6 +108,11 @@ export function ProjectWorkspace() {
   const acceptRef = useRef('image/*,.pdf,.txt,.md,.json,.csv,.docx,.xlsx,.zip')
 
   const voice = useComposerVoice({ isGenerating })
+  const chatScroll = useChatScroll()
+  const hideHeader = useHideOnScroll(24)
+  const [readingMessageId, setReadingMessageId] = useState<string | null>(null)
+  const [readAloudLoading, setReadAloudLoading] = useState(false)
+
 
   const reload = useCallback(async () => {
     if (!projectId || !user?.id || projectId === 'new') return
@@ -186,8 +199,8 @@ export function ProjectWorkspace() {
   }, [tab, loadFiles])
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, isGenerating])
+    chatScroll.scrollToBottom()
+  }, [messages.length, isGenerating, chatScroll])
 
   const handleSend = useCallback(
     async (payload: ComposerSendPayload, opts?: { fromVoice?: boolean }) => {
@@ -201,6 +214,16 @@ export function ProjectWorkspace() {
         role: 'user',
         content: text || 'Attachment',
         timestamp: Date.now(),
+        attachments: attachments.map((a) => ({
+          id: a.id,
+          name: a.name,
+          mimeType: a.mimeType,
+          size: a.size,
+          kind: a.kind,
+          previewDataUrl: a.previewUrl || (a.inlineBase64 && a.mimeType?.startsWith('image/')
+            ? `data:${a.mimeType};base64,${a.inlineBase64}`
+            : undefined),
+        })),
       }
       const streamId = crypto.randomUUID()
       const streamMsg: Message = {
@@ -225,6 +248,31 @@ export function ProjectWorkspace() {
       abortRef.current = controller
 
       const title = project?.name || project?.title || 'Project'
+      // Save chat attachments into project Files (best-effort)
+      for (const a of attachments) {
+        if (!a.file && !a.extractedText) continue
+        try {
+          const form = new FormData()
+          if (a.file) {
+            form.append('file', a.file, a.name)
+          } else if (a.extractedText) {
+            form.append(
+              'file',
+              new File([a.extractedText], a.name.endsWith('.txt') ? a.name : `${a.name}.txt`, {
+                type: 'text/plain',
+              })
+            )
+          }
+          await fetch(`/api/projects/${projectId}/files`, {
+            method: 'POST',
+            credentials: 'include',
+            body: form,
+          })
+        } catch {
+          /* */
+        }
+      }
+
       try {
         await fetch(`/api/conversations/${thread.id}`, {
           method: 'PUT',
@@ -254,7 +302,6 @@ export function ProjectWorkspace() {
 
       let full = ''
       try {
-        const memoryCtx = await buildMemoryContext(user?.id ?? null)
         await streamCoreChat(
           {
             message: text || 'Please analyze the attached content.',
@@ -264,7 +311,6 @@ export function ProjectWorkspace() {
             metadata: {
               projectId,
               conversationId: thread.id,
-              memoryContext: memoryCtx || undefined,
             },
           },
           {
@@ -323,6 +369,10 @@ export function ProjectWorkspace() {
               } else {
                 voice.markVoiceSubmitDone()
               }
+              void extractMemoriesFromExchange(user?.id ?? null, text, full, {
+                projectId,
+                conversationId: thread.id,
+              })
             },
             onError: (_code, message) => {
               setMessages((prev) =>
@@ -392,13 +442,17 @@ export function ProjectWorkspace() {
     }
   }
 
-  const uploadProjectFile = async (file: File) => {
+  const uploadProjectFile = async (file: File, kind: 'photos' | 'files' | 'zip') => {
     if (!projectId) return
-    setUploadBusy(true)
+    setBusyKind(kind)
     setActionError(null)
     try {
       const form = new FormData()
       form.append('file', file)
+      try {
+        const extracted = await extractAttachmentFile(file)
+        if (extracted.text) form.append('extractedText', extracted.text)
+      } catch { /* */ }
       const res = await fetch(`/api/projects/${projectId}/files`, {
         method: 'POST',
         credentials: 'include',
@@ -406,16 +460,23 @@ export function ProjectWorkspace() {
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok || !data.success) {
-        setActionError(data.error || 'Could not upload file.')
+        setActionError(data.error || 'Could not upload file. Please try again.')
       } else {
         if (data.note) setDurableStorage(false)
+        setFileSheetOpen(false)
+        if (data.file?.id) {
+          void cacheAttachmentBlob(data.file.id, file, {
+            name: file.name,
+            mime: file.type || 'application/octet-stream',
+            userId: user?.id || 'local',
+          })
+        }
         await loadFiles()
       }
     } catch {
-      setActionError('Could not upload file.')
+      setActionError('Could not upload file. Please try again.')
     } finally {
-      setUploadBusy(false)
-      setFileSheetOpen(false)
+      setBusyKind(null)
     }
   }
 
@@ -465,7 +526,7 @@ export function ProjectWorkspace() {
   return (
     <div className="h-full flex flex-col min-h-0 bg-nyven-bg">
       {/* Mobile-first header — no global hamburger row on this page (App hides MobileNavBar) */}
-      <header className="shrink-0 h-[52px] px-2 sm:px-3 border-b border-white/[0.07] flex items-center gap-1">
+      <header className={clsx("shrink-0 h-[52px] px-2 sm:px-3 flex items-center gap-1 transition-transform duration-200 bg-nyven-bg", hideHeader.hidden && tab === "chat" && "-translate-y-full opacity-0 pointer-events-none")}>
         <button
           type="button"
           onClick={() => navigate('/projects')}
@@ -488,7 +549,7 @@ export function ProjectWorkspace() {
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
         {tab === 'chat' && (
           <>
-            <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4">
+            <div ref={chatScrollRef} onScroll={onChatScroll} className="flex-1 min-h-0 overflow-y-auto px-4 py-4">
               <div className="max-w-3xl mx-auto space-y-4">
                 {messages.length === 0 && (
                   <div className="py-12 text-center">
@@ -500,15 +561,58 @@ export function ProjectWorkspace() {
                   </div>
                 )}
                 {messages.map((m) => (
-                  <ChatMessage key={m.id} message={m} />
+                  <div key={m.id} className="space-y-2">
+                    {m.role === 'user' && m.attachments && m.attachments.length > 0 && (
+                      <div className="flex flex-wrap gap-2 justify-end">
+                        {m.attachments.map((a) => (
+                          <AttachmentCard
+                            key={a.id}
+                            align="right"
+                            item={{
+                              id: a.id,
+                              name: a.name,
+                              mimeType: a.mimeType,
+                              size: a.size,
+                              kind: a.kind,
+                              previewUrl: a.previewDataUrl,
+                            }}
+                            onClick={() =>
+                              setViewerItem({
+                                id: a.id,
+                                name: a.name,
+                                mimeType: a.mimeType,
+                                size: a.size,
+                                kind: a.kind,
+                                previewUrl: a.previewDataUrl,
+                              })
+                            }
+                          />
+                        ))}
+                      </div>
+                    )}
+                    <ChatMessage message={m} />
+                  </div>
                 ))}
                 <div ref={bottomRef} />
+                {showJumpLatest && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      stickToBottomRef.current = true
+                      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+                      setShowJumpLatest(false)
+                    }}
+                    className="sticky bottom-2 mx-auto block px-3 py-1.5 rounded-full bg-white/10 text-xs"
+                  >
+                    Jump to latest
+                  </button>
+                )}
               </div>
             </div>
             {actionError && (
               <p className="px-4 text-xs text-red-300/90 text-center pb-1">{actionError}</p>
             )}
-            <div className="shrink-0 border-t border-white/[0.07] p-2 sm:p-3 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+            <div className="shrink-0 p-2 sm:p-3 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
               <div className="max-w-3xl mx-auto">
                 <MessageComposer
                   onSend={(p) => void handleSend(p)}
@@ -552,28 +656,35 @@ export function ProjectWorkspace() {
                   No files yet. Add photos, documents, or a zip.
                 </div>
               ) : (
-                <ul className="space-y-1">
+                <ul className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                   {files.map((f) => (
-                    <li
-                      key={f.id}
-                      className="flex items-center gap-3 px-3 py-3 rounded-xl border border-white/[0.06] bg-white/[0.02]"
-                    >
-                      <span className="w-10 h-10 rounded-lg bg-white/[0.06] grid place-items-center text-nyven-cyan shrink-0">
-                        {f.kind === 'image' ? <ImageIcon size={18} /> : <File size={18} />}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm truncate">{f.name}</p>
-                        <p className="text-[11px] text-nyven-text-secondary">
-                          {formatSize(f.size)} · {f.mimeType.split('/').pop()}
-                        </p>
-                      </div>
+                    <li key={f.id} className="relative">
+                      <AttachmentCard
+                        item={{
+                          id: f.id,
+                          name: f.name,
+                          mimeType: f.mimeType,
+                          size: f.size,
+                          kind: f.kind,
+                        }}
+                        onClick={() =>
+                          setViewerItem({
+                            id: f.id,
+                            name: f.name,
+                            mimeType: f.mimeType,
+                            size: f.size,
+                            kind: f.kind,
+                          })
+                        }
+                        className="w-full h-[120px]"
+                      />
                       <button
                         type="button"
                         onClick={() => void deleteFile(f.id)}
-                        className="w-10 h-10 grid place-items-center text-nyven-text-secondary hover:text-red-300"
+                        className="absolute top-1 right-1 w-7 h-7 rounded-full bg-black/50 grid place-items-center text-white/80"
                         aria-label={`Delete ${f.name}`}
                       >
-                        <Trash2 size={16} />
+                        <Trash2 size={12} />
                       </button>
                     </li>
                   ))}
@@ -721,7 +832,7 @@ export function ProjectWorkspace() {
 
       {/* Bottom tabs — hide when keyboard is open */}
       {!keyboardOpen && (
-        <nav className="shrink-0 border-t border-white/[0.07] flex pb-[env(safe-area-inset-bottom)] sm:pb-0">
+        <nav className="shrink-0 flex pb-[env(safe-area-inset-bottom)] sm:pb-0">
           {TABS.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
@@ -756,17 +867,20 @@ export function ProjectWorkspace() {
               </button>
             </div>
             <div className="grid grid-cols-3 gap-2">
-              {[
-                { label: 'Photos', accept: 'image/*' },
-                { label: 'Files', accept: '.pdf,.txt,.md,.json,.csv,.docx,.xlsx' },
-                { label: 'Zip', accept: '.zip,application/zip' },
-              ].map((opt) => (
+              {(
+                [
+                  { key: 'photos' as const, label: 'Photos', accept: 'image/*' },
+                  { key: 'files' as const, label: 'Files', accept: '.pdf,.txt,.md,.json,.csv,.docx,.xlsx' },
+                  { key: 'zip' as const, label: 'Zip', accept: '.zip,application/zip' },
+                ] as const
+              ).map((opt) => (
                 <button
-                  key={opt.label}
+                  key={opt.key}
                   type="button"
-                  disabled={uploadBusy}
+                  disabled={busyKind !== null}
                   onClick={() => {
                     acceptRef.current = opt.accept
+                    ;(fileInputRef.current as any).__kind = opt.key
                     requestAnimationFrame(() => {
                       if (fileInputRef.current) {
                         fileInputRef.current.accept = opt.accept
@@ -776,23 +890,43 @@ export function ProjectWorkspace() {
                   }}
                   className="h-24 rounded-2xl border border-white/[0.08] bg-white/[0.03] text-sm disabled:opacity-50"
                 >
-                  {uploadBusy ? '…' : opt.label}
+                  {busyKind === opt.key ? '…' : opt.label}
                 </button>
               ))}
             </div>
+            {actionError && <p className="text-xs text-red-300/90 mt-3 text-center">{actionError}</p>}
             <input
               ref={fileInputRef}
               type="file"
               className="hidden"
               onChange={(e) => {
                 const f = e.target.files?.[0]
+                const kind = ((e.target as any).__kind || 'files') as 'photos' | 'files' | 'zip'
                 e.target.value = ''
-                if (f) void uploadProjectFile(f)
+                if (f) void uploadProjectFile(f, kind)
               }}
             />
           </div>
         </div>
       )}
+
+      <AttachmentViewer
+        open={!!viewerItem}
+        item={viewerItem}
+        onClose={() => setViewerItem(null)}
+        userId={user?.id}
+        onSaveText={(text) => {
+          if (!viewerItem?.id || !projectId) return
+          void fetch(`/api/projects/${projectId}/files/${viewerItem.id}`, {
+            method: 'PUT',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ extractedText: text }),
+          }).then((r) => {
+            if (r.ok) void loadFiles()
+          })
+        }}
+      />
 
       <VoiceChatScreen
         open={voice.voiceChatOpen}

@@ -128,7 +128,7 @@ export default function App() {
       />
 
       <div className="flex-1 flex flex-col min-w-0 min-h-0 relative">
-        {!location.pathname.startsWith('/chat') && !location.pathname.startsWith('/projects') && (
+        {!location.pathname.startsWith('/chat') && !/^\/projects\/[^/]+$/.test(location.pathname) && (
           <MobileNavBar onMenuOpen={() => setMobileMenuOpen(true)} />
         )}
 

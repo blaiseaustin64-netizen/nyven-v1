@@ -1,23 +1,32 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FolderOpen, Plus, Search, MessageSquare, ListTodo, FileText } from 'lucide-react'
+import { FolderOpen, Plus, MoreHorizontal, Share2, Pencil, Copy, Trash2 } from 'lucide-react'
 import { useAuth } from '../lib/auth/AuthContext'
 import {
+  deleteProject,
   fetchProjects,
   formatRelative,
+  updateProject,
   type AiProject,
 } from '../lib/aiProjects/api'
 
-/**
- * NYVEN AI Projects — persistent workspaces (not builder/forge sessionStorage projects).
- */
+type Filter = 'all' | 'active' | 'archived'
+type Sort = 'edited' | 'name' | 'created'
+
 export function Projects() {
   const navigate = useNavigate()
   const { user, loading: authLoading } = useAuth()
   const [projects, setProjects] = useState<AiProject[]>([])
   const [loading, setLoading] = useState(true)
-  const [query, setQuery] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [filter, setFilter] = useState<Filter>('all')
+  const [sort, setSort] = useState<Sort>('edited')
+  const [menuProject, setMenuProject] = useState<AiProject | null>(null)
+  const [editProject, setEditProject] = useState<AiProject | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editDesc, setEditDesc] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState<AiProject | null>(null)
+  const longPressTimer = useRef<number | null>(null)
 
   const load = useCallback(async () => {
     if (!user?.id) {
@@ -41,15 +50,108 @@ export function Projects() {
     void load()
   }, [load])
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    if (!q) return projects
-    return projects.filter(
-      (p) =>
-        (p.name || p.title || '').toLowerCase().includes(q) ||
-        (p.description || '').toLowerCase().includes(q)
-    )
-  }, [projects, query])
+  const visible = useMemo(() => {
+    let list = [...projects]
+    if (filter === 'active') list = list.filter((p) => p.status !== 'archived' && !p.archivedAt)
+    if (filter === 'archived') list = list.filter((p) => p.status === 'archived' || !!p.archivedAt)
+    list.sort((a, b) => {
+      if (sort === 'name') return (a.name || a.title).localeCompare(b.name || b.title)
+      if (sort === 'created') return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+    })
+    return list
+  }, [projects, filter, sort])
+
+  const openMenu = (p: AiProject) => {
+    try {
+      navigator.vibrate?.(15)
+    } catch {
+      /* */
+    }
+    setMenuProject(p)
+  }
+
+  const onPressStart = (p: AiProject) => {
+    if (longPressTimer.current) window.clearTimeout(longPressTimer.current)
+    longPressTimer.current = window.setTimeout(() => openMenu(p), 450)
+  }
+  const onPressEnd = () => {
+    if (longPressTimer.current) {
+      window.clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+    }
+  }
+
+  const shareProject = async (p: AiProject) => {
+    const text = `${p.name || p.title}\n\n${p.description || ''}\n\n${p.instructions || ''}`.trim()
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: p.name || p.title, text })
+        return
+      }
+    } catch {
+      /* */
+    }
+    try {
+      await navigator.clipboard.writeText(text)
+    } catch {
+      /* */
+    }
+    setMenuProject(null)
+  }
+
+  const cloneProject = async (p: AiProject) => {
+    setMenuProject(null)
+    try {
+      const res = await fetch(`/api/projects/${p.id}/clone`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok && data.project?.id) {
+        await load()
+        navigate(`/projects/${data.project.id}`)
+        return
+      }
+      // Fallback: create via create API if clone route missing
+      const created = await fetch('/api/projects', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: `${p.name || p.title} (copy)`,
+          description: p.description,
+          instructions: p.instructions,
+        }),
+      })
+      const body = await created.json().catch(() => ({}))
+      if (created.ok && body.project?.id) {
+        await load()
+        navigate(`/projects/${body.project.id}`)
+      } else {
+        setError('Could not clone project.')
+      }
+    } catch {
+      setError('Could not clone project.')
+    }
+  }
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return
+    const ok = await deleteProject(deleteTarget.id)
+    setDeleteTarget(null)
+    if (ok) await load()
+  }
+
+  const saveEdit = async () => {
+    if (!editProject) return
+    await updateProject(editProject.id, {
+      name: editName.trim(),
+      description: editDesc,
+    })
+    setEditProject(null)
+    await load()
+  }
 
   if (authLoading) {
     return (
@@ -66,7 +168,7 @@ export function Projects() {
           <FolderOpen className="mx-auto mb-4 text-nyven-text-secondary opacity-70" size={32} />
           <h1 className="font-display text-2xl font-medium mb-2">Projects</h1>
           <p className="text-sm text-nyven-text-secondary mb-6 leading-relaxed">
-            Sign in to create persistent AI workspaces for conversations, instructions, tasks, and files.
+            Sign in to create persistent AI workspaces.
           </p>
           <button
             type="button"
@@ -82,110 +184,202 @@ export function Projects() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
-        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
-          <div className="min-w-0">
-            <h1 className="font-display text-2xl sm:text-3xl font-medium tracking-tight">Projects</h1>
-            <p className="text-nyven-text-secondary text-sm mt-1.5 max-w-xl leading-relaxed">
-              Persistent AI workspaces for ongoing work — instructions, chats, tasks, and context that
-              stay with the project.
-            </p>
-          </div>
+      <div className="max-w-3xl mx-auto px-3 sm:px-4 py-3">
+        <header className="flex items-center gap-2 mb-3">
+          <h1 className="flex-1 text-center font-medium text-base">Projects</h1>
           <button
             type="button"
             onClick={() => navigate('/projects/new')}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-nyven-cyan text-nyven-bg text-sm font-medium hover:bg-nyven-cyan/90 transition-colors min-h-[44px] shrink-0"
+            className="w-11 h-11 grid place-items-center text-nyven-text"
+            aria-label="New project"
           >
-            <Plus size={18} strokeWidth={2.25} />
-            New Project
+            <Plus size={22} />
           </button>
+        </header>
+
+        <div className="flex gap-2 mb-4 overflow-x-auto">
+          <select
+            value={filter}
+            onChange={(e) => setFilter(e.target.value as Filter)}
+            className="h-9 px-3 rounded-full bg-white/[0.06] border border-white/[0.08] text-xs outline-none"
+          >
+            <option value="all">All</option>
+            <option value="active">Active</option>
+            <option value="archived">Archived</option>
+          </select>
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value as Sort)}
+            className="h-9 px-3 rounded-full bg-white/[0.06] border border-white/[0.08] text-xs outline-none"
+          >
+            <option value="edited">Last Edited</option>
+            <option value="name">Name</option>
+            <option value="created">Created</option>
+          </select>
         </div>
 
-        <div className="relative mb-6">
-          <Search
-            size={16}
-            className="absolute left-3.5 top-1/2 -translate-y-1/2 text-nyven-text-secondary pointer-events-none"
-          />
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search projects"
-            className="w-full h-11 pl-10 pr-4 rounded-xl bg-white/[0.03] border border-white/[0.08] text-sm text-nyven-text placeholder:text-nyven-text-secondary outline-none focus:border-nyven-cyan/35"
-            aria-label="Search projects"
-          />
-        </div>
-
-        {error && (
-          <p className="text-sm text-red-300/90 mb-4">{error}</p>
-        )}
+        {error && <p className="text-sm text-red-300/90 mb-3">{error}</p>}
 
         {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-36 rounded-2xl bg-white/[0.03] border border-white/[0.06] animate-pulse" />
-            ))}
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center px-4">
-            <div className="w-16 h-16 rounded-2xl bg-nyven-surface border border-white/[0.08] flex items-center justify-center mb-5">
-              <FolderOpen size={28} className="text-nyven-text-secondary opacity-70" />
-            </div>
-            <p className="text-nyven-text font-medium mb-2">
-              {query ? 'No matching projects' : 'No projects yet'}
-            </p>
-            <p className="text-nyven-text-secondary text-sm mb-6 max-w-sm leading-relaxed">
-              {query
-                ? 'Try a different search.'
-                : 'Create a project to organize chats, instructions, tasks, and ongoing work with NYVEN.'}
-            </p>
-            {!query && (
-              <button
-                type="button"
-                onClick={() => navigate('/projects/new')}
-                className="px-5 py-2.5 rounded-xl bg-nyven-cyan text-nyven-bg text-sm font-medium min-h-[44px]"
-              >
-                + New Project
-              </button>
-            )}
+          <p className="text-sm text-nyven-text-secondary py-12 text-center">Loading…</p>
+        ) : visible.length === 0 ? (
+          <div className="py-16 text-center">
+            <FolderOpen className="mx-auto mb-3 opacity-50" size={28} />
+            <p className="text-sm text-nyven-text-secondary mb-4">No projects yet.</p>
+            <button
+              type="button"
+              onClick={() => navigate('/projects/new')}
+              className="px-4 h-10 rounded-xl bg-nyven-cyan text-nyven-bg text-sm font-medium"
+            >
+              New Project
+            </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {filtered.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => navigate(`/projects/${p.id}`)}
-                className="text-left rounded-2xl border border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.04] hover:border-white/[0.12] transition-colors p-5 min-h-[140px] flex flex-col"
-              >
-                <div className="flex items-start justify-between gap-3 mb-2">
-                  <h2 className="font-medium text-[15px] text-nyven-text truncate">
-                    {p.name || p.title}
-                  </h2>
-                  <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-md bg-white/[0.04] text-nyven-text-secondary shrink-0">
-                    {p.status || 'active'}
+          <div className="grid grid-cols-2 gap-3">
+            {visible.map((p) => (
+              <div key={p.id} className="relative">
+                <button
+                  type="button"
+                  onClick={() => navigate(`/projects/${p.id}`)}
+                  onTouchStart={() => onPressStart(p)}
+                  onTouchEnd={onPressEnd}
+                  onTouchMove={onPressEnd}
+                  onMouseDown={() => onPressStart(p)}
+                  onMouseUp={onPressEnd}
+                  onMouseLeave={onPressEnd}
+                  onContextMenu={(e) => {
+                    e.preventDefault()
+                    openMenu(p)
+                  }}
+                  className="w-full aspect-square rounded-2xl bg-white/[0.04] border border-white/[0.07] p-4 flex flex-col items-start text-left active:scale-[0.98] transition-transform"
+                >
+                  <FolderOpen className="text-nyven-text-secondary mb-3" size={22} />
+                  <span className="text-sm font-medium line-clamp-2">{p.name || p.title}</span>
+                  <span className="text-[11px] text-nyven-text-secondary mt-auto">
+                    Modified: {formatRelative(p.updatedAt)}
                   </span>
-                </div>
-                <p className="text-sm text-nyven-text-secondary line-clamp-2 leading-relaxed flex-1">
-                  {p.description || 'No description'}
-                </p>
-                <div className="flex flex-wrap items-center gap-3 mt-4 text-[11px] text-nyven-text-secondary">
-                  <span className="inline-flex items-center gap-1">
-                    <MessageSquare size={12} /> {p.chatCount ?? 0} chats
-                  </span>
-                  <span className="inline-flex items-center gap-1">
-                    <ListTodo size={12} /> {p.taskCount ?? 0} tasks
-                  </span>
-                  <span className="inline-flex items-center gap-1">
-                    <FileText size={12} /> {p.fileCount ?? 0} files
-                  </span>
-                  <span className="ml-auto">{formatRelative(p.updatedAt)}</span>
-                </div>
-              </button>
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    openMenu(p)
+                  }}
+                  className="absolute top-2 right-2 w-8 h-8 rounded-full grid place-items-center bg-black/30 text-white/70"
+                  aria-label="Project menu"
+                >
+                  <MoreHorizontal size={16} />
+                </button>
+              </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* Long-press / menu sheet */}
+      {menuProject && (
+        <div className="fixed inset-0 z-50 flex flex-col justify-end">
+          <button type="button" className="absolute inset-0 bg-black/50" onClick={() => setMenuProject(null)} />
+          <div className="relative rounded-t-2xl bg-[#12151c] border-t border-white/[0.08] pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <div className="flex justify-center py-2">
+              <span className="w-10 h-1 rounded-full bg-white/20" />
+            </div>
+            <button
+              type="button"
+              className="w-full flex items-center gap-3 px-5 h-14 text-sm"
+              onClick={() => void shareProject(menuProject)}
+            >
+              <Share2 size={18} /> Share Project
+            </button>
+            <button
+              type="button"
+              className="w-full flex items-center gap-3 px-5 h-14 text-sm"
+              onClick={() => {
+                setEditName(menuProject.name || menuProject.title)
+                setEditDesc(menuProject.description || '')
+                setEditProject(menuProject)
+                setMenuProject(null)
+              }}
+            >
+              <Pencil size={18} /> Edit Project
+            </button>
+            <button
+              type="button"
+              className="w-full flex items-center gap-3 px-5 h-14 text-sm"
+              onClick={() => void cloneProject(menuProject)}
+            >
+              <Copy size={18} /> Clone Project
+            </button>
+            <button
+              type="button"
+              className="w-full flex items-center gap-3 px-5 h-14 text-sm text-red-400"
+              onClick={() => {
+                setDeleteTarget(menuProject)
+                setMenuProject(null)
+              }}
+            >
+              <Trash2 size={18} /> Delete
+            </button>
+          </div>
+        </div>
+      )}
+
+      {editProject && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <button type="button" className="absolute inset-0 bg-black/50" onClick={() => setEditProject(null)} />
+          <div className="relative w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl bg-[#12151c] border border-white/[0.08] p-4">
+            <h3 className="font-medium mb-3">Edit project</h3>
+            <input
+              value={editName}
+              onChange={(e) => setEditName(e.target.value.slice(0, 120))}
+              className="w-full h-11 px-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-sm mb-2 outline-none"
+              placeholder="Name"
+            />
+            <textarea
+              value={editDesc}
+              onChange={(e) => setEditDesc(e.target.value.slice(0, 2000))}
+              rows={3}
+              className="w-full px-3 py-2 rounded-xl bg-white/[0.04] border border-white/[0.08] text-sm mb-3 outline-none resize-y"
+              placeholder="Description"
+            />
+            <div className="flex gap-2 justify-end">
+              <button type="button" onClick={() => setEditProject(null)} className="px-4 h-10 text-sm">
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void saveEdit()}
+                className="px-4 h-10 rounded-xl bg-nyven-cyan text-nyven-bg text-sm font-medium"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button type="button" className="absolute inset-0 bg-black/50" onClick={() => setDeleteTarget(null)} />
+          <div className="relative w-full max-w-sm rounded-2xl bg-[#12151c] border border-white/[0.08] p-4">
+            <p className="text-sm mb-4">
+              Delete <strong>{deleteTarget.name || deleteTarget.title}</strong>? This cannot be undone.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button type="button" onClick={() => setDeleteTarget(null)} className="px-4 h-10 text-sm">
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmDelete()}
+                className="px-4 h-10 rounded-xl bg-red-500/90 text-white text-sm font-medium"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

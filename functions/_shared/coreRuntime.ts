@@ -7,6 +7,12 @@
 import type { CoreEvent, CoreRequest, CoreResult, EmitFn } from './coreTypes'
 import { planWithTools, streamGeminiChat } from './geminiProvider'
 import { streamProjectChat, USER_FACING_AI_UNAVAILABLE } from './openrouter/stream'
+import {
+  buildServerMemoryContext,
+  maybeUpdateConversationSummary,
+  searchPastChats,
+  wantsPastChatRecall,
+} from './memory/service'
 import type { OpenRouterMessage } from './openrouter/stream'
 import { toGeminiFunctionDeclarations } from './tools/registry'
 import { executeTool } from './tools/executor'
@@ -38,6 +44,7 @@ export type CoreRuntimeEnv = {
   BRAVE_SEARCH_API_KEY?: string
   TAVILY_API_KEY?: string
   OPENROUTER_API_KEY?: string
+  DB?: import('./db/types').D1Database
   NVIDIA_API_KEY?: string
   APP_URL?: string
 }
@@ -137,6 +144,12 @@ export async function runCore(
   }
 
   // Declared once for both Project OpenRouter path and Gemini system instruction path.
+  const userId =
+    typeof (rawRequest as any).identity?.userId === 'string'
+      ? (rawRequest as any).identity.userId
+      : typeof rawRequest.metadata?.userId === 'string'
+        ? rawRequest.metadata.userId
+        : ''
   const projectId =
     typeof rawRequest.metadata?.projectId === 'string' ? rawRequest.metadata.projectId : ''
   const projectContext =
@@ -163,11 +176,23 @@ export async function runCore(
 
     const systemPartsProject = [NYVEN_SYSTEM_INSTRUCTION]
     if (projectContext) systemPartsProject.push(projectContext)
-    const memoryContext =
-      typeof rawRequest.metadata?.memoryContext === 'string'
-        ? rawRequest.metadata.memoryContext.trim()
-        : ''
-    if (memoryContext) systemPartsProject.push(memoryContext)
+    const memoryEnabled = rawRequest.metadata?.memoryEnabled !== false
+    try {
+      if (env.DB && userId && memoryEnabled) {
+        const mem = await buildServerMemoryContext(env.DB, userId, normalized.request.message || '', {
+          projectId,
+          memoryEnabled,
+        })
+        if (mem) systemPartsProject.push(mem)
+        if (wantsPastChatRecall(normalized.request.message || '')) {
+          const hist = (rawRequest.history || []).slice(-4).map((h: any) => h.content || '')
+          const recall = await searchPastChats(env.DB, userId, normalized.request.message || '', hist)
+          if (recall) systemPartsProject.push(recall)
+        }
+      }
+    } catch (e) {
+      console.error('memory context', e instanceof Error ? e.message : e)
+    }
     systemPartsProject.push(
       "You are assisting inside a NYVEN Project workspace. Be professional, organized, and precise. Process the user's actual request dynamically. Do not invent completed work."
     )
@@ -355,6 +380,24 @@ export async function runCore(
   if (searchReady) systemParts.push(WEB_SEARCH_SYSTEM_ADDENDUM)
   // Reuse projectContext declared once at start of runCore.
   if (projectContext) systemParts.push(projectContext)
+  const memoryEnabledNormal = rawRequest.metadata?.memoryEnabled !== false
+  try {
+    if (env.DB && userId && memoryEnabledNormal) {
+      const mem = await buildServerMemoryContext(env.DB, userId, normalized.request.message || '', {
+        projectId: projectId || null,
+        memoryEnabled: memoryEnabledNormal,
+      })
+      if (mem) systemParts.push(mem)
+      if (wantsPastChatRecall(normalized.request.message || '')) {
+        const hist = (rawRequest.history || []).slice(-4).map((h: any) => h.content || '')
+        const recall = await searchPastChats(env.DB, userId, normalized.request.message || '', hist)
+        if (recall) systemParts.push(recall)
+      }
+    }
+  } catch (e) {
+    console.error('memory context', e instanceof Error ? e.message : e)
+  }
+
   providerConfig.systemInstruction = systemParts.join('\n\n')
   const toolContextBlocks: string[] = []
   const allCitations: Array<{ id: string; title: string; url: string; source?: string }> = []

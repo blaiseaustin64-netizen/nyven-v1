@@ -19,7 +19,8 @@ import { MicWaveCircle } from './MicWaveCircle'
 import clsx from 'clsx'
 import { ATTACHMENT_LIMITS, extensionOf, ALLOWED_EXTENSIONS, kindForMime } from '../lib/attachments/limits'
 import type { PendingAttachment, AttachmentPayload } from '../lib/attachments/types'
-import { extractZipForChat } from '../lib/attachments/zip'
+import { extractAttachmentFile } from '../lib/attachments/extract'
+import { cacheAttachmentBlob } from '../lib/attachments/fileCache'
 
 export type ComposerSendPayload = {
   text: string
@@ -242,23 +243,37 @@ export function MessageComposer({
 
       try {
         const ext = extensionOf(file.name)
-        // ZIP: expand in the browser only — never upload binary to the server
-        if (ext === '.zip' || file.type === 'application/zip' || file.type === 'application/x-zip-compressed') {
+        // Client-side extract for zip/docx/xlsx/pdf/text before (or instead of) server
+        if (
+          ext === '.zip' ||
+          ext === '.docx' ||
+          ext === '.xlsx' ||
+          ext === '.pdf' ||
+          file.type === 'application/zip' ||
+          file.type === 'application/x-zip-compressed' ||
+          (file.type || '').includes('wordprocessingml') ||
+          (file.type || '').includes('spreadsheetml')
+        ) {
           updateAttachment(id, { status: 'processing' })
           try {
-            const extracted = await extractZipForChat(file)
+            const extracted = await extractAttachmentFile(file)
             updateAttachment(id, {
               status: 'ready',
               kind: 'document',
-              mimeType: 'text/plain',
+              mimeType: file.type || 'application/octet-stream',
               name: file.name,
-              extractedText: extracted.textContent,
-              // Surface file count via error-free status; chip uses name
+              extractedText: extracted.text,
+              file,
+            })
+            void cacheAttachmentBlob(id, file, {
+              name: file.name,
+              mime: file.type || 'application/octet-stream',
+              userId: (window as any).__nyvenUserId || 'local',
             })
           } catch (ze: unknown) {
             updateAttachment(id, {
               status: 'error',
-              error: ze instanceof Error ? ze.message : 'Could not read this archive.',
+              error: ze instanceof Error ? ze.message : 'Could not read this file.',
             })
           }
           return
@@ -306,6 +321,12 @@ export function MessageComposer({
           inlineBase64: att.inlineBase64,
           mimeType: att.mimeType || toUpload.type,
           kind: (att.kind as PendingAttachment['kind']) || kind,
+          file: toUpload,
+        })
+        void cacheAttachmentBlob(id, toUpload, {
+          name: toUpload.name || file.name,
+          mime: att.mimeType || toUpload.type,
+          userId: (window as any).__nyvenUserId || 'local',
         })
       } catch (err: unknown) {
         if ((err as { name?: string })?.name === 'AbortError') {

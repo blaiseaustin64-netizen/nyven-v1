@@ -158,3 +158,30 @@ export async function deleteMemory(
     return { ok: false, error: 'Network error.' }
   }
 }
+
+
+/** Background auto-extract after a completed turn (non-blocking). */
+export async function extractMemoriesFromExchange(
+  userId: string | null,
+  userText: string,
+  assistantText: string,
+  meta?: { projectId?: string; conversationId?: string }
+): Promise<{ count: number; ids: string[] }> {
+  if (!userId || !userText.trim()) return { count: 0, ids: [] }
+  try {
+    const res = await fetch('/api/memories', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        extractFrom: { user: userText, assistant: assistantText },
+        projectId: meta?.projectId,
+        conversationId: meta?.conversationId,
+      }),
+    })
+    const data = (await res.json().catch(() => ({}))) as { count?: number; ids?: string[] }
+    return { count: data.count || 0, ids: data.ids || [] }
+  } catch {
+    return { count: 0, ids: [] }
+  }
+}

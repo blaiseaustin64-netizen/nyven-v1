@@ -216,6 +216,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
           OPENROUTER_API_KEY: env.OPENROUTER_API_KEY,
           NVIDIA_API_KEY: env.NVIDIA_API_KEY,
           APP_URL: env.APP_URL,
+          DB: env.DB,
         },
         coreRequest,
         emit,

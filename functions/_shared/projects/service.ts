@@ -134,6 +134,19 @@ export async function ensureProjectsSchema(db: D1Database): Promise<void> {
       /* */
     }
   }
+
+  // 0007 columns — additive, idempotent
+  for (const sql of [
+    `ALTER TABLE project_files ADD COLUMN extracted_text TEXT NOT NULL DEFAULT ''`,
+    `ALTER TABLE project_files ADD COLUMN kind TEXT NOT NULL DEFAULT 'document'`,
+    `ALTER TABLE project_files ADD COLUMN r2_key TEXT`,
+  ]) {
+    try {
+      await db.prepare(sql).run()
+    } catch {
+      /* column exists */
+    }
+  }
 }
 
 export function toPublicProject(
@@ -766,13 +779,24 @@ export async function buildProjectContextBlock(
 
   let filesBlock: string | null = null
   try {
-    const rows = await db
-      .prepare(
-        `SELECT name, extracted_text, metadata_json, created_at FROM project_files
-         WHERE project_id = ? AND user_id = ? ORDER BY created_at DESC LIMIT 40`
-      )
-      .bind(projectId, userId)
-      .all<{ name: string; extracted_text?: string; metadata_json?: string; created_at: string }>()
+    let rows: { results?: Array<{ name: string; extracted_text?: string; metadata_json?: string; created_at: string }> }
+    try {
+      rows = await db
+        .prepare(
+          `SELECT name, extracted_text, metadata_json, created_at FROM project_files
+           WHERE project_id = ? AND user_id = ? ORDER BY created_at DESC LIMIT 40`
+        )
+        .bind(projectId, userId)
+        .all()
+    } catch {
+      rows = await db
+        .prepare(
+          `SELECT name, metadata_json, created_at FROM project_files
+           WHERE project_id = ? AND user_id = ? ORDER BY created_at DESC LIMIT 40`
+        )
+        .bind(projectId, userId)
+        .all()
+    }
     const parts: string[] = []
     let budget = 30000
     for (const r of rows.results || []) {

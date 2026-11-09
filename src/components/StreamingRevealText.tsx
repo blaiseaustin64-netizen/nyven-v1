@@ -1,8 +1,8 @@
 /**
- * Streamed assistant text with Claude-style blue→normal word reveal.
- * Words already shown stay settled; only new tokens get the cool-in animation.
+ * Paced stream reveal: buffer tokens, reveal by word with soft fade via rAF.
+ * Catches up quickly when the stream ends so no text stays hidden.
  */
-import { useMemo, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
 
 type Props = {
@@ -12,90 +12,106 @@ type Props = {
 }
 
 export function StreamingRevealText({ content, isStreaming, className }: Props) {
-  const settledCountRef = useRef(0)
-  const prevContentRef = useRef('')
+  const [visible, setVisible] = useState('')
+  const targetRef = useRef(content)
+  const visibleRef = useRef('')
+  const rafRef = useRef<number | null>(null)
+  const lastTs = useRef(0)
 
-  const parts = useMemo(() => {
-    // Split preserving whitespace so layout stays stable
-    const tokens = content.split(/(\s+)/).filter((t) => t.length > 0)
-    return tokens
-  }, [content])
+  targetRef.current = content
 
-  // When content grows, previous word tokens are "settled"
-  if (content.startsWith(prevContentRef.current) && content.length > prevContentRef.current.length) {
-    // settle all complete words from previous length
-    const prevTokens = prevContentRef.current.split(/(\s+)/).filter((t) => t.length > 0)
-    settledCountRef.current = prevTokens.filter((t) => t.trim().length > 0).length
-  } else if (content !== prevContentRef.current && !content.startsWith(prevContentRef.current)) {
-    // full replace (regenerate) — settle nothing of old
-    settledCountRef.current = 0
-  }
-  prevContentRef.current = content
+  useEffect(() => {
+    const tick = (ts: number) => {
+      const target = targetRef.current
+      let vis = visibleRef.current
 
+      if (!target.startsWith(vis)) {
+        // regenerate / replace
+        vis = ''
+      }
+
+      if (vis.length < target.length) {
+        const dt = lastTs.current ? ts - lastTs.current : 16
+        lastTs.current = ts
+        // While streaming: ~1–3 words per frame; when done: catch up fast
+        const remaining = target.slice(vis.length)
+        const words = remaining.split(/(\s+)/)
+        let take = 0
+        let wordBudget = isStreaming ? (dt > 24 ? 2 : 1) : 12
+        for (const part of words) {
+          take += part.length
+          if (part.trim()) {
+            wordBudget -= 1
+            if (wordBudget <= 0) break
+          }
+        }
+        if (take <= 0) take = Math.min(remaining.length, isStreaming ? 4 : remaining.length)
+        vis = target.slice(0, vis.length + take)
+        visibleRef.current = vis
+        setVisible(vis)
+      } else if (vis !== target) {
+        vis = target
+        visibleRef.current = vis
+        setVisible(vis)
+      }
+
+      if (visibleRef.current.length < targetRef.current.length || isStreaming) {
+        rafRef.current = requestAnimationFrame(tick)
+      } else {
+        rafRef.current = null
+        lastTs.current = 0
+      }
+    }
+
+    if (rafRef.current == null) {
+      rafRef.current = requestAnimationFrame(tick)
+    }
+    return () => {
+      if (rafRef.current != null) {
+        cancelAnimationFrame(rafRef.current)
+        rafRef.current = null
+      }
+    }
+  }, [content, isStreaming])
+
+  // Split for soft fade on the newest word only
+  const tokens = visible.split(/(\s+)/).filter((t) => t.length > 0)
   let wordIndex = 0
+  const lastWordIdx = (() => {
+    let n = -1
+    let i = 0
+    for (const t of tokens) {
+      if (t.trim()) n = i
+      i++
+    }
+    return n
+  })()
 
   return (
     <div className={clsx('text-[15px] leading-relaxed text-nyven-text whitespace-pre-wrap', className)}>
       <style>{`
-        @keyframes nyven-word-cool {
-          to {
-            color: var(--nyven-fg, #e8ecf5);
-            text-shadow: 0 0 0 rgba(79, 140, 255, 0);
-          }
+        @keyframes nyven-soft-fade {
+          from { opacity: 0.35; }
+          to { opacity: 1; }
         }
-        @keyframes nyven-type-pulse {
-          50% { opacity: 0.3; }
-        }
-        .nyven-w {
-          color: #4f8cff;
-          text-shadow: 0 0 14px rgba(79, 140, 255, 0.55);
-          animation: nyven-word-cool 1s ease-out forwards;
-        }
-        .nyven-w-settled {
-          color: inherit;
-          text-shadow: none;
-          animation: none;
-        }
-        .nyven-typing-dot::after {
-          content: "";
-          display: inline-block;
-          width: 7px;
-          height: 7px;
-          margin-left: 5px;
-          border-radius: 50%;
-          background: #2f6bff;
-          vertical-align: middle;
-          animation: nyven-type-pulse 1s ease-in-out infinite;
+        .nyven-reveal-word {
+          animation: nyven-soft-fade 0.28s ease-out both;
         }
         @media (prefers-reduced-motion: reduce) {
-          .nyven-w {
-            animation: none;
-            color: inherit;
-            text-shadow: none;
-          }
-          .nyven-typing-dot::after {
-            animation: none;
-            opacity: 0.7;
-          }
+          .nyven-reveal-word { animation: none; }
         }
       `}</style>
-      <span className={clsx(isStreaming && 'nyven-typing-dot')}>
-        {parts.map((tok, i) => {
-          if (!tok.trim()) {
-            return <span key={`s-${i}`}>{tok}</span>
-          }
-          const idx = wordIndex++
-          const settled = idx < settledCountRef.current
-          return (
-            <span
-              key={`w-${i}-${tok.slice(0, 8)}`}
-              className={settled ? 'nyven-w-settled' : 'nyven-w'}
-            >
-              {tok}
-            </span>
-          )
-        })}
-      </span>
+      {tokens.map((tok, i) => {
+        if (!tok.trim()) return <span key={`s-${i}`}>{tok}</span>
+        const isNew = isStreaming && i === lastWordIdx
+        wordIndex++
+        return (
+          <span key={`w-${i}-${wordIndex}`} className={isNew ? 'nyven-reveal-word' : undefined}>
+            {tok}
+          </span>
+        )
+      })}
+      {isStreaming && <span className="nyven-typing-dot" aria-hidden />}
     </div>
   )
 }
