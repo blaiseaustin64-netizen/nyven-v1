@@ -29,8 +29,7 @@ import {
 } from '../../lib/aiProjects/api'
 import { MessageComposer, type ComposerSendPayload } from '../../components/MessageComposer'
 import { ChatThread } from '../../components/chat/ChatThread'
-import { JumpToLatestButton } from '../../components/chat/JumpToLatestButton'
-import { ReadAloudPlayer } from '../../components/chat/ReadAloudPlayer'
+import { ChatFloatingChrome } from '../../components/chat/ChatFloatingChrome'
 import { useReadAloud } from '../../hooks/useReadAloud'
 import { streamCoreChat } from '../../lib/core/streamClient'
 import type { Message } from '../../lib/types'
@@ -663,10 +662,6 @@ export function ProjectWorkspace() {
               }
               className="flex-1 min-h-0 overflow-y-auto px-4 py-4"
             />
-            <JumpToLatestButton
-              visible={chatScroll.showJumpLatest}
-              onClick={() => chatScroll.scrollToBottom(true, true)}
-            />
             {feedbackToast && (
               <p className="px-4 text-xs text-nyven-cyan text-center pb-1">{feedbackToast}</p>
             )}
@@ -674,14 +669,12 @@ export function ProjectWorkspace() {
               <p className="px-4 text-xs text-red-300/90 text-center pb-1">{actionError}</p>
             )}
             <div className="shrink-0 p-2 sm:p-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] relative">
-              <ReadAloudPlayer
-                state={readAloud.state}
-                onTogglePause={readAloud.togglePause}
-                onSeek={readAloud.seek}
-                onCycleRate={readAloud.cycleRate}
-                onClose={readAloud.stop}
+              <ChatFloatingChrome
+                showJump={chatScroll.showJumpLatest}
+                onJump={() => chatScroll.scrollToBottom(true, true)}
+                readAloud={readAloud}
               />
-              <div className="max-w-3xl mx-auto">
+<div className="max-w-3xl mx-auto">
                 <MessageComposer
                   onSend={(p) => void handleSend(p)}
                   isGenerating={isGenerating}

@@ -2,8 +2,7 @@ import { ChevronDown, Menu } from 'lucide-react'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useLocation } from 'react-router-dom'
 import { ChatThread } from '../components/chat/ChatThread'
-import { JumpToLatestButton } from '../components/chat/JumpToLatestButton'
-import { ReadAloudPlayer } from '../components/chat/ReadAloudPlayer'
+import { ChatFloatingChrome } from '../components/chat/ChatFloatingChrome'
 import { useReadAloud } from '../hooks/useReadAloud'
 import { MessageComposer, type ComposerSendPayload } from '../components/MessageComposer'
 import { NIdentity } from '../components/NIdentity'
@@ -821,28 +820,13 @@ export function Chat() {
           <p className="text-center text-xs text-red-300 px-4 py-1 max-w-xl mx-auto">{voiceError}</p>
         )}
         <div ref={composerWrapRef} className="relative shrink-0 w-full max-w-3xl mx-auto px-0 sm:px-4 pt-1 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] min-w-0">
-          {showJumpLatest && (
-            <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-3 z-20">
-              <button
-                type="button"
-                onClick={() => {
-                  stickToBottomRef.current = true
-                  scrollToBottom(true, true)
-                }}
-                className="pointer-events-auto inline-flex items-center justify-center w-10 h-10 rounded-full bg-nyven-surface/90 backdrop-blur-md border border-white/10 text-nyven-text shadow-lg shadow-black/30 hover:border-nyven-cyan/40 hover:text-nyven-cyan transition-colors"
-                aria-label="Jump to latest"
-                title="Jump to latest"
-              >
-                <ChevronDown size={20} strokeWidth={2} />
-              </button>
-            </div>
-          )}
-          <ReadAloudPlayer
-            state={readAloud.state}
-            onTogglePause={readAloud.togglePause}
-            onSeek={readAloud.seek}
-            onCycleRate={readAloud.cycleRate}
-            onClose={readAloud.stop}
+          <ChatFloatingChrome
+            showJump={showJumpLatest}
+            onJump={() => {
+              stickToBottomRef.current = true
+              scrollToBottom(true, true)
+            }}
+            readAloud={readAloud}
           />
           <MessageComposer
             onSend={handleSend}

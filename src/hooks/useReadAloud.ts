@@ -36,6 +36,11 @@ export function useReadAloud() {
   /** Cache generated audio per messageId (object URLs). */
   const cacheRef = useRef<Map<string, string>>(new Map())
   const rateRef = useRef(1)
+  const progressElRef = useRef<HTMLElement | null>(null)
+  const rafRef = useRef<number | null>(null)
+  const knownDurationRef = useRef(0)
+  const maxProgressRef = useRef(0) // monotonic progress 0..1
+
 
   const clearTimer = () => {
     if (timerRef.current != null) {
@@ -44,7 +49,39 @@ export function useReadAloud() {
     }
   }
 
+  const stopRaf = () => {
+    if (rafRef.current != null) {
+      cancelAnimationFrame(rafRef.current)
+      rafRef.current = null
+    }
+  }
+
+  const updateProgressBar = () => {
+    const el = progressElRef.current
+    if (!el) return
+    const a = audioRef.current
+    let p = 0
+    if (a && knownDurationRef.current > 0 && Number.isFinite(a.currentTime)) {
+      p = a.currentTime / knownDurationRef.current
+    }
+    // Monotonic — never jump backwards
+    if (p < maxProgressRef.current) p = maxProgressRef.current
+    else maxProgressRef.current = p
+    p = Math.max(0, Math.min(1, p))
+    el.style.transform = `scaleX(${p})`
+  }
+
+  const startRaf = () => {
+    stopRaf()
+    const tick = () => {
+      updateProgressBar()
+      rafRef.current = requestAnimationFrame(tick)
+    }
+    rafRef.current = requestAnimationFrame(tick)
+  }
+
   const teardownAudio = useCallback((revokeCurrent = true) => {
+    stopRaf()
     clearTimer()
     const a = audioRef.current
     if (a) {
@@ -143,6 +180,7 @@ export function useReadAloud() {
       }
       audio.onloadedmetadata = () => {
         const d = Number.isFinite(audio.duration) ? audio.duration : 0
+        if (d > 0) knownDurationRef.current = d
         setState((s) =>
           s.messageId === messageId ? { ...s, duration: d } : s
         )
@@ -162,9 +200,19 @@ export function useReadAloud() {
         )
       }
 
+      maxProgressRef.current = 0
+      knownDurationRef.current =
+        Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : knownDurationRef.current
+      if (progressElRef.current) {
+        progressElRef.current.style.transform = 'scaleX(0)'
+        progressElRef.current.style.transformOrigin = 'left center'
+        progressElRef.current.style.willChange = 'transform'
+      }
+
       const p = audio.play()
       if (p && typeof p.then === 'function') {
         p.then(() => {
+          startRaf()
           setState((s) =>
             s.messageId === messageId
               ? { ...s, loading: false, playing: true, error: null }
@@ -263,9 +311,14 @@ export function useReadAloud() {
     const a = audioRef.current
     if (!a) return
     if (a.paused) {
-      void a.play().then(() => setState((s) => ({ ...s, playing: true }))).catch(() => {})
+      void a.play().then(() => {
+        startRaf()
+        setState((s) => ({ ...s, playing: true }))
+      }).catch(() => {})
     } else {
       a.pause()
+      stopRaf()
+      updateProgressBar()
       setState((s) => ({ ...s, playing: false }))
     }
   }, [])
@@ -290,6 +343,15 @@ export function useReadAloud() {
     setState((s) => ({ ...s, elapsed: Math.floor(a.currentTime) }))
   }, [])
 
+  const bindProgressEl = useCallback((el: HTMLElement | null) => {
+    progressElRef.current = el
+    if (el) {
+      el.style.transformOrigin = 'left center'
+      el.style.willChange = 'transform'
+      updateProgressBar()
+    }
+  }, [])
+
   return {
     state,
     play,
@@ -297,6 +359,7 @@ export function useReadAloud() {
     togglePause,
     cycleRate,
     seek,
+    bindProgressEl,
     isReading: (id: string) => state.messageId === id && (state.playing || state.loading),
     isLoading: (id: string) => state.messageId === id && state.loading,
   }
