@@ -44,7 +44,10 @@ export type ProjectActivity = {
   createdAt: string
 }
 
-async function jsonFetch<T>(url: string, init?: RequestInit): Promise<{ ok: boolean; status: number; data: T }> {
+async function jsonFetch<T>(
+  url: string,
+  init?: RequestInit
+): Promise<{ ok: boolean; status: number; data: T }> {
   try {
     const res = await fetch(url, {
       credentials: 'include',
@@ -68,7 +71,12 @@ export async function createProject(input: {
   description?: string
   instructions?: string
 }): Promise<{ project: AiProject | null; error?: string }> {
-  const r = await jsonFetch<{ success?: boolean; project?: AiProject; error?: string; code?: string }>('/api/projects', {
+  const r = await jsonFetch<{
+    success?: boolean
+    project?: AiProject
+    error?: string
+    code?: string
+  }>('/api/projects', {
     method: 'POST',
     body: JSON.stringify(input),
   })
@@ -80,14 +88,12 @@ export async function createProject(input: {
   }
   return {
     project: null,
-    error: r.data?.error || (r.status === 0 ? 'Network error. Check your connection and try again.' : 'Could not create project. Please try again.'),
+    error:
+      r.data?.error ||
+      (r.status === 0
+        ? 'Network error. Check your connection and try again.'
+        : 'Could not create project. Please try again.'),
   }
-}): Promise<AiProject | null> {
-  const r = await jsonFetch<{ success?: boolean; project?: AiProject }>('/api/projects', {
-    method: 'POST',
-    body: JSON.stringify(input),
-  })
-  return r.ok && r.data.project ? r.data.project : null
 }
 
 export async function fetchProject(id: string): Promise<{
@@ -114,7 +120,13 @@ export async function fetchProject(id: string): Promise<{
 
 export async function updateProject(
   id: string,
-  patch: Partial<{ name: string; description: string; instructions: string; status: string; archive: boolean }>
+  patch: Partial<{
+    name: string
+    description: string
+    instructions: string
+    status: string
+    archive: boolean
+  }>
 ): Promise<AiProject | null> {
   const r = await jsonFetch<{ success?: boolean; project?: AiProject }>(`/api/projects/${id}`, {
     method: 'PATCH',
@@ -128,27 +140,44 @@ export async function deleteProject(id: string): Promise<boolean> {
   return r.ok
 }
 
-export async function createProjectChat(projectId: string, title?: string): Promise<ProjectChat | null> {
-  const r = await jsonFetch<{ success?: boolean; chat?: ProjectChat }>(`/api/projects/${projectId}/chats`, {
-    method: 'POST',
-    body: JSON.stringify({ title }),
-  })
+export async function createProjectChat(
+  projectId: string,
+  title?: string
+): Promise<ProjectChat | null> {
+  const r = await jsonFetch<{ success?: boolean; chat?: ProjectChat }>(
+    `/api/projects/${projectId}/chats`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ title }),
+    }
+  )
   return r.ok && r.data.chat ? r.data.chat : null
 }
 
 export async function fetchProjectChats(projectId: string): Promise<ProjectChat[]> {
-  const r = await jsonFetch<{ success?: boolean; chats?: ProjectChat[] }>(`/api/projects/${projectId}/chats`)
+  const r = await jsonFetch<{ success?: boolean; chats?: ProjectChat[] }>(
+    `/api/projects/${projectId}/chats`
+  )
   return r.ok && Array.isArray(r.data.chats) ? r.data.chats : []
 }
 
 export async function saveTask(
   projectId: string,
-  task: { id?: string; title: string; description?: string; status?: string; priority?: string }
+  task: {
+    id?: string
+    title: string
+    description?: string
+    status?: string
+    priority?: string
+  }
 ): Promise<ProjectTask | null> {
-  const r = await jsonFetch<{ success?: boolean; task?: ProjectTask }>(`/api/projects/${projectId}/tasks`, {
-    method: 'POST',
-    body: JSON.stringify(task),
-  })
+  const r = await jsonFetch<{ success?: boolean; task?: ProjectTask }>(
+    `/api/projects/${projectId}/tasks`,
+    {
+      method: 'POST',
+      body: JSON.stringify(task),
+    }
+  )
   return r.ok && r.data.task ? r.data.task : null
 }
 
