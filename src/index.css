@@ -272,3 +272,44 @@ input:focus-visible {
     to { transform: none; opacity: 1; }
   }
 }
+
+/* ── Theme modes (Appearance) ── */
+html[data-theme="dark"],
+html[data-theme="default"] {
+  --nyven-bg: #07090D;
+  --nyven-bg-secondary: #0D1118;
+  --nyven-surface: #111722;
+  --nyven-surface-2: #161d2a;
+  --nyven-text: #F5F7FA;
+  --nyven-text-secondary: #8993A4;
+  --nyven-border: rgba(255,255,255,0.08);
+  --nyven-cyan: #62E6FF;
+  --nyven-violet: #8B7CFF;
+  color-scheme: dark;
+}
+html[data-theme="light"] {
+  --nyven-bg: #F6F4EF;
+  --nyven-bg-secondary: #EFEBE3;
+  --nyven-surface: #FFFFFF;
+  --nyven-surface-2: #F3F0EA;
+  --nyven-text: #1A1D24;
+  --nyven-text-secondary: #5C6570;
+  --nyven-border: rgba(0,0,0,0.08);
+  --nyven-cyan: #0B8FA8;
+  --nyven-violet: #6B5CE7;
+  color-scheme: light;
+}
+html {
+  font-size: var(--nyven-font-scale, 16px);
+}
+body {
+  background-color: var(--nyven-bg);
+  color: var(--nyven-text);
+}
+/* Map Tailwind-ish utilities used in components to CSS vars where possible */
+.bg-nyven-bg { background-color: var(--nyven-bg) !important; }
+.bg-nyven-surface { background-color: var(--nyven-surface) !important; }
+.text-nyven-text { color: var(--nyven-text) !important; }
+.text-nyven-text-secondary { color: var(--nyven-text-secondary) !important; }
+.text-nyven-cyan { color: var(--nyven-cyan) !important; }
+.border-nyven-cyan\/30 { border-color: color-mix(in srgb, var(--nyven-cyan) 30%, transparent) !important; }

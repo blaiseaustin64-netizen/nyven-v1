@@ -3,6 +3,8 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useLocation } from 'react-router-dom'
 import { ChatThread } from '../components/chat/ChatThread'
 import { ChatFloatingChrome } from '../components/chat/ChatFloatingChrome'
+import { PrivateChatIcon } from '../components/PrivateChatIcon'
+import { recordChatTurnForInstall } from '../lib/pwa'
 import { useReadAloud } from '../hooks/useReadAloud'
 import { MessageComposer, type ComposerSendPayload } from '../components/MessageComposer'
 import { NIdentity } from '../components/NIdentity'
@@ -119,6 +121,7 @@ export function Chat() {
   } = chatScroll
   const hideHeader = useHideOnScroll(24)
   const readAloud = useReadAloud()
+  const [privateMode, setPrivateMode] = useState(false)
 
 
   useEffect(() => {
@@ -166,7 +169,7 @@ export function Chat() {
     window.history.replaceState({}, '')
     // Fresh conversation for Home; set activeIdRef immediately so handleSend uses it
     skipNextActiveLoadRef.current = true
-    const newId = contextNewChat()
+    const newId = contextNewChat(); setPrivateMode(false)
     activeIdRef.current = newId
     setMessages([])
     void handleSendRef.current(msg)
@@ -248,7 +251,12 @@ export function Chat() {
       // Durable write (non-blocking). Streaming UI is already updated.
       void (async () => {
         try {
-          const convId = await ensureConversation(userId, activeId, title || 'Chat')
+          let convId = activeId || ''
+          if (!privateMode) {
+            convId = await ensureConversation(userId, activeId, title || 'Chat')
+          } else {
+            convId = activeId || `private_${Date.now()}`
+          }
           const last = updated[updated.length - 1]
           if (last && !last.isThinking && !last.isStreaming) {
             await persistMessage(userId, convId, last, title)
@@ -391,12 +399,13 @@ export function Chat() {
     const history = historySnapshot
 
     setMessages((prev) => [...prev, userMsg, streamMsg])
+    recordChatTurnForInstall()
     setIsGenerating(true)
     isGeneratingRef.current = true
     scrollToBottom()
     void recordUsage(userId, 'message')
     void ensureConversation(userId, convId, text.slice(0, 40) || 'Chat')
-    void persistMessage(userId, convId, userMsg, text.slice(0, 40))
+    if (!privateMode) { void persistMessage(userId, convId, userMsg, text.slice(0, 40) })
 
     const controller = new AbortController()
     abortControllerRef.current = controller
@@ -794,6 +803,21 @@ export function Chat() {
             )}
 
             {messages.length > 0 && (
+              
+        {messages.length === 0 && (
+          <div className="absolute top-[max(0.75rem,env(safe-area-inset-top))] right-3 z-30">
+            <PrivateChatIcon active={privateMode} onToggle={() => setPrivateMode((v) => !v)} />
+          </div>
+        )}
+        {privateMode && messages.length === 0 && (
+          <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 z-10 px-6 text-center pointer-events-none">
+            <p className="text-[15px] font-medium text-[var(--nyven-text)]">Private chat</p>
+            <p className="text-[13px] text-[var(--nyven-text-secondary)] mt-2 max-w-xs mx-auto leading-relaxed">
+              This chat won't be saved to your history or Nyven's memory.
+            </p>
+          </div>
+        )}
+
               <ChatThread
                 messages={messages}
                 isGenerating={isGenerating}

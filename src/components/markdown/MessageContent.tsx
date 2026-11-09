@@ -213,7 +213,7 @@ function CodeBlock({
       </div>
       <pre
         className={clsx(
-          'p-3 m-0 text-[13px] leading-relaxed font-mono text-nyven-text/95 max-w-full nyven-code-pre',
+          'p-3 m-0 text-[13px] leading-relaxed font-mono text-nyven-text/95 max-w-full nyven-code-pre max-h-[min(50vh,22rem)] overflow-y-auto',
           wrap
             ? 'whitespace-pre-wrap break-words [overflow-wrap:anywhere] overflow-x-hidden'
             : 'overflow-x-auto whitespace-pre [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'

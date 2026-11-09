@@ -1,9 +1,11 @@
 {
-  "name": "NYVEN",
+  "name": "Nyven",
   "short_name": "Nyven",
   "description": "Intelligence, built for what's next.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait-primary",
   "background_color": "#07090D",
   "theme_color": "#07090D",
   "lang": "en",
@@ -19,6 +21,12 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
+    },
+    {
+      "src": "/nyven-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
     },
     {
       "src": "/nyven-icon-512.png",

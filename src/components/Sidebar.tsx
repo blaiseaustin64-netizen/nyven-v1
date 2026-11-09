@@ -31,9 +31,21 @@ const mainNav = [
 
 const GROUP_ORDER = ['Today', 'Yesterday', 'Previous 7 days', 'Older'] as const
 const PIN_KEY = 'nyven_pinned_chats_v1'
+const ARCHIVE_KEY = 'nyven_archived_chats_v1'
 const CHAT_PROJECT_KEY = 'nyven_chat_projects_v1'
 const PAGE_SIZE = 30
 
+function loadArchived(): Set<string> {
+  try {
+    const raw = localStorage.getItem(ARCHIVE_KEY)
+    if (!raw) return new Set()
+    const arr = JSON.parse(raw)
+    return new Set(Array.isArray(arr) ? arr : [])
+  } catch { return new Set() }
+}
+function saveArchived(s: Set<string>) {
+  localStorage.setItem(ARCHIVE_KEY, JSON.stringify([...s]))
+}
 function loadPinned(): Set<string> {
   try {
     const raw = localStorage.getItem(PIN_KEY)
@@ -118,6 +130,8 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
     }
   })
   const [pinned, setPinned] = useState<Set<string>>(() => loadPinned())
+  const [archived, setArchived] = useState<Set<string>>(() => loadArchived())
+  const [showArchived, setShowArchived] = useState(false)
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
   const holdRef = useRef<{ id: string; timer: number; moved: boolean } | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
@@ -128,13 +142,20 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
 
   const onChatRoute = location.pathname.startsWith('/chat')
 
-  const filtered = useMemo(() => {
+  const filteredAll = useMemo(() => {
     const q = query.trim().toLowerCase()
     const list = !q
       ? conversations
       : conversations.filter((c) => (c.title || '').toLowerCase().includes(q))
     return [...list].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
   }, [conversations, query])
+
+  const filtered = useMemo(() => {
+    const base = showArchived
+      ? filteredAll.filter((c) => archived.has(c.id))
+      : filteredAll.filter((c) => !archived.has(c.id))
+    return base
+  }, [filteredAll, archived, showArchived])
 
   const groups = useMemo(() => {
     const pinnedItems = filtered.filter((c) => pinned.has(c.id))
@@ -208,6 +229,15 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
     setMenuId(null)
   }
 
+  const toggleArchive = (id: string) => {
+    setArchived((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      saveArchived(next)
+      return next
+    })
+  }
   const togglePin = (id: string) => {
     setPinned((prev) => {
       const next = new Set(prev)
@@ -631,6 +661,9 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
                     <FolderOpen size={18} className="text-[#6f7a90]" /> Add to project
                   </button>
                 )}
+                <button type="button" className="w-full flex items-center gap-3 px-3 min-h-[52px] rounded-xl text-left text-[#e9edf5] hover:bg-white/[0.06]" onClick={() => { if (menuId) toggleArchive(menuId); setMenuId(null) }}>
+                  <FolderOpen size={18} className="text-[#6f7a90]" /> {menuId && archived.has(menuId) ? 'Unarchive' : 'Archive'}
+                </button>
                 <button type="button" className="w-full flex items-center gap-3 px-3 min-h-[52px] rounded-xl text-left text-[#F87171] hover:bg-red-500/10" onClick={() => { setDeleteId(menuId); setMenuId(null) }}>
                   <Trash2 size={18} /> Delete
                 </button>

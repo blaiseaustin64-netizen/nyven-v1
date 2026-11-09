@@ -83,6 +83,8 @@ export function ChatMessage({
   const [shareHint, setShareHint] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<'positive' | 'negative' | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
+  const [userSheetOpen, setUserSheetOpen] = useState(false)
+  const userLongPress = useRef<number | null>(null)
   const longPressTimer = useRef<number | null>(null)
   const isUser = message.role === 'user'
   const active = Boolean(message.isThinking || message.isStreaming)
@@ -104,11 +106,25 @@ export function ChatMessage({
 
   if (isUser) {
     // Attachments render once in ChatThread above this bubble — not inside it.
+    const ts = new Date(message.timestamp || Date.now())
+    const timeLabel = ts.toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' })
     return (
+      <>
       <div className="flex justify-end group">
         <div className="max-w-[85%] sm:max-w-[75%] min-w-0">
           {message.content ? (
-            <div className="bg-nyven-surface border border-white/[0.06] rounded-2xl rounded-br-md px-4 py-3 text-[15px] leading-relaxed text-nyven-text break-words">
+            <div
+              className="bg-nyven-surface border border-white/[0.06] rounded-2xl rounded-br-md px-4 py-3 text-[15px] leading-relaxed text-nyven-text break-words"
+              onContextMenu={(e) => { e.preventDefault(); setUserSheetOpen(true) }}
+              onTouchStart={() => {
+                userLongPress.current = window.setTimeout(() => {
+                  try { navigator.vibrate?.(15) } catch {}
+                  setUserSheetOpen(true)
+                }, 450)
+              }}
+              onTouchEnd={() => { if (userLongPress.current) window.clearTimeout(userLongPress.current) }}
+              onTouchMove={() => { if (userLongPress.current) window.clearTimeout(userLongPress.current) }}
+            >
               {message.content}
             </div>
           ) : null}
@@ -125,6 +141,37 @@ export function ChatMessage({
           </div>
         </div>
       </div>
+      {userSheetOpen && (
+        <div className="fixed inset-0 z-[90]" role="dialog" aria-modal="true">
+          <button type="button" className="absolute inset-0 bg-black/50" aria-label="Close" onClick={() => setUserSheetOpen(false)} />
+          <div className="absolute left-3 right-3 bottom-[max(1rem,env(safe-area-inset-bottom))] rounded-2xl border border-[var(--nyven-border)] bg-[var(--nyven-surface)]/95 backdrop-blur-xl shadow-2xl p-2">
+            <p className="text-[12px] text-[var(--nyven-text-secondary)] px-3 py-2">{timeLabel}</p>
+            <button type="button" className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-[15px] text-[var(--nyven-text)] hover:bg-white/[0.05]" onClick={() => { void navigator.clipboard.writeText(message.content); setUserSheetOpen(false) }}>
+              <Copy size={18} /> Copy
+            </button>
+            <button type="button" className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-[15px] text-[var(--nyven-text)] hover:bg-white/[0.05]" onClick={() => {
+              try {
+                const sel = window.getSelection()
+                const range = document.createRange()
+                // best-effort select all in bubble via clipboard already
+                void navigator.clipboard.writeText(message.content)
+              } catch {}
+              setUserSheetOpen(false)
+            }}>
+              <span className="w-[18px] text-center text-sm">≡</span> Select text
+            </button>
+            {onEdit && (
+              <button type="button" className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-[15px] text-[var(--nyven-text)] hover:bg-white/[0.05]" onClick={() => { setUserSheetOpen(false); onEdit() }}>
+                <Pencil size={18} /> Edit message
+              </button>
+            )}
+            <button type="button" className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-[15px] text-[var(--nyven-text)] hover:bg-white/[0.05]" onClick={() => { void handleShare(); setUserSheetOpen(false) }}>
+              <Share2 size={18} /> Share prompt
+            </button>
+          </div>
+        </div>
+      )}
+      </>
     )
   }
 

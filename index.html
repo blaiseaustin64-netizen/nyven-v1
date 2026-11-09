@@ -15,6 +15,23 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <title>NYVEN</title>
+    <script>
+      (function () {
+        try {
+          var k = 'nyven_appearance_v1';
+          var raw = localStorage.getItem(k);
+          var pref = raw ? JSON.parse(raw) : { theme: 'default', textScale: 1 };
+          var theme = pref.theme || 'default';
+          if (theme === 'system') {
+            theme = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+          }
+          document.documentElement.setAttribute('data-theme', theme === 'default' ? 'dark' : theme);
+          document.documentElement.style.setProperty('--nyven-font-scale', (pref.textScale || 1) * 16 + 'px');
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute('content', theme === 'light' ? '#F6F4EF' : '#07090D');
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body class="bg-nyven-bg text-nyven-text antialiased">
     <div id="root"></div>

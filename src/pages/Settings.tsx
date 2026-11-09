@@ -32,6 +32,7 @@ import { resolveFishVoiceId } from '../lib/voice/catalog'
 
 type Section =
   | 'account'
+  | 'appearance'
   | 'ai'
   | 'voice'
   | 'privacy'
@@ -41,6 +42,7 @@ type Section =
 
 const sections: { id: Section; label: string; icon: typeof User }[] = [
   { id: 'account', label: 'Account', icon: User },
+  { id: 'appearance', label: 'Appearance', icon: Sparkles },
   { id: 'ai', label: 'AI', icon: Sparkles },
   { id: 'voice', label: 'Voice', icon: Mic },
   { id: 'privacy', label: 'Privacy & Security', icon: Shield },
@@ -207,6 +209,7 @@ export function Settings() {
   }
 
   const sectionMeta: Record<Section, { label: string; hint: string }> = {
+    appearance: { label: 'Appearance', hint: 'Theme and text size' },
     account: { label: 'Account', hint: 'Profile and sign-in' },
     ai: { label: 'AI', hint: 'Response style and memory' },
     voice: { label: 'Voice', hint: 'Speech and voice options' },
@@ -345,7 +348,12 @@ export function Settings() {
             )}
 
             {/* ── Account ── */}
-            {active === 'account' && (
+            
+        {active === 'appearance' && (
+          <AppearancePanel showToast={showToast} />
+        )}
+
+        {active === 'account' && (
               <>
                 <SectionTitle title="Account" desc="Profile and sign-in." />
                 {!configured && (
@@ -991,5 +999,89 @@ function BugReportCard() {
         </button>
       </form>
     </Card>
+  )
+}
+
+
+function AppearancePanel({ showToast }: { showToast: (m: string) => void }) {
+  const [prefs, setPrefs] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('nyven_appearance_v1') || '{}')
+    } catch {
+      return { theme: 'default', textScale: 1 }
+    }
+  })
+  const theme = prefs.theme || 'default'
+  const scale = typeof prefs.textScale === 'number' ? prefs.textScale : 1
+
+  const apply = (next: { theme?: string; textScale?: number }) => {
+    const merged = { theme, textScale: scale, ...next }
+    setPrefs(merged)
+    localStorage.setItem('nyven_appearance_v1', JSON.stringify(merged))
+    const choice = merged.theme || 'default'
+    let resolved = choice
+    if (choice === 'system') {
+      resolved = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
+    }
+    if (choice === 'default') resolved = 'dark'
+    document.documentElement.setAttribute('data-theme', resolved === 'light' ? 'light' : 'dark')
+    document.documentElement.style.setProperty('--nyven-font-scale', `${(merged.textScale || 1) * 16}px`)
+    const meta = document.querySelector('meta[name="theme-color"]')
+    if (meta) meta.setAttribute('content', resolved === 'light' ? '#F6F4EF' : '#07090D')
+    showToast('Appearance updated')
+  }
+
+  const options = [
+    { id: 'default', label: 'Default' },
+    { id: 'system', label: 'System' },
+    { id: 'dark', label: 'Dark' },
+    { id: 'light', label: 'Light' },
+  ]
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <p className="text-sm text-[var(--nyven-text-secondary)] mb-3">Theme</p>
+        <div className="flex flex-wrap gap-2">
+          {options.map((o) => (
+            <button
+              key={o.id}
+              type="button"
+              onClick={() => apply({ theme: o.id })}
+              className={`px-4 py-2.5 rounded-2xl text-sm font-medium border transition ${
+                theme === o.id
+                  ? 'border-[var(--nyven-cyan)] text-[var(--nyven-cyan)] bg-[var(--nyven-surface)]'
+                  : 'border-[var(--nyven-border)] text-[var(--nyven-text-secondary)]'
+              }`}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div>
+        <p className="text-sm text-[var(--nyven-text-secondary)] mb-3">Text size</p>
+        <div className="rounded-2xl border border-[var(--nyven-border)] bg-[var(--nyven-surface)] p-4">
+          <input
+            type="range"
+            min={0.9}
+            max={1.25}
+            step={0.05}
+            value={scale}
+            onChange={(e) => apply({ textScale: Number(e.target.value) })}
+            className="w-full accent-[var(--nyven-cyan)]"
+          />
+          <div className="mt-4 rounded-xl bg-[var(--nyven-bg-secondary)] p-3">
+            <p className="text-[13px] text-[var(--nyven-text-secondary)] mb-2">Preview</p>
+            <div className="rounded-2xl bg-[var(--nyven-surface)] px-3 py-2 text-[15px] text-[var(--nyven-text)] inline-block mb-2">
+              What is the truth of the universe?
+            </div>
+            <p className="text-[15px] text-[var(--nyven-text)] leading-relaxed">
+              The universe is a vast system of laws and mysteries.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }
