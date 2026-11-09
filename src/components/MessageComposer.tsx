@@ -19,6 +19,7 @@ import { MicWaveCircle } from './MicWaveCircle'
 import clsx from 'clsx'
 import { ATTACHMENT_LIMITS, extensionOf, ALLOWED_EXTENSIONS, kindForMime } from '../lib/attachments/limits'
 import type { PendingAttachment, AttachmentPayload } from '../lib/attachments/types'
+import { extractZipForChat } from '../lib/attachments/zip'
 
 export type ComposerSendPayload = {
   text: string
@@ -89,7 +90,7 @@ function isAllowedFile(file: File): boolean {
 type MenuKind = 'any' | 'image' | 'document' | 'pdf'
 
 const ACCEPT: Record<MenuKind, string> = {
-  any: '.png,.jpg,.jpeg,.webp,.gif,.pdf,.txt,.md,.markdown,.json,.csv,image/png,image/jpeg,image/webp,image/gif,application/pdf,text/plain,text/markdown,application/json,text/csv',
+  any: '.png,.jpg,.jpeg,.webp,.gif,.pdf,.txt,.md,.markdown,.json,.csv,.docx,.xlsx,.zip,image/png,image/jpeg,image/webp,image/gif,application/pdf,text/plain,text/markdown,application/json,text/csv,application/zip,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   image: '.png,.jpg,.jpeg,.webp,.gif,image/png,image/jpeg,image/webp,image/gif',
   document: '.txt,.md,.markdown,.json,.csv,text/plain,text/markdown,application/json,text/csv',
   pdf: '.pdf,application/pdf',
@@ -240,6 +241,29 @@ export function MessageComposer({
       })
 
       try {
+        const ext = extensionOf(file.name)
+        // ZIP: expand in the browser only — never upload binary to the server
+        if (ext === '.zip' || file.type === 'application/zip' || file.type === 'application/x-zip-compressed') {
+          updateAttachment(id, { status: 'processing' })
+          try {
+            const extracted = await extractZipForChat(file)
+            updateAttachment(id, {
+              status: 'ready',
+              kind: 'document',
+              mimeType: 'text/plain',
+              name: file.name,
+              extractedText: extracted.textContent,
+              // Surface file count via error-free status; chip uses name
+            })
+          } catch (ze: unknown) {
+            updateAttachment(id, {
+              status: 'error',
+              error: ze instanceof Error ? ze.message : 'Could not read this archive.',
+            })
+          }
+          return
+        }
+
         const toUpload = kind === 'image' ? await compressImage(file) : file
         updateAttachment(id, {
           status: 'processing',

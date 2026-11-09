@@ -1,7 +1,14 @@
+/**
+ * Real streaming for Project AI via NVIDIA direct and/or OpenRouter.
+ * Token deltas are forwarded as-is (no fake chunking).
+ */
+
 import {
   isRetryableProviderFailure,
-  PROJECT_FALLBACK_MODEL,
+  NVIDIA_BASE_URL,
   PROJECT_PRIMARY_MODEL,
+  PROJECT_PRIMARY_MODEL_OPENROUTER,
+  PROJECT_VISION_FALLBACK_MODEL,
   USER_FACING_AI_UNAVAILABLE,
 } from './models'
 
@@ -17,6 +24,7 @@ export type OpenRouterMessage = {
 
 export type OpenRouterStreamHandlers = {
   onToken: (text: string) => void
+  onActivity?: (detail: string) => void
   signal?: AbortSignal
 }
 
@@ -26,6 +34,7 @@ export type OpenRouterStreamResult =
 
 export type OpenRouterStreamConfig = {
   apiKey: string
+  baseUrl?: string
   models?: string[]
   temperature?: number
   maxTokens?: number
@@ -50,9 +59,10 @@ async function streamOneModel(
   messages: OpenRouterMessage[],
   handlers: OpenRouterStreamHandlers
 ): Promise<OpenRouterStreamResult> {
+  const base = (cfg.baseUrl || 'https://openrouter.ai/api/v1').replace(/\/$/, '')
   let res: Response
   try {
-    res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    res = await fetch(`${base}/chat/completions`, {
       method: 'POST',
       headers: buildHeaders(cfg),
       body: JSON.stringify({
@@ -88,11 +98,16 @@ async function streamOneModel(
   let buffer = ''
   let fullText = ''
   let emitted = false
+  let activityEmitted = false
 
   try {
     while (true) {
       if (handlers.signal?.aborted) {
-        try { await reader.cancel() } catch { /* */ }
+        try {
+          await reader.cancel()
+        } catch {
+          /* */
+        }
         return { ok: true, text: fullText, model }
       }
       const { done, value } = await reader.read()
@@ -108,7 +123,14 @@ async function streamOneModel(
         if (!payload || payload === '[DONE]') continue
         try {
           const json = JSON.parse(payload) as {
-            choices?: Array<{ delta?: { content?: string | null }; message?: { content?: string } }>
+            choices?: Array<{
+              delta?: {
+                content?: string | null
+                reasoning_content?: string | null
+                reasoning?: string | null
+              }
+              message?: { content?: string }
+            }>
             error?: { message?: string }
           }
           if (json.error?.message) {
@@ -121,13 +143,21 @@ async function streamOneModel(
               message: USER_FACING_AI_UNAVAILABLE,
             }
           }
-          const delta = json.choices?.[0]?.delta?.content ?? json.choices?.[0]?.message?.content ?? ''
+          const deltaObj = json.choices?.[0]?.delta
+          const reasoning = deltaObj?.reasoning_content || deltaObj?.reasoning
+          if (reasoning && !activityEmitted) {
+            activityEmitted = true
+            handlers.onActivity?.('Thinking')
+          }
+          const delta = deltaObj?.content ?? json.choices?.[0]?.message?.content ?? ''
           if (typeof delta === 'string' && delta.length > 0) {
             fullText += delta
             emitted = true
             handlers.onToken(delta)
           }
-        } catch { /* partial JSON */ }
+        } catch {
+          /* partial JSON */
+        }
       }
     }
   } catch (err: unknown) {
@@ -141,15 +171,82 @@ async function streamOneModel(
   return { ok: true, text: fullText, model }
 }
 
+/**
+ * Stream a Project completion with model routing.
+ * - Images → vision fallback first, then primary
+ * - Text → primary (NVIDIA direct or OpenRouter), then vision fallback
+ * Only retries before meaningful content is emitted.
+ */
 export async function streamProjectChat(
-  cfg: OpenRouterStreamConfig,
+  cfg: {
+    openRouterKey?: string
+    nvidiaKey?: string
+    hasImages?: boolean
+    temperature?: number
+    maxTokens?: number
+    siteUrl?: string
+    siteName?: string
+  },
   messages: OpenRouterMessage[],
   handlers: OpenRouterStreamHandlers
 ): Promise<OpenRouterStreamResult> {
-  const chain = cfg.models?.length ? cfg.models : [PROJECT_PRIMARY_MODEL, PROJECT_FALLBACK_MODEL]
+  type Attempt = { key: string; baseUrl: string; model: string; site?: boolean }
+  const attempts: Attempt[] = []
+
+  if (cfg.hasImages) {
+    if (cfg.openRouterKey) {
+      attempts.push({
+        key: cfg.openRouterKey,
+        baseUrl: 'https://openrouter.ai/api/v1',
+        model: PROJECT_VISION_FALLBACK_MODEL,
+        site: true,
+      })
+    }
+  }
+
+  if (cfg.nvidiaKey) {
+    attempts.push({
+      key: cfg.nvidiaKey,
+      baseUrl: NVIDIA_BASE_URL,
+      model: PROJECT_PRIMARY_MODEL,
+    })
+  }
+  if (cfg.openRouterKey) {
+    attempts.push({
+      key: cfg.openRouterKey,
+      baseUrl: 'https://openrouter.ai/api/v1',
+      model: PROJECT_PRIMARY_MODEL_OPENROUTER,
+      site: true,
+    })
+    if (!cfg.hasImages) {
+      attempts.push({
+        key: cfg.openRouterKey,
+        baseUrl: 'https://openrouter.ai/api/v1',
+        model: PROJECT_VISION_FALLBACK_MODEL,
+        site: true,
+      })
+    }
+  }
+
+  if (!attempts.length) {
+    return { ok: false, code: 'CONFIG', message: USER_FACING_AI_UNAVAILABLE }
+  }
+
   let last: OpenRouterStreamResult | null = null
-  for (const model of chain) {
-    const result = await streamOneModel(cfg, model, messages, handlers)
+  for (const a of attempts) {
+    const result = await streamOneModel(
+      {
+        apiKey: a.key,
+        baseUrl: a.baseUrl,
+        temperature: cfg.temperature,
+        maxTokens: cfg.maxTokens,
+        siteUrl: a.site ? cfg.siteUrl : undefined,
+        siteName: a.site ? cfg.siteName : undefined,
+      },
+      a.model,
+      messages,
+      handlers
+    )
     if (result.ok) return result
     if (result.code === 'STREAM_INTERRUPTED' || result.code === 'ABORTED') return result
     if (result.code !== 'RETRYABLE' && result.code !== 'MODEL_UNAVAILABLE') return result
@@ -158,4 +255,9 @@ export async function streamProjectChat(
   return last || { ok: false, code: 'MODEL_UNAVAILABLE', message: USER_FACING_AI_UNAVAILABLE }
 }
 
-export { PROJECT_PRIMARY_MODEL, PROJECT_FALLBACK_MODEL, USER_FACING_AI_UNAVAILABLE }
+export {
+  PROJECT_PRIMARY_MODEL,
+  PROJECT_PRIMARY_MODEL_OPENROUTER,
+  PROJECT_VISION_FALLBACK_MODEL,
+  USER_FACING_AI_UNAVAILABLE,
+}

@@ -3,9 +3,11 @@
 export const ATTACHMENT_LIMITS = {
   MAX_FILES_PER_MESSAGE: 5,
   MAX_FILE_SIZE: 8 * 1024 * 1024,
-  MAX_TOTAL_UPLOAD_SIZE: 20 * 1024 * 1024,
-  MAX_EXTRACTED_TEXT_CHARS: 80_000,
+  MAX_ZIP_FILE_SIZE: 8 * 1024 * 1024,
+  MAX_TOTAL_UPLOAD_SIZE: 24 * 1024 * 1024,
+  MAX_EXTRACTED_TEXT_CHARS: 120_000,
   MAX_INLINE_BYTES: 7 * 1024 * 1024,
+  PROJECT_FILE_CONTEXT_CHARS: 30_000,
 } as const
 
 export const ALLOWED_EXTENSIONS: Record<string, string> = {
@@ -20,9 +22,16 @@ export const ALLOWED_EXTENSIONS: Record<string, string> = {
   '.markdown': 'text/markdown',
   '.json': 'application/json',
   '.csv': 'text/csv',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  '.zip': 'application/zip',
 }
 
-export const ALLOWED_MIME = new Set(Object.values(ALLOWED_EXTENSIONS))
+export const ALLOWED_MIME = new Set([
+  ...Object.values(ALLOWED_EXTENSIONS),
+  'application/x-zip-compressed',
+  'application/octet-stream',
+])
 
 export function extensionOf(name: string): string {
   const i = name.lastIndexOf('.')
@@ -33,16 +42,15 @@ export function resolveMime(filename: string, claimed?: string): string | null {
   const ext = extensionOf(filename)
   const fromExt = ALLOWED_EXTENSIONS[ext]
   if (!fromExt) return null
-  // Prefer extension mapping over client claim (anti-spoof)
   if (claimed && claimed !== fromExt) {
-    // Allow common jpeg aliases
     if (
       (fromExt === 'image/jpeg' && (claimed === 'image/jpg' || claimed === 'image/pjpeg')) ||
-      claimed === fromExt
+      claimed === fromExt ||
+      (fromExt === 'application/zip' &&
+        (claimed === 'application/x-zip-compressed' || claimed === 'application/octet-stream'))
     ) {
       return fromExt
     }
-    // Still use extension as source of truth when claimed differs
     return fromExt
   }
   return fromExt
@@ -50,6 +58,8 @@ export function resolveMime(filename: string, claimed?: string): string | null {
 
 export function kindForMime(mime: string): 'image' | 'document' | 'text' {
   if (mime.startsWith('image/')) return 'image'
-  if (mime === 'application/pdf') return 'document'
+  if (mime === 'application/pdf' || mime === 'application/zip' || mime.includes('officedocument')) {
+    return 'document'
+  }
   return 'text'
 }

@@ -38,6 +38,7 @@ export type CoreRuntimeEnv = {
   BRAVE_SEARCH_API_KEY?: string
   TAVILY_API_KEY?: string
   OPENROUTER_API_KEY?: string
+  NVIDIA_API_KEY?: string
   APP_URL?: string
 }
 
@@ -146,7 +147,8 @@ export async function runCore(
   // ── Project mode: OpenRouter Nemotron (real streaming + fallback) ──
   if (projectId) {
     const orKey = (env.OPENROUTER_API_KEY || '').trim()
-    if (!orKey) {
+    const nvidiaKey = (env.NVIDIA_API_KEY || '').trim()
+    if (!orKey && !nvidiaKey) {
       const message = USER_FACING_AI_UNAVAILABLE
       emit(emitFn, { type: 'error', code: 'CONFIG', message, timestamp: Date.now() })
       return { messageId, text: '', error: { code: 'CONFIG', message } }
@@ -161,6 +163,11 @@ export async function runCore(
 
     const systemPartsProject = [NYVEN_SYSTEM_INSTRUCTION]
     if (projectContext) systemPartsProject.push(projectContext)
+    const memoryContext =
+      typeof rawRequest.metadata?.memoryContext === 'string'
+        ? rawRequest.metadata.memoryContext.trim()
+        : ''
+    if (memoryContext) systemPartsProject.push(memoryContext)
     systemPartsProject.push(
       "You are assisting inside a NYVEN Project workspace. Be professional, organized, and precise. Process the user's actual request dynamically. Do not invent completed work."
     )
@@ -190,7 +197,7 @@ export async function runCore(
           image_url: { url: `data:${mime};base64,${a.inlineBase64}` },
         })
       } else if (a.extractedText) {
-        textBits.push(`[Attachment: ${a.name}]\n${a.extractedText.slice(0, 12000)}`)
+        textBits.push(`[Attachment: ${a.name}]\n${a.extractedText.slice(0, 40000)}`)
       } else if (a.name) {
         textBits.push(`[Attachment: ${a.name}]`)
       }
@@ -210,10 +217,13 @@ export async function runCore(
       timestamp: Date.now(),
     })
 
+    const hasImages = imageParts.length > 0
     let full = ''
     const streamResult = await streamProjectChat(
       {
-        apiKey: orKey,
+        openRouterKey: orKey || undefined,
+        nvidiaKey: nvidiaKey || undefined,
+        hasImages,
         siteUrl: env.APP_URL || 'https://nyven.vexdyn.tech',
         siteName: 'NYVEN',
       },
@@ -223,6 +233,14 @@ export async function runCore(
         onToken: (text) => {
           full += text
           emit(emitFn, { type: 'token', text, timestamp: Date.now() })
+        },
+        onActivity: (detail) => {
+          emit(emitFn, {
+            type: 'activity',
+            state: 'thinking',
+            detail,
+            timestamp: Date.now(),
+          })
         },
       }
     )

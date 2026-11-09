@@ -59,6 +59,7 @@ export type CoreRequest = {
     client?: string
     projectId?: string
     projectContext?: string
+    memoryContext?: string
   }
 }
 

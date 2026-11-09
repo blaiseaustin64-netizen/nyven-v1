@@ -7,11 +7,12 @@ export const ATTACHMENT_LIMITS = {
   MAX_FILES_PER_MESSAGE: 5,
   /** Per-file max (bytes) */
   MAX_FILE_SIZE: 8 * 1024 * 1024, // 8 MB
+  MAX_ZIP_FILE_SIZE: 8 * 1024 * 1024,
   /** Sum of all files in one message */
-  MAX_TOTAL_UPLOAD_SIZE: 20 * 1024 * 1024, // 20 MB
+  MAX_TOTAL_UPLOAD_SIZE: 24 * 1024 * 1024,
   /** Max characters of extracted text sent to the model */
-  MAX_EXTRACTED_TEXT_CHARS: 80_000,
-  /** Max base64 payload we keep for a single image/pdf inline to Gemini */
+  MAX_EXTRACTED_TEXT_CHARS: 120_000,
+  /** Max base64 payload we keep for a single image/pdf inline */
   MAX_INLINE_BYTES: 7 * 1024 * 1024,
 } as const
 
@@ -28,9 +29,15 @@ export const ALLOWED_EXTENSIONS: Record<string, string> = {
   '.markdown': 'text/markdown',
   '.json': 'application/json',
   '.csv': 'text/csv',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  '.zip': 'application/zip',
 }
 
-export const ALLOWED_MIME_TYPES = new Set(Object.values(ALLOWED_EXTENSIONS))
+export const ALLOWED_MIME_TYPES = new Set([
+  ...Object.values(ALLOWED_EXTENSIONS),
+  'application/x-zip-compressed',
+])
 
 export function extensionOf(filename: string): string {
   const i = filename.lastIndexOf('.')
@@ -40,6 +47,13 @@ export function extensionOf(filename: string): string {
 
 export function kindForMime(mime: string): 'image' | 'document' | 'text' {
   if (mime.startsWith('image/')) return 'image'
-  if (mime === 'application/pdf') return 'document'
+  if (
+    mime === 'application/pdf' ||
+    mime === 'application/zip' ||
+    mime === 'application/x-zip-compressed' ||
+    mime.includes('officedocument')
+  ) {
+    return 'document'
+  }
   return 'text'
 }

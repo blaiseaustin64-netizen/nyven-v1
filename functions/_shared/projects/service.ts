@@ -763,6 +763,38 @@ export async function buildProjectContextBlock(
   const tasks = await listTasks(db, userId, projectId)
   const openTasks = (tasks || []).filter((tk) => tk.status !== 'done').slice(0, 12)
   const doneTasks = (tasks || []).filter((tk) => tk.status === 'done').slice(0, 6)
+
+  let filesBlock: string | null = null
+  try {
+    const rows = await db
+      .prepare(
+        `SELECT name, extracted_text, metadata_json, created_at FROM project_files
+         WHERE project_id = ? AND user_id = ? ORDER BY created_at DESC LIMIT 40`
+      )
+      .bind(projectId, userId)
+      .all<{ name: string; extracted_text?: string; metadata_json?: string; created_at: string }>()
+    const parts: string[] = []
+    let budget = 30000
+    for (const r of rows.results || []) {
+      let text = r.extracted_text || ''
+      if (!text && r.metadata_json) {
+        try {
+          const m = JSON.parse(r.metadata_json) as { extractedText?: string }
+          text = m.extractedText || ''
+        } catch { /* */ }
+      }
+      const snippet = text ? text.slice(0, Math.min(8000, budget)) : ''
+      const line = snippet
+        ? `- ${r.name}:\n${snippet}`
+        : `- ${r.name}`
+      if (line.length > budget) break
+      parts.push(line)
+      budget -= line.length
+      if (budget <= 0) break
+    }
+    if (parts.length) filesBlock = `Project files (newest first):\n${parts.join('\n\n')}`
+  } catch { /* */ }
+
   const lines = [
     '[NYVEN PROJECT CONTEXT]',
     `Project: ${pub.title}`,
@@ -777,6 +809,7 @@ export async function buildProjectContextBlock(
     doneTasks.length
       ? `Recently completed:\n${doneTasks.map((tk) => `- ${tk.title}`).join('\n')}`
       : null,
+    filesBlock,
     'Behave as a professional project partner for this workspace. Prefer organized, decision-aware answers. Do not invent completed work.',
     '[/NYVEN PROJECT CONTEXT]',
   ].filter(Boolean)

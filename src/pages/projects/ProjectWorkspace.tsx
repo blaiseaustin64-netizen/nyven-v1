@@ -3,14 +3,14 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft,
   MessageSquare,
-  LayoutDashboard,
   FileText,
-  ListTodo,
-  Activity as ActivityIcon,
-  Settings,
+  MoreHorizontal,
   Plus,
   Trash2,
   Check,
+  Image as ImageIcon,
+  File,
+  X,
 } from 'lucide-react'
 import clsx from 'clsx'
 import { useAuth } from '../../lib/auth/AuthContext'
@@ -32,24 +32,42 @@ import { ChatMessage } from '../../components/ChatMessage'
 import { streamCoreChat } from '../../lib/core/streamClient'
 import type { Message } from '../../lib/types'
 import type { ActivityState } from '../../lib/core/types'
+import { useKeyboardOpen } from '../../hooks/useKeyboardOpen'
+import { useComposerVoice } from '../../hooks/useComposerVoice'
+import { VoiceChatScreen } from '../../components/voice/VoiceChatScreen'
+import { buildMemoryContext } from '../../lib/memoryStore'
 
-type Tab = 'overview' | 'chat' | 'files' | 'instructions' | 'activity' | 'settings'
+type Tab = 'chat' | 'files' | 'details'
 
-const TABS: { id: Tab; label: string; icon: typeof LayoutDashboard; mobile?: boolean }[] = [
-  { id: 'overview', label: 'Overview', icon: LayoutDashboard, mobile: true },
-  { id: 'chat', label: 'Chat', icon: MessageSquare, mobile: true },
-  { id: 'files', label: 'Files', icon: FileText, mobile: true },
-  { id: 'instructions', label: 'Instructions', icon: FileText },
-  { id: 'activity', label: 'Activity', icon: ActivityIcon },
-  { id: 'settings', label: 'Settings', icon: Settings, mobile: true },
+type ProjectFileRow = {
+  id: string
+  name: string
+  mimeType: string
+  size: number
+  kind: string
+  createdAt: string
+  stored?: boolean
+}
+
+const TABS: { id: Tab; label: string; icon: typeof MessageSquare }[] = [
+  { id: 'chat', label: 'Chat', icon: MessageSquare },
+  { id: 'files', label: 'Files', icon: FileText },
+  { id: 'details', label: 'Details', icon: MoreHorizontal },
 ]
+
+function formatSize(n: number) {
+  if (n < 1024) return `${n} B`
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`
+}
 
 export function ProjectWorkspace() {
   const { projectId = '' } = useParams()
   const [search, setSearch] = useSearchParams()
   const navigate = useNavigate()
   const { user } = useAuth()
-  const tab = (search.get('tab') as Tab) || 'overview'
+  const keyboardOpen = useKeyboardOpen()
+  const tab = ((search.get('tab') as Tab) || 'chat') as Tab
   const setTab = (t: Tab) => {
     const next = new URLSearchParams(search)
     next.set('tab', t)
@@ -57,26 +75,34 @@ export function ProjectWorkspace() {
   }
 
   const [project, setProject] = useState<AiProject | null>(null)
-  const [chats, setChats] = useState<ProjectChat[]>([])
+  const [thread, setThread] = useState<ProjectChat | null>(null)
   const [tasks, setTasks] = useState<ProjectTask[]>([])
   const [activity, setActivity] = useState<ProjectActivity[]>([])
+  const [files, setFiles] = useState<ProjectFileRow[]>([])
+  const [durableStorage, setDurableStorage] = useState(true)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [activeChatId, setActiveChatId] = useState<string | null>(search.get('c'))
   const [messages, setMessages] = useState<Message[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
-  const [chatBusy, setChatBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
-  const abortRef = useRef<AbortController | null>(null)
   const [instrDraft, setInstrDraft] = useState('')
-  const [nameDraft, setNameDraft] = useState('')
   const [descDraft, setDescDraft] = useState('')
+  const [nameDraft, setNameDraft] = useState('')
   const [saving, setSaving] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState('')
   const [newTaskTitle, setNewTaskTitle] = useState('')
+  const [fileSheetOpen, setFileSheetOpen] = useState(false)
+  const [uploadBusy, setUploadBusy] = useState(false)
+  const [activityOpen, setActivityOpen] = useState(false)
+  const abortRef = useRef<AbortController | null>(null)
+  const bottomRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const acceptRef = useRef('image/*,.pdf,.txt,.md,.json,.csv,.docx,.xlsx,.zip')
+
+  const voice = useComposerVoice({ isGenerating })
 
   const reload = useCallback(async () => {
-    if (!projectId || !user?.id) return
+    if (!projectId || !user?.id || projectId === 'new') return
     setLoading(true)
     setError(null)
     const data = await fetchProject(projectId)
@@ -87,12 +113,23 @@ export function ProjectWorkspace() {
       return
     }
     setProject(data.project)
-    setChats(data.chats)
     setTasks(data.tasks)
     setActivity(data.activity)
     setInstrDraft(data.project.instructions || '')
-    setNameDraft(data.project.name || data.project.title)
     setDescDraft(data.project.description || '')
+    setNameDraft(data.project.name || data.project.title)
+
+    // One continuous thread: newest chat, or create with project name
+    const sorted = [...(data.chats || [])].sort(
+      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+    )
+    let main = sorted[0] || null
+    if (!main) {
+      const created = await createProjectChat(projectId, data.project.name || data.project.title)
+      if (created.chat) main = created.chat
+      else setActionError(created.error || null)
+    }
+    setThread(main)
     setLoading(false)
   }, [projectId, user?.id])
 
@@ -100,15 +137,16 @@ export function ProjectWorkspace() {
     void reload()
   }, [reload])
 
+  // Load messages for the single thread
   useEffect(() => {
-    if (!activeChatId || !user?.id) {
+    if (!thread?.id || !user?.id) {
       setMessages([])
       return
     }
     let cancelled = false
     void (async () => {
       try {
-        const res = await fetch(`/api/conversations/${activeChatId}`, { credentials: 'include' })
+        const res = await fetch(`/api/conversations/${thread.id}`, { credentials: 'include' })
         const data = await res.json().catch(() => ({}))
         if (!cancelled && res.ok && Array.isArray(data.messages)) {
           setMessages(
@@ -127,185 +165,198 @@ export function ProjectWorkspace() {
     return () => {
       cancelled = true
     }
-  }, [activeChatId, user?.id])
+  }, [thread?.id, user?.id])
 
-  const openChat = (id: string) => {
-    setActiveChatId(id)
-    setActionError(null)
-    const next = new URLSearchParams(search)
-    next.set('tab', 'chat')
-    next.set('c', id)
-    setSearch(next, { replace: true })
-  }
-
-  const handleNewChat = async () => {
-    if (!projectId || projectId === 'new') {
-      setActionError('Invalid project.')
-      return
-    }
-    if (chatBusy) return
-    setChatBusy(true)
-    setActionError(null)
-    // Always switch to chat tab so the user sees progress / errors
-    const next = new URLSearchParams(search)
-    next.set('tab', 'chat')
-    setSearch(next, { replace: true })
+  const loadFiles = useCallback(async () => {
+    if (!projectId || !user?.id) return
     try {
-      const result = await createProjectChat(projectId)
-      if (!result.chat) {
-        setActionError(result.error || 'Could not start project chat. Please try again.')
-        return
+      const res = await fetch(`/api/projects/${projectId}/files`, { credentials: 'include' })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok && Array.isArray(data.files)) {
+        setFiles(data.files)
+        setDurableStorage(data.durableStorage !== false)
       }
-      setChats((prev) => [result.chat!, ...prev.filter((c) => c.id !== result.chat!.id)])
-      openChat(result.chat.id)
     } catch {
-      setActionError('Could not start project chat. Please try again.')
-    } finally {
-      setChatBusy(false)
+      /* */
     }
-  }
+  }, [projectId, user?.id])
 
-  const handleSend = async (payload: ComposerSendPayload) => {
-    if (!projectId || !activeChatId || isGenerating) return
-    const text = (payload.text || '').trim()
-    if (!text && !(payload.attachments?.length)) return
+  useEffect(() => {
+    if (tab === 'files') void loadFiles()
+  }, [tab, loadFiles])
 
-    const userMsg: Message = {
-      id: crypto.randomUUID(),
-      role: 'user',
-      content: text || 'Attachment',
-      timestamp: Date.now(),
-    }
-    const streamId = crypto.randomUUID()
-    const streamMsg: Message = {
-      id: streamId,
-      role: 'nyven',
-      content: '',
-      timestamp: Date.now(),
-      isThinking: true,
-      isStreaming: true,
-      activityState: 'thinking',
-    }
-    const history = messages
-      .filter((m) => m.role === 'user' || m.role === 'nyven')
-      .map((m) => ({
-        role: (m.role === 'nyven' ? 'assistant' : 'user') as 'user' | 'assistant',
-        content: m.content,
-      }))
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages, isGenerating])
 
-    setMessages((prev) => [...prev, userMsg, streamMsg])
-    setIsGenerating(true)
-    const controller = new AbortController()
-    abortRef.current = controller
+  const handleSend = useCallback(
+    async (payload: ComposerSendPayload, opts?: { fromVoice?: boolean }) => {
+      if (!projectId || !thread?.id || isGenerating) return
+      const text = typeof payload === 'string' ? payload : (payload.text || '').trim()
+      const attachments = typeof payload === 'string' ? [] : payload.attachments || []
+      if (!text && !attachments.length) return
 
-    // Persist user message + ensure conversation linked to project
-    try {
-      await fetch(`/api/conversations/${activeChatId}`, {
-        method: 'PUT',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ project_id: projectId }),
-      })
-      await fetch(`/api/conversations/${activeChatId}/messages`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: text.slice(0, 40) || 'Chat',
-          messages: [{ id: userMsg.id, role: 'user', content: userMsg.content, createdAt: userMsg.timestamp }],
-        }),
-      })
-    } catch { /* */ }
+      const userMsg: Message = {
+        id: crypto.randomUUID(),
+        role: 'user',
+        content: text || 'Attachment',
+        timestamp: Date.now(),
+      }
+      const streamId = crypto.randomUUID()
+      const streamMsg: Message = {
+        id: streamId,
+        role: 'nyven',
+        content: '',
+        timestamp: Date.now(),
+        isThinking: true,
+        isStreaming: true,
+        activityState: 'thinking',
+      }
+      const history = messages
+        .filter((m) => m.role === 'user' || m.role === 'nyven')
+        .map((m) => ({
+          role: (m.role === 'nyven' ? 'assistant' : 'user') as 'user' | 'assistant',
+          content: m.content,
+        }))
 
-    let full = ''
-    try {
-      await streamCoreChat(
-        {
-          message: text || 'Please analyze the attached content.',
-          history,
-          signal: controller.signal,
-          metadata: { projectId, conversationId: activeChatId },
-        },
-        {
-          onActivity: (state: ActivityState, detail?: string) => {
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === streamId
-                  ? {
-                      ...m,
-                      activityState: state,
-                      activityDetail: detail,
-                      isThinking: state === 'thinking' && !m.content,
-                      isStreaming: state === 'generating' || state === 'thinking',
-                    }
-                  : m
-              )
-            )
+      setMessages((prev) => [...prev, userMsg, streamMsg])
+      setIsGenerating(true)
+      const controller = new AbortController()
+      abortRef.current = controller
+
+      const title = project?.name || project?.title || 'Project'
+      try {
+        await fetch(`/api/conversations/${thread.id}`, {
+          method: 'PUT',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ project_id: projectId, title }),
+        })
+        await fetch(`/api/conversations/${thread.id}/messages`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title,
+            messages: [
+              {
+                id: userMsg.id,
+                role: 'user',
+                content: userMsg.content,
+                createdAt: userMsg.timestamp,
+              },
+            ],
+          }),
+        })
+      } catch {
+        /* */
+      }
+
+      let full = ''
+      try {
+        const memoryCtx = await buildMemoryContext(user?.id ?? null)
+        await streamCoreChat(
+          {
+            message: text || 'Please analyze the attached content.',
+            history,
+            attachments: attachments as any,
+            signal: controller.signal,
+            metadata: {
+              projectId,
+              conversationId: thread.id,
+              memoryContext: memoryCtx || undefined,
+            },
           },
-          onToken: (tokenText: string) => {
-            full += tokenText
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === streamId
-                  ? { ...m, content: full, isThinking: false, isStreaming: true, activityState: 'generating' }
-                  : m
+          {
+            onActivity: (state: ActivityState, detail?: string) => {
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === streamId
+                    ? {
+                        ...m,
+                        activityState: state,
+                        activityDetail: detail,
+                        isThinking: state === 'thinking' && !m.content,
+                        isStreaming: state === 'generating' || state === 'thinking',
+                      }
+                    : m
+                )
               )
-            )
-          },
-          onDone: () => {
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === streamId
-                  ? { ...m, isStreaming: false, isThinking: false, activityState: undefined }
-                  : m
+            },
+            onToken: (tokenText: string) => {
+              full += tokenText
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === streamId
+                    ? {
+                        ...m,
+                        content: full,
+                        isThinking: false,
+                        isStreaming: true,
+                        activityState: 'generating',
+                      }
+                    : m
+                )
               )
-            )
-            void fetch(`/api/conversations/${activeChatId}/messages`, {
-              method: 'POST',
-              credentials: 'include',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                messages: [{ id: streamId, role: 'assistant', content: full, createdAt: Date.now() }],
-              }),
-            })
-          },
-          onError: (_code, message) => {
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === streamId
-                  ? {
-                      ...m,
-                      content: message || 'Something went wrong.',
-                      isStreaming: false,
-                      isThinking: false,
-                    }
-                  : m
+            },
+            onDone: () => {
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === streamId
+                    ? { ...m, isStreaming: false, isThinking: false, activityState: undefined }
+                    : m
+                )
               )
-            )
-          },
-        }
-      )
-    } finally {
-      setIsGenerating(false)
-      abortRef.current = null
-    }
-  }
+              void fetch(`/api/conversations/${thread.id}/messages`, {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  title,
+                  messages: [
+                    { id: streamId, role: 'assistant', content: full, createdAt: Date.now() },
+                  ],
+                }),
+              })
+              if (opts?.fromVoice || voice.fromVoiceRef.current) {
+                void voice.speakReply(full)
+              } else {
+                voice.markVoiceSubmitDone()
+              }
+            },
+            onError: (_code, message) => {
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === streamId
+                    ? {
+                        ...m,
+                        content: message || 'Something went wrong.',
+                        isStreaming: false,
+                        isThinking: false,
+                      }
+                    : m
+                )
+              )
+              voice.markVoiceSubmitDone()
+            },
+          }
+        )
+      } finally {
+        setIsGenerating(false)
+        abortRef.current = null
+      }
+    },
+    [projectId, thread?.id, isGenerating, messages, project, user?.id, voice]
+  )
 
-  const saveInstructions = async () => {
+  useEffect(() => {
+    voice.setSendHandler((payload, opts) => handleSend(payload as ComposerSendPayload, opts))
+  }, [handleSend, voice])
+
+  const saveDetails = async (fields: { name?: string; description?: string; instructions?: string }) => {
     if (!projectId) return
     setSaving(true)
-    const updated = await updateProject(projectId, { instructions: instrDraft })
-    if (updated) setProject(updated)
-    setSaving(false)
-  }
-
-  const saveGeneral = async () => {
-    if (!projectId) return
-    setSaving(true)
-    const updated = await updateProject(projectId, {
-      name: nameDraft,
-      description: descDraft,
-    })
+    const updated = await updateProject(projectId, fields)
     if (updated) setProject(updated)
     setSaving(false)
   }
@@ -341,6 +392,47 @@ export function ProjectWorkspace() {
     }
   }
 
+  const uploadProjectFile = async (file: File) => {
+    if (!projectId) return
+    setUploadBusy(true)
+    setActionError(null)
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      const res = await fetch(`/api/projects/${projectId}/files`, {
+        method: 'POST',
+        credentials: 'include',
+        body: form,
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.success) {
+        setActionError(data.error || 'Could not upload file.')
+      } else {
+        if (data.note) setDurableStorage(false)
+        await loadFiles()
+      }
+    } catch {
+      setActionError('Could not upload file.')
+    } finally {
+      setUploadBusy(false)
+      setFileSheetOpen(false)
+    }
+  }
+
+  const deleteFile = async (fileId: string) => {
+    if (!projectId) return
+    await fetch(`/api/projects/${projectId}/files?fileId=${encodeURIComponent(fileId)}`, {
+      method: 'DELETE',
+      credentials: 'include',
+    })
+    setFiles((prev) => prev.filter((f) => f.id !== fileId))
+  }
+
+  if (projectId === 'new') {
+    navigate('/projects/new', { replace: true })
+    return null
+  }
+
   if (!user) {
     return (
       <div className="h-full flex items-center justify-center p-6 text-sm text-nyven-text-secondary">
@@ -357,11 +449,6 @@ export function ProjectWorkspace() {
     )
   }
 
-  if (projectId === 'new') {
-    navigate('/projects/new', { replace: true })
-    return null
-  }
-
   if (error || !project) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-3 p-6">
@@ -373,120 +460,205 @@ export function ProjectWorkspace() {
     )
   }
 
-  const mobileTabs = TABS.filter((t) => t.mobile)
+  const projectTitle = project.name || project.title
 
   return (
-    <div className="h-full flex flex-col min-h-0">
-      {/* Header */}
-      <div className="shrink-0 border-b border-white/[0.07] px-3 sm:px-5 py-3">
-        <div className="flex items-center gap-2 mb-2">
-          <button
-            type="button"
-            onClick={() => navigate('/projects')}
-            className="p-2 rounded-lg text-nyven-text-secondary hover:bg-white/[0.05] min-h-[40px] min-w-[40px] grid place-items-center"
-            aria-label="Back to projects"
-          >
-            <ArrowLeft size={18} />
-          </button>
-          <div className="min-w-0 flex-1">
-            <h1 className="font-medium text-[15px] truncate">{project.name || project.title}</h1>
-            <p className="text-[11px] text-nyven-text-secondary truncate">
-              Updated {formatRelative(project.updatedAt)}
-            </p>
-          </div>
-        </div>
-        {/* Desktop tabs */}
-        <nav className="hidden sm:flex gap-1 overflow-x-auto">
-          {TABS.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setTab(id)}
-              className={clsx(
-                'inline-flex items-center gap-1.5 px-3 h-9 rounded-lg text-xs font-medium transition-colors',
-                tab === id
-                  ? 'bg-white/[0.08] text-nyven-text'
-                  : 'text-nyven-text-secondary hover:text-nyven-text hover:bg-white/[0.04]'
-              )}
-            >
-              <Icon size={14} />
-              {label}
-            </button>
-          ))}
-        </nav>
-      </div>
+    <div className="h-full flex flex-col min-h-0 bg-nyven-bg">
+      {/* Mobile-first header — no global hamburger row on this page (App hides MobileNavBar) */}
+      <header className="shrink-0 h-[52px] px-2 sm:px-3 border-b border-white/[0.07] flex items-center gap-1">
+        <button
+          type="button"
+          onClick={() => navigate('/projects')}
+          className="w-11 h-11 rounded-xl grid place-items-center text-nyven-text-secondary hover:bg-white/[0.05]"
+          aria-label="Back to projects"
+        >
+          <ArrowLeft size={20} />
+        </button>
+        <h1 className="flex-1 min-w-0 font-medium text-[15px] truncate px-1">{projectTitle}</h1>
+        <button
+          type="button"
+          onClick={() => setTab('details')}
+          className="w-11 h-11 rounded-xl grid place-items-center text-nyven-text-secondary hover:bg-white/[0.05]"
+          aria-label="Project details"
+        >
+          <MoreHorizontal size={20} />
+        </button>
+      </header>
 
-      {/* Body */}
-      <div className="flex-1 min-h-0 overflow-y-auto">
-        {tab === 'overview' && (
-          <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
-            <section>
-              <h2 className="text-xs font-medium uppercase tracking-wider text-nyven-text-secondary mb-2">
-                About
-              </h2>
-              <p className="text-sm text-nyven-text leading-relaxed">
-                {project.description || 'No description yet.'}
-              </p>
-              <p className="text-xs text-nyven-text-secondary mt-2">Status: {project.status}</p>
-            </section>
+      <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+        {tab === 'chat' && (
+          <>
+            <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4">
+              <div className="max-w-3xl mx-auto space-y-4">
+                {messages.length === 0 && (
+                  <div className="py-12 text-center">
+                    <h2 className="font-display text-xl font-medium mb-2">{projectTitle}</h2>
+                    <p className="text-sm text-nyven-text-secondary leading-relaxed max-w-md mx-auto mb-6">
+                      {project.description || 'Ask anything about this project'}
+                    </p>
+                    <p className="text-xs text-nyven-text-secondary/80">Ask anything about this project</p>
+                  </div>
+                )}
+                {messages.map((m) => (
+                  <ChatMessage key={m.id} message={m} />
+                ))}
+                <div ref={bottomRef} />
+              </div>
+            </div>
+            {actionError && (
+              <p className="px-4 text-xs text-red-300/90 text-center pb-1">{actionError}</p>
+            )}
+            <div className="shrink-0 border-t border-white/[0.07] p-2 sm:p-3 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+              <div className="max-w-3xl mx-auto">
+                <MessageComposer
+                  onSend={(p) => void handleSend(p)}
+                  isGenerating={isGenerating}
+                  onStop={() => abortRef.current?.abort()}
+                  placeholder="Message this project…"
+                  onVoiceToggle={voice.onVoiceToggle}
+                  voicePhase={voice.voicePhase}
+                  voiceEnergy={voice.voiceEnergy}
+                  onOpenVoiceChat={voice.openVoiceChat}
+                />
+              </div>
+            </div>
+          </>
+        )}
 
-            <section>
-              <div className="flex items-center justify-between mb-2">
-                <h2 className="text-xs font-medium uppercase tracking-wider text-nyven-text-secondary">
-                  Recent chats
+        {tab === 'files' && (
+          <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4">
+            <div className="max-w-3xl mx-auto">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-medium">
+                  Files <span className="text-nyven-text-secondary font-normal">({files.length})</span>
                 </h2>
                 <button
                   type="button"
-                  onClick={() => void handleNewChat()}
-                  className="text-xs text-nyven-cyan inline-flex items-center gap-1 min-h-[36px]"
+                  onClick={() => setFileSheetOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3 h-10 rounded-xl bg-nyven-cyan text-nyven-bg text-sm font-medium"
                 >
-                  <Plus size={14} /> New chat
+                  <Plus size={16} /> Add
                 </button>
               </div>
-              {chats.length === 0 ? (
-                <p className="text-sm text-nyven-text-secondary">No chats yet.</p>
+              {!durableStorage && (
+                <p className="text-xs text-nyven-text-secondary mb-3 leading-relaxed">
+                  Text from files is saved with the project. Original images may not be kept until durable
+                  storage is configured.
+                </p>
+              )}
+              {actionError && <p className="text-xs text-red-300/90 mb-3">{actionError}</p>}
+              {files.length === 0 ? (
+                <div className="py-16 text-center text-sm text-nyven-text-secondary">
+                  No files yet. Add photos, documents, or a zip.
+                </div>
               ) : (
                 <ul className="space-y-1">
-                  {chats.slice(0, 5).map((c) => (
-                    <li key={c.id}>
+                  {files.map((f) => (
+                    <li
+                      key={f.id}
+                      className="flex items-center gap-3 px-3 py-3 rounded-xl border border-white/[0.06] bg-white/[0.02]"
+                    >
+                      <span className="w-10 h-10 rounded-lg bg-white/[0.06] grid place-items-center text-nyven-cyan shrink-0">
+                        {f.kind === 'image' ? <ImageIcon size={18} /> : <File size={18} />}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm truncate">{f.name}</p>
+                        <p className="text-[11px] text-nyven-text-secondary">
+                          {formatSize(f.size)} · {f.mimeType.split('/').pop()}
+                        </p>
+                      </div>
                       <button
                         type="button"
-                        onClick={() => openChat(c.id)}
-                        className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-white/[0.04] text-sm text-nyven-text min-h-[44px]"
+                        onClick={() => void deleteFile(f.id)}
+                        className="w-10 h-10 grid place-items-center text-nyven-text-secondary hover:text-red-300"
+                        aria-label={`Delete ${f.name}`}
                       >
-                        {c.title}
+                        <Trash2 size={16} />
                       </button>
                     </li>
                   ))}
                 </ul>
               )}
-            </section>
+            </div>
+          </div>
+        )}
 
-            <section>
-              <h2 className="text-xs font-medium uppercase tracking-wider text-nyven-text-secondary mb-2">
-                Tasks
-              </h2>
-              {tasks.length === 0 ? (
-                <p className="text-sm text-nyven-text-secondary">No tasks yet.</p>
-              ) : (
+        {tab === 'details' && (
+          <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4">
+            <div className="max-w-3xl mx-auto space-y-4">
+              <section className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-4">
+                <h3 className="text-xs uppercase tracking-wider text-nyven-text-secondary mb-2">Name</h3>
+                <input
+                  value={nameDraft}
+                  onChange={(e) => setNameDraft(e.target.value.slice(0, 120))}
+                  onBlur={() => {
+                    if (nameDraft.trim() && nameDraft !== projectTitle) {
+                      void saveDetails({ name: nameDraft.trim() })
+                    }
+                  }}
+                  className="w-full h-11 px-3 rounded-xl bg-white/[0.03] border border-white/[0.08] text-sm outline-none focus:border-nyven-cyan/35"
+                />
+              </section>
+
+              <section className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-4">
+                <h3 className="text-xs uppercase tracking-wider text-nyven-text-secondary mb-2">
+                  Description
+                </h3>
+                <textarea
+                  value={descDraft}
+                  onChange={(e) => setDescDraft(e.target.value.slice(0, 2000))}
+                  onBlur={() => void saveDetails({ description: descDraft })}
+                  rows={3}
+                  className="w-full px-3 py-2 rounded-xl bg-white/[0.03] border border-white/[0.08] text-sm outline-none focus:border-nyven-cyan/35 resize-y"
+                />
+              </section>
+
+              <section className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-4">
+                <h3 className="text-xs uppercase tracking-wider text-nyven-text-secondary mb-2">
+                  Instructions
+                </h3>
+                <textarea
+                  value={instrDraft}
+                  onChange={(e) => setInstrDraft(e.target.value.slice(0, 8000))}
+                  rows={5}
+                  className="w-full px-3 py-2 rounded-xl bg-white/[0.03] border border-white/[0.08] text-sm outline-none focus:border-nyven-cyan/35 resize-y min-h-[120px]"
+                />
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => void saveDetails({ instructions: instrDraft })}
+                  className="mt-2 px-4 h-10 rounded-xl bg-nyven-cyan text-nyven-bg text-sm font-medium disabled:opacity-50"
+                >
+                  {saving ? 'Saving…' : 'Save'}
+                </button>
+              </section>
+
+              <section className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-4">
+                <h3 className="text-xs uppercase tracking-wider text-nyven-text-secondary mb-2">Tasks</h3>
+                <div className="flex gap-2 mb-2">
+                  <input
+                    value={newTaskTitle}
+                    onChange={(e) => setNewTaskTitle(e.target.value)}
+                    placeholder="New task"
+                    className="flex-1 h-10 px-3 rounded-xl bg-white/[0.03] border border-white/[0.08] text-sm outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void addTask()}
+                    className="px-3 h-10 rounded-xl border border-white/[0.1] text-sm"
+                  >
+                    Add
+                  </button>
+                </div>
                 <ul className="space-y-1">
-                  {tasks.slice(0, 8).map((t) => (
-                    <li
-                      key={t.id}
-                      className="flex items-center gap-2 px-2 py-2 text-sm text-nyven-text"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => void toggleTaskDone(t)}
-                        className={clsx(
-                          'w-5 h-5 rounded border grid place-items-center shrink-0',
-                          t.status === 'done'
-                            ? 'bg-nyven-cyan/20 border-nyven-cyan/40 text-nyven-cyan'
-                            : 'border-white/20'
+                  {tasks.map((t) => (
+                    <li key={t.id} className="flex items-center gap-2 text-sm py-1.5">
+                      <button type="button" onClick={() => void toggleTaskDone(t)} className="shrink-0">
+                        {t.status === 'done' ? (
+                          <Check size={16} className="text-nyven-cyan" />
+                        ) : (
+                          <span className="w-4 h-4 rounded border border-white/25 block" />
                         )}
-                        aria-label={t.status === 'done' ? 'Mark todo' : 'Mark done'}
-                      >
-                        {t.status === 'done' && <Check size={12} />}
                       </button>
                       <span className={clsx(t.status === 'done' && 'line-through opacity-60')}>
                         {t.title}
@@ -494,285 +666,147 @@ export function ProjectWorkspace() {
                     </li>
                   ))}
                 </ul>
-              )}
-            </section>
+              </section>
 
-            <section>
-              <h2 className="text-xs font-medium uppercase tracking-wider text-nyven-text-secondary mb-2">
-                Recent activity
-              </h2>
-              {activity.length === 0 ? (
-                <p className="text-sm text-nyven-text-secondary">No activity yet.</p>
-              ) : (
-                <ul className="space-y-2">
-                  {activity.slice(0, 8).map((a) => (
-                    <li key={a.id} className="text-sm text-nyven-text-secondary">
-                      <span className="text-nyven-text">{activityLabel(a.eventType)}</span>
-                      <span className="ml-2 text-[11px]">{formatRelative(a.createdAt)}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-
-            <button
-              type="button"
-              disabled={chatBusy}
-              onClick={() => {
-                if (activeChatId) {
-                  openChat(activeChatId)
-                } else if (chats[0]) {
-                  openChat(chats[0].id)
-                } else {
-                  void handleNewChat()
-                }
-              }}
-              className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-nyven-cyan text-nyven-bg text-sm font-medium min-h-[44px] disabled:opacity-50"
-            >
-              {chatBusy ? 'Starting…' : activeChatId || chats[0] ? 'Continue working' : 'Start Project Chat'}
-            </button>
-          </div>
-        )}
-
-        {tab === 'chat' && (
-          <div className="h-full flex min-h-0 flex-col sm:flex-row">
-            <aside className="sm:w-56 shrink-0 border-b sm:border-b-0 sm:border-r border-white/[0.07] max-h-40 sm:max-h-none overflow-y-auto">
-              <div className="p-2 flex items-center justify-between">
-                <span className="text-[11px] uppercase tracking-wider text-nyven-text-secondary px-2">
-                  Chats
-                </span>
+              <section className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-4">
                 <button
                   type="button"
-                  disabled={chatBusy}
-                  onClick={() => void handleNewChat()}
-                  className="p-2 rounded-lg text-nyven-cyan hover:bg-white/[0.05] disabled:opacity-50"
-                  aria-label="New project chat"
+                  onClick={() => setActivityOpen((v) => !v)}
+                  className="w-full flex items-center justify-between text-xs uppercase tracking-wider text-nyven-text-secondary"
                 >
-                  <Plus size={16} />
+                  Recent activity
+                  <span className="text-[10px]">{activityOpen ? 'Hide' : 'Show'}</span>
                 </button>
-              </div>
-              <ul className="px-1 pb-2 space-y-0.5">
-                {chats.map((c) => (
-                  <li key={c.id}>
-                    <button
-                      type="button"
-                      onClick={() => openChat(c.id)}
-                      className={clsx(
-                        'w-full text-left px-3 py-2 rounded-xl text-sm truncate min-h-[40px]',
-                        activeChatId === c.id
-                          ? 'bg-white/[0.08] text-nyven-text'
-                          : 'text-nyven-text-secondary hover:bg-white/[0.04]'
-                      )}
-                    >
-                      {c.title}
-                    </button>
-                  </li>
-                ))}
-                {chats.length === 0 && (
-                  <li className="px-3 py-4 text-xs text-nyven-text-secondary">
-                    No chats yet. Start one.
-                  </li>
+                {activityOpen && (
+                  <ul className="mt-3 space-y-2">
+                    {activity.length === 0 ? (
+                      <li className="text-sm text-nyven-text-secondary">No activity yet.</li>
+                    ) : (
+                      activity.map((a) => (
+                        <li key={a.id} className="flex justify-between gap-2 text-sm">
+                          <span>{activityLabel(a.eventType)}</span>
+                          <span className="text-[11px] text-nyven-text-secondary shrink-0">
+                            {formatRelative(a.createdAt)}
+                          </span>
+                        </li>
+                      ))
+                    )}
+                  </ul>
                 )}
-              </ul>
-            </aside>
-            <div className="flex-1 min-h-0 flex flex-col">
-              {!activeChatId ? (
-                <div className="flex-1 flex flex-col items-center justify-center gap-3 p-6">
-                  {actionError && (
-                    <p className="text-sm text-red-300/90 text-center max-w-sm">{actionError}</p>
-                  )}
-                  <button
-                    type="button"
-                    disabled={chatBusy}
-                    onClick={() => void handleNewChat()}
-                    className="px-4 py-2.5 rounded-xl bg-nyven-cyan text-nyven-bg text-sm font-medium min-h-[44px] disabled:opacity-50"
-                  >
-                    {chatBusy ? 'Starting…' : 'Start Project Chat'}
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <div className="flex-1 min-h-0 overflow-y-auto px-3 sm:px-5 py-4 space-y-3">
-                    {messages.map((m) => (
-                      <ChatMessage key={m.id} message={m} />
-                    ))}
-                  </div>
-                  <div className="shrink-0 border-t border-white/[0.07] p-2 sm:p-3">
-                    <MessageComposer
-                      onSend={(p) => void handleSend(p)}
-                      isGenerating={isGenerating}
-                      onStop={() => abortRef.current?.abort()}
-                      placeholder="Message NYVEN in this project…"
-                    />
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        )}
+              </section>
 
-        {tab === 'files' && (
-          <div className="max-w-2xl mx-auto px-4 py-8">
-            <h2 className="font-medium mb-2">Files</h2>
-            <p className="text-sm text-nyven-text-secondary leading-relaxed mb-4">
-              Project file storage is designed to use NYVEN’s existing attachment system. Full
-              project-level library UI ships with the next resources pass. You can still attach
-              files in Project Chat today.
-            </p>
-            <p className="text-xs text-nyven-text-secondary">
-              Files associated with this project: {project.fileCount ?? 0}
-            </p>
-          </div>
-        )}
-
-        {tab === 'instructions' && (
-          <div className="max-w-2xl mx-auto px-4 py-6">
-            <h2 className="font-medium mb-1">Project instructions</h2>
-            <p className="text-sm text-nyven-text-secondary mb-4 leading-relaxed">
-              These instructions are included in AI context for every chat inside this project.
-            </p>
-            <textarea
-              value={instrDraft}
-              onChange={(e) => setInstrDraft(e.target.value.slice(0, 8000))}
-              rows={10}
-              className="w-full px-3 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.08] text-sm outline-none focus:border-nyven-cyan/35 resize-y min-h-[180px]"
-            />
-            <button
-              type="button"
-              disabled={saving}
-              onClick={() => void saveInstructions()}
-              className="mt-3 px-4 py-2.5 rounded-xl bg-nyven-cyan text-nyven-bg text-sm font-medium disabled:opacity-50 min-h-[44px]"
-            >
-              {saving ? 'Saving…' : 'Save instructions'}
-            </button>
-          </div>
-        )}
-
-        {tab === 'activity' && (
-          <div className="max-w-2xl mx-auto px-4 py-6">
-            <h2 className="font-medium mb-4">Activity</h2>
-            {activity.length === 0 ? (
-              <p className="text-sm text-nyven-text-secondary">No activity recorded yet.</p>
-            ) : (
-              <ul className="space-y-3">
-                {activity.map((a) => (
-                  <li
-                    key={a.id}
-                    className="flex items-start justify-between gap-3 border-b border-white/[0.05] pb-3"
-                  >
-                    <span className="text-sm text-nyven-text">{activityLabel(a.eventType)}</span>
-                    <span className="text-[11px] text-nyven-text-secondary shrink-0">
-                      {formatRelative(a.createdAt)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        )}
-
-        {tab === 'settings' && (
-          <div className="max-w-2xl mx-auto px-4 py-6 space-y-8">
-            <section>
-              <h2 className="font-medium mb-3">General</h2>
-              <label className="block mb-3">
-                <span className="text-xs text-nyven-text-secondary">Name</span>
+              <section className="rounded-2xl border border-red-400/20 p-4">
+                <h3 className="font-medium text-red-300/90 mb-2">Danger zone</h3>
+                <p className="text-xs text-nyven-text-secondary mb-2">
+                  Permanently delete this project. Type DELETE to confirm.
+                </p>
                 <input
-                  value={nameDraft}
-                  onChange={(e) => setNameDraft(e.target.value.slice(0, 120))}
-                  className="mt-1 w-full h-11 px-3 rounded-xl bg-white/[0.03] border border-white/[0.08] text-sm outline-none focus:border-nyven-cyan/35"
-                />
-              </label>
-              <label className="block mb-3">
-                <span className="text-xs text-nyven-text-secondary">Description</span>
-                <textarea
-                  value={descDraft}
-                  onChange={(e) => setDescDraft(e.target.value.slice(0, 2000))}
-                  rows={3}
-                  className="mt-1 w-full px-3 py-2 rounded-xl bg-white/[0.03] border border-white/[0.08] text-sm outline-none focus:border-nyven-cyan/35"
-                />
-              </label>
-              <button
-                type="button"
-                disabled={saving}
-                onClick={() => void saveGeneral()}
-                className="px-4 py-2.5 rounded-xl bg-nyven-cyan text-nyven-bg text-sm font-medium disabled:opacity-50 min-h-[44px]"
-              >
-                {saving ? 'Saving…' : 'Save'}
-              </button>
-            </section>
-
-            <section>
-              <h2 className="font-medium mb-3">Tasks</h2>
-              <div className="flex gap-2 mb-3">
-                <input
-                  value={newTaskTitle}
-                  onChange={(e) => setNewTaskTitle(e.target.value)}
-                  placeholder="New task"
-                  className="flex-1 h-11 px-3 rounded-xl bg-white/[0.03] border border-white/[0.08] text-sm outline-none"
+                  value={deleteConfirm}
+                  onChange={(e) => setDeleteConfirm(e.target.value)}
+                  placeholder="DELETE"
+                  className="w-full h-10 px-3 rounded-xl bg-white/[0.03] border border-white/[0.08] text-sm mb-2 outline-none"
                 />
                 <button
                   type="button"
-                  onClick={() => void addTask()}
-                  className="px-3 rounded-xl border border-white/[0.1] text-sm min-h-[44px]"
+                  onClick={() => void handleDelete()}
+                  className="inline-flex items-center gap-1.5 text-sm text-red-400/90 min-h-[40px]"
                 >
-                  Add
+                  <Trash2 size={14} /> Delete project
                 </button>
-              </div>
-              <ul className="space-y-1">
-                {tasks.map((t) => (
-                  <li key={t.id} className="flex items-center gap-2 text-sm py-1">
-                    <button type="button" onClick={() => void toggleTaskDone(t)}>
-                      {t.status === 'done' ? <Check size={14} className="text-nyven-cyan" /> : <ListTodo size={14} />}
-                    </button>
-                    <span className={clsx(t.status === 'done' && 'line-through opacity-60')}>
-                      {t.title}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </section>
-
-            <section className="border border-red-400/20 rounded-2xl p-4">
-              <h2 className="font-medium text-red-300/90 mb-2">Danger zone</h2>
-              <p className="text-xs text-nyven-text-secondary mb-3">
-                Permanently delete this project. Type DELETE to confirm.
-              </p>
-              <input
-                value={deleteConfirm}
-                onChange={(e) => setDeleteConfirm(e.target.value)}
-                placeholder="DELETE"
-                className="w-full h-11 px-3 rounded-xl bg-white/[0.03] border border-white/[0.08] text-sm mb-2 outline-none"
-              />
-              <button
-                type="button"
-                onClick={() => void handleDelete()}
-                className="inline-flex items-center gap-1.5 text-sm text-red-400/90 min-h-[44px]"
-              >
-                <Trash2 size={14} /> Delete project
-              </button>
-            </section>
+              </section>
+            </div>
           </div>
         )}
       </div>
 
-      {/* Mobile bottom tabs */}
-      <nav className="sm:hidden shrink-0 border-t border-white/[0.07] flex pb-[env(safe-area-inset-bottom)]">
-        {mobileTabs.map(({ id, label, icon: Icon }) => (
+      {/* Bottom tabs — hide when keyboard is open */}
+      {!keyboardOpen && (
+        <nav className="shrink-0 border-t border-white/[0.07] flex pb-[env(safe-area-inset-bottom)] sm:pb-0">
+          {TABS.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setTab(id)}
+              className={clsx(
+                'flex-1 flex flex-col items-center gap-0.5 py-2 text-[10px] min-h-[52px]',
+                tab === id ? 'text-nyven-cyan' : 'text-nyven-text-secondary'
+              )}
+            >
+              <Icon size={18} />
+              {label}
+            </button>
+          ))}
+        </nav>
+      )}
+
+      {/* Add file sheet */}
+      {fileSheetOpen && (
+        <div className="fixed inset-0 z-50 flex flex-col justify-end">
           <button
-            key={id}
             type="button"
-            onClick={() => setTab(id)}
-            className={clsx(
-              'flex-1 flex flex-col items-center gap-0.5 py-2 text-[10px] min-h-[52px]',
-              tab === id ? 'text-nyven-cyan' : 'text-nyven-text-secondary'
-            )}
-          >
-            <Icon size={18} />
-            {label}
-          </button>
-        ))}
-      </nav>
+            className="absolute inset-0 bg-black/50"
+            aria-label="Close"
+            onClick={() => setFileSheetOpen(false)}
+          />
+          <div className="relative rounded-t-2xl bg-[#0c1018] border-t border-white/[0.1] p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="font-medium text-sm">Add to project</h3>
+              <button type="button" onClick={() => setFileSheetOpen(false)} className="p-2">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { label: 'Photos', accept: 'image/*' },
+                { label: 'Files', accept: '.pdf,.txt,.md,.json,.csv,.docx,.xlsx' },
+                { label: 'Zip', accept: '.zip,application/zip' },
+              ].map((opt) => (
+                <button
+                  key={opt.label}
+                  type="button"
+                  disabled={uploadBusy}
+                  onClick={() => {
+                    acceptRef.current = opt.accept
+                    requestAnimationFrame(() => {
+                      if (fileInputRef.current) {
+                        fileInputRef.current.accept = opt.accept
+                        fileInputRef.current.click()
+                      }
+                    })
+                  }}
+                  className="h-24 rounded-2xl border border-white/[0.08] bg-white/[0.03] text-sm disabled:opacity-50"
+                >
+                  {uploadBusy ? '…' : opt.label}
+                </button>
+              ))}
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0]
+                e.target.value = ''
+                if (f) void uploadProjectFile(f)
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      <VoiceChatScreen
+        open={voice.voiceChatOpen}
+        onClose={voice.closeVoiceChat}
+        voicePhase={voice.voicePhase}
+        isProcessing={isGenerating || voice.voicePhase === 'transcribing'}
+        isSpeaking={voice.voicePhase === 'speaking'}
+        energy={voice.voiceEnergy}
+        muted={voice.voiceMuted}
+        onToggleMute={() => voice.toggleMute()}
+        onToggleListen={voice.onVoiceToggle}
+        lastTranscript={voice.lastVoiceTranscript}
+        lastReply={voice.lastVoiceReply}
+      />
     </div>
   )
 }
