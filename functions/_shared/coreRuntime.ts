@@ -13,6 +13,7 @@ import {
   searchPastChats,
   wantsPastChatRecall,
 } from './memory/service'
+import { sanitizeExtractedText } from './sanitizeExtracted'
 import type { OpenRouterMessage } from './openrouter/stream'
 import { toGeminiFunctionDeclarations } from './tools/registry'
 import { executeTool } from './tools/executor'
@@ -222,11 +223,25 @@ export async function runCore(
           image_url: { url: `data:${mime};base64,${a.inlineBase64}` },
         })
       } else if (a.extractedText) {
-        textBits.push(`[Attachment: ${a.name}]\n${a.extractedText.slice(0, 40000)}`)
-      } else if (a.name) {
-        textBits.push(`[Attachment: ${a.name}]`)
+        const clean = sanitizeExtractedText(a.extractedText)
+        console.log(
+          '[nyven-att]',
+          a.name,
+          'len=',
+          clean.length,
+          'preview=',
+          JSON.stringify(clean.slice(0, 200))
+        )
+        if (clean) {
+          textBits.push(
+            `[File content of "${a.name}" — this is the actual extracted text from the file; use it, do not ask the user to paste it]\n${clean.slice(0, 40000)}`
+          )
+        } else {
+          textBits.push(
+            `[File "${a.name}" has no readable text extract (may be scanned or unsupported). Say so plainly if asked.]`
+          )
+        }
       }
-    }
 
     const userContent =
       imageParts.length > 0

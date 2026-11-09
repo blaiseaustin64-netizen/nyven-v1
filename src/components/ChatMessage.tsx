@@ -107,38 +107,7 @@ export function ChatMessage({
       <div className="flex justify-end group">
         <div className="max-w-[85%] sm:max-w-[75%] min-w-0">
           <div className="bg-nyven-surface border border-white/[0.06] rounded-2xl rounded-br-md px-4 py-3 text-[15px] leading-relaxed text-nyven-text break-words">
-            {message.attachments && message.attachments.length > 0 && (
-              <div className="flex gap-2 overflow-x-auto mb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                {message.attachments.map((a) => (
-                  <a
-                    key={a.id}
-                    href={a.previewDataUrl || undefined}
-                    target={a.previewDataUrl ? '_blank' : undefined}
-                    rel={a.previewDataUrl ? 'noopener noreferrer' : undefined}
-                    className="relative shrink-0 w-[104px] h-[104px] max-w-[104px] rounded-xl overflow-hidden border border-white/[0.08] bg-white/[0.04]"
-                    title={a.name}
-                    onClick={(e) => {
-                      if (!a.previewDataUrl) e.preventDefault()
-                    }}
-                  >
-                    {a.kind === 'image' && a.previewDataUrl ? (
-                      <img
-                        src={a.previewDataUrl}
-                        alt={a.name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex flex-col items-center justify-center gap-0.5 px-1">
-                        {a.kind === 'image' ? (
-                          <ImageIcon size={18} className="text-nyven-text-secondary" />
-                        ) : (
-                          <FileText size={18} className="text-nyven-text-secondary" />
-                        )}
-                        <span className="text-[9px] text-nyven-text-secondary truncate max-w-full px-0.5">
-                          {a.name}
-                        </span>
-                      </div>
-                    )}
+            
                   </a>
                 ))}
               </div>

@@ -3,6 +3,7 @@
  * Zip/docx via native inflate; no server-side zip parse.
  */
 import { extractZipForChat } from './zip'
+import { sanitizeExtractedText } from './sanitize'
 
 export type ExtractMeta = {
   kind: 'zip' | 'docx' | 'xlsx' | 'pdf' | 'text' | 'image' | 'unknown'
@@ -84,15 +85,46 @@ function stripXml(xml: string): string {
 async function extractDocx(file: File): Promise<ExtractResult> {
   const entries = await readZipEntries(file)
   const doc = entries.find((e) => e.name === 'word/document.xml')
-  if (!doc) return { text: '', meta: { kind: 'docx', truncated: false } }
+  if (!doc) {
+    return { text: '', meta: { kind: 'docx', truncated: false, status: 'no readable content (missing document body)' } }
+  }
   const xml = new TextDecoder('utf-8', { fatal: false }).decode(doc.data)
-  let text = stripXml(xml)
+  // Prefer joining w:t runs; paragraph breaks on w:p — never return raw XML
+  const paragraphs: string[] = []
+  const pRe = /<w:p[\s>][\s\S]*?<\/w:p>/g
+  let pm: RegExpExecArray | null
+  while ((pm = pRe.exec(xml))) {
+    const runs: string[] = []
+    const tRe = /<w:t[^>]*>([\s\S]*?)<\/w:t>/g
+    let tm: RegExpExecArray | null
+    while ((tm = tRe.exec(pm[0]))) {
+      runs.push(
+        tm[1]
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&quot;/g, '"')
+          .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+      )
+    }
+    const line = runs.join('').trim()
+    if (line) paragraphs.push(line)
+  }
+  let text = paragraphs.length ? paragraphs.join('\n') : stripXml(xml)
+  text = sanitizeExtractedText(text)
   let truncated = false
   if (text.length > MAX_TOTAL) {
     text = text.slice(0, MAX_TOTAL) + '\n… truncated'
     truncated = true
   }
-  return { text, meta: { kind: 'docx', truncated } }
+  return {
+    text,
+    meta: {
+      kind: 'docx',
+      truncated,
+      status: text ? (truncated ? 'partial' : 'text included') : 'no readable content (could not extract text)',
+    },
+  }
 }
 
 /** Minimal XLSX: sharedStrings + first sheets as TSV-ish text */
@@ -182,6 +214,23 @@ async function extractPdf(file: File): Promise<ExtractResult> {
 
 
 export async function extractAttachmentFile(file: File): Promise<ExtractResult> {
+  const result = await extractAttachmentFileInner(file)
+  const clean = sanitizeExtractedText(result.text)
+  if (result.text && !clean) {
+    return {
+      text: '',
+      meta: {
+        ...result.meta,
+        status: result.meta.status || 'no readable content (file internals rejected)',
+      },
+      pageImages: result.pageImages,
+    }
+  }
+  return { ...result, text: clean }
+}
+
+async function extractAttachmentFileInner(file: File): Promise<ExtractResult> {
+
   const name = file.name.toLowerCase()
   const mime = (file.type || '').toLowerCase()
 

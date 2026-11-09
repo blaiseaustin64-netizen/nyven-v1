@@ -8,6 +8,7 @@ import {
   kindForMime,
   resolveMime,
 } from './attachmentLimits'
+import { sanitizeExtractedText } from './sanitizeExtracted'
  
 export type ProcessedAttachment = {
   id: string
@@ -121,8 +122,7 @@ export function processFileBytes(
   }
 
   if (mime === 'application/pdf') {
-    const bytes = new Uint8Array(buffer)
-    const extracted = truncateText(extractPdfTextRough(bytes))
+    // Never trust regex/binary decode for PDFs — client sends extractedText via form when available
     const canInline = size <= ATTACHMENT_LIMITS.MAX_INLINE_BYTES
     return {
       ok: true,
@@ -132,15 +132,40 @@ export function processFileBytes(
         mimeType: mime,
         size,
         kind: 'document',
-        extractedText: extracted || undefined,
+        extractedText: undefined,
         inlineBase64: canInline ? arrayBufferToBase64(buffer) : undefined,
       },
     }
   }
 
-  // Text-like documents
+  // OOXML (docx/xlsx) and zip: never UTF-8 decode the container
+  const lower = name.toLowerCase()
+  if (
+    mime.includes('wordprocessingml') ||
+    mime.includes('spreadsheetml') ||
+    mime.includes('zip') ||
+    lower.endsWith('.docx') ||
+    lower.endsWith('.xlsx') ||
+    lower.endsWith('.zip')
+  ) {
+    return {
+      ok: true,
+      attachment: {
+        id,
+        name,
+        mimeType: mime,
+        size,
+        kind: 'document',
+        extractedText: undefined,
+      },
+    }
+  }
+
+  // Text-like documents only
   try {
-    const text = new TextDecoder('utf-8', { fatal: false }).decode(buffer)
+    const text = sanitizeExtractedText(
+      truncateText(new TextDecoder('utf-8', { fatal: false }).decode(buffer))
+    )
     return {
       ok: true,
       attachment: {
@@ -149,7 +174,7 @@ export function processFileBytes(
         mimeType: mime,
         size,
         kind: 'text',
-        extractedText: truncateText(text),
+        extractedText: text || undefined,
       },
     }
   } catch {

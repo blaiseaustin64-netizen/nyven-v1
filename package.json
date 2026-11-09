@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "echo \"ESLint not configured; run tsc --noEmit if typecheck is needed.\"",
-    "test": "node --import ./tests/github/register-ts.mjs --test tests/github/*.test.ts tests/code/*.test.ts tests/usage/*.test.ts tests/email/*.test.ts tests/feedback/*.test.ts tests/auth/*.test.ts tests/attachments/*.test.ts tests/memory/*.test.ts tests/attachments/pdfQuality.test.ts",
+    "test": "node --import ./tests/github/register-ts.mjs --test tests/github/*.test.ts tests/code/*.test.ts tests/usage/*.test.ts tests/email/*.test.ts tests/feedback/*.test.ts tests/auth/*.test.ts tests/attachments/*.test.ts tests/memory/*.test.ts tests/attachments/pdfQuality.test.ts tests/attachments/sanitize.test.ts",
     "test:usage": "node --import ./tests/github/register-ts.mjs --test tests/usage/*.test.ts tests/email/*.test.ts tests/feedback/*.test.ts"
   },
   "dependencies": {

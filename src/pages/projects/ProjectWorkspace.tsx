@@ -30,6 +30,8 @@ import {
 import { MessageComposer, type ComposerSendPayload } from '../../components/MessageComposer'
 import { ChatThread } from '../../components/chat/ChatThread'
 import { JumpToLatestButton } from '../../components/chat/JumpToLatestButton'
+import { ReadAloudPlayer } from '../../components/chat/ReadAloudPlayer'
+import { useReadAloud } from '../../hooks/useReadAloud'
 import { streamCoreChat } from '../../lib/core/streamClient'
 import type { Message } from '../../lib/types'
 import type { ActivityState } from '../../lib/core/types'
@@ -111,8 +113,7 @@ export function ProjectWorkspace() {
   const voice = useComposerVoice({ isGenerating })
   const chatScroll = useChatScroll()
   const hideHeader = useHideOnScroll(24)
-  const [readingMessageId, setReadingMessageId] = useState<string | null>(null)
-  const [readAloudLoading, setReadAloudLoading] = useState(false)
+  const readAloud = useReadAloud()
   const [feedbackToast, setFeedbackToast] = useState<string | null>(null)
 
 
@@ -646,26 +647,10 @@ export function ProjectWorkspace() {
                   })
                   .catch(() => {})
               }}
-              onReadAloud={(id, content) => {
-                setReadingMessageId(id)
-                setReadAloudLoading(true)
-                void voice
-                  .speakReply(content)
-                  .catch(() => {})
-                  .finally(() => {
-                    setReadAloudLoading(false)
-                    setReadingMessageId((cur) => (cur === id ? null : cur))
-                  })
-              }}
-              onStopReadAloud={() => {
-                try {
-                  voice.voiceRef.current?.stopAll?.()
-                } catch { /* */ }
-                setReadingMessageId(null)
-                setReadAloudLoading(false)
-              }}
-              readingMessageId={readingMessageId}
-              readAloudLoading={readAloudLoading}
+              onReadAloud={(id, content) => readAloud.play(id, content)}
+              onStopReadAloud={readAloud.stop}
+              readingMessageId={readAloud.state.messageId}
+              readAloudLoading={readAloud.state.loading}
               onAttachmentClick={(a) =>
                 setViewerItem({
                   id: a.id,
@@ -688,7 +673,14 @@ export function ProjectWorkspace() {
             {actionError && (
               <p className="px-4 text-xs text-red-300/90 text-center pb-1">{actionError}</p>
             )}
-            <div className="shrink-0 p-2 sm:p-3 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+            <div className="shrink-0 p-2 sm:p-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] relative">
+              <ReadAloudPlayer
+                state={readAloud.state}
+                onTogglePause={readAloud.togglePause}
+                onSeek={readAloud.seek}
+                onCycleRate={readAloud.cycleRate}
+                onClose={readAloud.stop}
+              />
               <div className="max-w-3xl mx-auto">
                 <MessageComposer
                   onSend={(p) => void handleSend(p)}

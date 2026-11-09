@@ -3,6 +3,8 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useLocation } from 'react-router-dom'
 import { ChatThread } from '../components/chat/ChatThread'
 import { JumpToLatestButton } from '../components/chat/JumpToLatestButton'
+import { ReadAloudPlayer } from '../components/chat/ReadAloudPlayer'
+import { useReadAloud } from '../hooks/useReadAloud'
 import { MessageComposer, type ComposerSendPayload } from '../components/MessageComposer'
 import { NIdentity } from '../components/NIdentity'
 import { useHideOnScroll } from '../hooks/useHideOnScroll'
@@ -799,10 +801,10 @@ export function Chat() {
                 onFeedback={(messageId, rating, note) => {
                   void submitFeedback(messageId, rating)
                 }}
-                onReadAloud={(id, content) => void handleReadAloud(id, content)}
-                onStopReadAloud={stopReadAloud}
-                readingMessageId={readingMessageId}
-                readAloudLoading={readAloudLoading}
+                onReadAloud={(id, content) => readAloud.play(id, content)}
+                onStopReadAloud={readAloud.stop}
+                readingMessageId={readAloud.state.messageId}
+                readAloudLoading={readAloud.state.loading}
                 onRegenerate={handleRegenerate}
                 listOnly
                 className="contents"

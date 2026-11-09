@@ -286,8 +286,15 @@ export function MessageComposer({
           mimeType: toUpload.type || file.type,
           name: toUpload.name || file.name,
         })
+        // Client extract for any file we still upload (prefer over server decode)
+        let clientExtract = ''
+        try {
+          const ex = await extractAttachmentFile(file)
+          clientExtract = ex.text || ''
+        } catch { /* */ }
         const form = new FormData()
         form.append('file', toUpload)
+        if (clientExtract) form.append('extractedText', clientExtract)
         const res = await fetch('/api/attachments', {
           method: 'POST',
           body: form,
@@ -317,7 +324,7 @@ export function MessageComposer({
         const att = data.attachment || data
         updateAttachment(id, {
           status: 'ready',
-          extractedText: att.extractedText,
+          extractedText: att.extractedText || clientExtract || undefined,
           inlineBase64: att.inlineBase64,
           mimeType: att.mimeType || toUpload.type,
           kind: (att.kind as PendingAttachment['kind']) || kind,

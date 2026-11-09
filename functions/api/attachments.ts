@@ -111,6 +111,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       )
     }
 
+    const clientExtracted = String(form.get('extractedText') || '')
     const buffer = await blob.arrayBuffer()
     const result = processFileBytes(filename, blob.type, buffer)
 
@@ -124,6 +125,12 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       )
     }
 
+    // Prefer client-side extract (docx/pdf/xlsx) over server binary decode
+    const { sanitizeExtractedText } = await import('../_shared/sanitizeExtracted')
+    const cleanClient = sanitizeExtractedText(clientExtracted)
+    const cleanServer = sanitizeExtractedText(result.attachment.extractedText || '')
+    const extractedText = cleanClient || cleanServer || undefined
+
     return jsonWithCors(
       request,
       env,
@@ -131,6 +138,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         success: true,
         attachment: {
           ...result.attachment,
+          extractedText,
           status: 'ready',
         },
       },
