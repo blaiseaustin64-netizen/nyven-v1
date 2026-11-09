@@ -373,17 +373,12 @@ export function MessageComposer({
 
   const handleInput = () => {
     const el = textareaRef.current
-    if (el) {
+    if (!el) return
+    const maxPx = 150
+    requestAnimationFrame(() => {
       el.style.height = 'auto'
-      // Cap growth so control row (plus/mic/voice/send) always stays visible on mobile
-      const vh = typeof window !== 'undefined' ? window.innerHeight : 600
-      const coarse =
-        typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches
-      const maxPx = coarse ? Math.min(160, Math.round(vh * 0.28)) : Math.min(280, Math.round(vh * 0.4))
-      const next = Math.min(el.scrollHeight, maxPx)
-      el.style.height = `${next}px`
-      el.style.overflowY = el.scrollHeight > maxPx ? 'auto' : 'hidden'
-    }
+      el.style.height = `${Math.min(el.scrollHeight, maxPx)}px`
+    })
   }
 
   const handlePaste = (e: React.ClipboardEvent) => {
@@ -709,7 +704,7 @@ export function MessageComposer({
           onPaste={handlePaste}
           placeholder={placeholder}
           rows={1}
-          className="w-full min-w-0 bg-transparent border-0 outline-none resize-none text-base leading-[1.65] text-nyven-text placeholder:text-nyven-text-secondary/70 max-h-[160px] sm:max-h-[40vh] overflow-y-auto py-1.5"
+          className="w-full min-w-0 bg-transparent border-0 outline-none resize-none text-base leading-[1.65] text-nyven-text placeholder:text-nyven-text-secondary/70 max-h-[150px] overflow-y-auto overscroll-contain py-1 [scrollbar-width:thin] touch-pan-y"
           style={{ minHeight: '48px' }}
         />
 

@@ -21,6 +21,7 @@ import {
   savePreAccountGitHub,
   clearPreAccountGitHubCookie,
 } from '../../../_shared/github/preAccount'
+import { resolveIdentity } from '../../../_shared/auth'
 
 interface Env extends GitHubEnv {}
 
@@ -125,9 +126,17 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     if (!githubDbConfigured(env)) {
       return fail('config')
     }
+    const identity = await resolveIdentity(request, env, request.signal)
+    if (
+      !identity.ok ||
+      !identity.identity.authenticated ||
+      !identity.identity.userId ||
+      identity.identity.userId !== session.userId
+    ) {
+      return fail('session_mismatch')
+    }
     const saved = await upsertGitHubConnection(env, session.userId, tokenResult, ghUser)
     if (!saved.ok) return fail('save_failed')
-    // Clear any leftover pre-account cookie
     extraCookies.push(clearPreAccountGitHubCookie(secure))
   }
 

@@ -1,30 +1,21 @@
 import { useEffect, useState } from 'react'
-
-/**
- * True when the on-screen keyboard is likely open (visualViewport shrinks).
- * Used to hide the mobile bottom nav so it does not sit above the keyboard.
- */
 export function useKeyboardOpen(thresholdPx = 120): boolean {
   const [open, setOpen] = useState(false)
-
   useEffect(() => {
     if (typeof window === 'undefined') return
     const vv = window.visualViewport
-    if (!vv) return
-
     const update = () => {
-      const keyboardLikely = window.innerHeight - vv.height > thresholdPx
-      setOpen(keyboardLikely)
+      const height = vv ? vv.height : window.innerHeight
+      document.documentElement.style.setProperty('--app-vh', `${height}px`)
+      if (vv) setOpen(window.innerHeight - vv.height > thresholdPx)
     }
-
     update()
-    vv.addEventListener('resize', update)
-    vv.addEventListener('scroll', update)
+    if (vv) { vv.addEventListener('resize', update); vv.addEventListener('scroll', update) }
+    window.addEventListener('resize', update)
     return () => {
-      vv.removeEventListener('resize', update)
-      vv.removeEventListener('scroll', update)
+      if (vv) { vv.removeEventListener('resize', update); vv.removeEventListener('scroll', update) }
+      window.removeEventListener('resize', update)
     }
   }, [thresholdPx])
-
   return open
 }

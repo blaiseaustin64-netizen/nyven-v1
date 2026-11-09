@@ -1,6 +1,8 @@
 import { optionsResponse, corsHeaders } from '../../_shared/cors'
 import type { D1Database } from '../../_shared/db/types'
 import { logoutSession } from '../../_shared/auth/service'
+import { clearPreAccountGitHubCookie, clearCookieHeader, OWNER_COOKIE } from '../../_shared/github/preAccount'
+import { requestIsHttps } from '../../_shared/auth/cookies'
 
 interface Env {
   DB?: D1Database
@@ -30,5 +32,8 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     ...ch,
   })
   headers.append('Set-Cookie', setCookie)
+  const secure = requestIsHttps(request)
+  headers.append('Set-Cookie', clearPreAccountGitHubCookie(secure))
+  headers.append('Set-Cookie', clearCookieHeader(OWNER_COOKIE, secure))
   return new Response(JSON.stringify({ success: true }), { status: 200, headers })
 }

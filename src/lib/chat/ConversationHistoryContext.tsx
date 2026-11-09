@@ -79,27 +79,6 @@ export function ConversationHistoryProvider({ children }: { children: ReactNode 
       void deleteConversationRemote(userId, id)
       setConversations((prev) => prev.filter((c) => c.id !== id))
       setActiveId((cur) => (cur === id ? newConversationId() : cur))
-      // Clear local UI metadata so deleted chats never reappear in pin/project maps
-      try {
-        const pinRaw = localStorage.getItem('nyven_pinned_chats_v1')
-        if (pinRaw) {
-          const arr = JSON.parse(pinRaw) as string[]
-          localStorage.setItem(
-            'nyven_pinned_chats_v1',
-            JSON.stringify(arr.filter((x) => x !== id))
-          )
-        }
-        const projRaw = localStorage.getItem('nyven_chat_projects_v1')
-        if (projRaw) {
-          const map = JSON.parse(projRaw) as Record<string, string>
-          if (id in map) {
-            delete map[id]
-            localStorage.setItem('nyven_chat_projects_v1', JSON.stringify(map))
-          }
-        }
-      } catch {
-        /* ignore */
-      }
     },
     [userId]
   )

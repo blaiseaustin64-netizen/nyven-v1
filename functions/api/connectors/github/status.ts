@@ -63,25 +63,17 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   }
 
   if (identity.ok && identity.identity.authenticated && identity.identity.userId) {
-    if (githubDbConfigured(env)) {
-      const row = await getGitHubConnectionRow(env, identity.identity.userId)
-      const connected = !!(row && row.status === 'connected')
+    if (!githubDbConfigured(env)) {
       return json({
-        success: true,
-        configured: true,
-        connected,
-        mode: 'account',
-        connection: row && connected ? toPublicConnection(row) : null,
+        success: true, configured: true, connected: false, mode: 'account', connection: null,
+        error: 'Database not configured for account connections.',
       })
     }
-    // Authenticated but D1 oauth table unavailable — never use pre-account cookie
+    const row = await getGitHubConnectionRow(env, identity.identity.userId)
+    const connected = !!(row && row.status === 'connected')
     return json({
-      success: true,
-      configured: configured,
-      connected: false,
-      mode: 'account',
-      connection: null,
-      error: 'GitHub connector storage is unavailable for this account.',
+      success: true, configured: true, connected, mode: 'account',
+      connection: row && connected ? toPublicConnection(row) : null,
     })
   }
 

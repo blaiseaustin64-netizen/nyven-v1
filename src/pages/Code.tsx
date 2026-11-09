@@ -305,7 +305,7 @@ export function Code() {
             <div>
               <h1 className="font-display text-2xl sm:text-3xl font-medium">NYVEN Code</h1>
               <p className="text-nyven-text-secondary text-sm mt-1 leading-relaxed">
-                Connect GitHub to explore your repositories, files, issues, and pull requests.
+                Connect GitHub to browse your repositories, files, issues and pull requests — all read-only.
               </p>
             </div>
           </div>

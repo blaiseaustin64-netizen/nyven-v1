@@ -27,7 +27,7 @@ export function ConnectionBar({ view, busy, onConnect, onDisconnect, onRetry }: 
             <p className="text-xs text-nyven-text-secondary mt-1 leading-relaxed">
               {view.kind === 'connected'
                 ? `Signed in as ${view.account}. Repositories shown are only those your GitHub account can access.`
-                : 'NYVEN uses a read-only GitHub grant. Tokens stay on the NYVEN server.'}
+                : 'Connect your GitHub account to explore your code here. NYVEN only requests read access and never stores your password.'}
             </p>
           </div>
         </div>

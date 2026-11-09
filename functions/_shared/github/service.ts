@@ -34,11 +34,9 @@ export function githubConfigured(env: GitHubEnv): boolean {
   )
 }
 
-/** Privileged DB ops require service role — never fall back to anon. */
+/** GitHub connection persistence uses Cloudflare D1 (binding DB). */
 export function githubDbConfigured(env: GitHubEnv): boolean {
-  return Boolean(
-    (env.SUPABASE_URL || env.VITE_SUPABASE_URL) && env.SUPABASE_SERVICE_ROLE_KEY
-  )
+  return Boolean(env.DB)
 }
 
 export type AppOriginResult = { ok: true; origin: string } | { ok: false; error: string }
@@ -186,6 +184,7 @@ export async function buildAuthorizeUrl(
     state,
     code_challenge: challenge,
     code_challenge_method: 'S256',
+    prompt: 'select_account',
   })
   // Embed state also in cookie session via binding state in cookie name suffix — store state in session
   const sessionWithState = await packOAuthSession(
@@ -367,62 +366,20 @@ export async function upsertGitHubConnection(
     github_name: ghUser.name || null,
   }
 
-  if (env.DB) {
-    const d1 = await d1UpsertGitHub(env, userId, {
-      account_label: ghUser.login,
-      scopes,
-      token_ciphertext: ciphertext,
-      metadata,
-    })
-    if (!d1.ok) return d1
-    return { ok: true, row: toPublicConnection(d1.row) }
-  }
-
-  const cfg = supabaseAdmin(env)
-  if (!cfg) {
+  if (!env.DB) {
     return {
       ok: false,
-      error:
-        'Server configuration error: D1 DB binding or SUPABASE_SERVICE_ROLE_KEY is required to store GitHub connections.',
+      error: 'Server configuration error: D1 DB binding is required to store GitHub connections.',
     }
   }
-
-  const body = {
-    user_id: userId,
-    provider: PROVIDER,
-    status: 'connected',
+  const d1 = await d1UpsertGitHub(env, userId, {
     account_label: ghUser.login,
     scopes,
     token_ciphertext: ciphertext,
     metadata,
-    connected_at: now,
-    updated_at: now,
-  }
-
-  // Upsert on (user_id, provider)
-  const res = await sbFetch(
-    cfg,
-    `connections?on_conflict=user_id,provider`,
-    {
-      method: 'POST',
-      userJwt,
-      headers: {
-        Prefer: 'resolution=merge-duplicates,return=representation',
-      },
-      body: JSON.stringify(body),
-    }
-  )
-
-  if (!res.ok) {
-    const errText = await res.text().catch(() => '')
-    console.error('github upsert failed', res.status, errText.slice(0, 200))
-    return { ok: false, error: 'Could not save GitHub connection.' }
-  }
-
-  const rows = (await res.json()) as Record<string, unknown>[]
-  const row = Array.isArray(rows) ? rows[0] : rows
-  if (!row) return { ok: false, error: 'Could not save GitHub connection.' }
-  return { ok: true, row: toPublicConnection(row as Record<string, unknown>) }
+  })
+  if (!d1.ok) return d1
+  return { ok: true, row: toPublicConnection(d1.row) }
 }
 
 /**
@@ -505,34 +462,12 @@ async function d1UpsertGitHub(
 export async function lookupGitHubConnectionRow(
   env: GitHubEnv,
   userId: string,
-  userJwt?: string
+  _userJwt?: string
 ): Promise<GitHubConnectionLookup> {
-  if (env.DB) {
-    return d1LookupGitHub(env, userId)
+  if (!env.DB) {
+    return { ok: false, error: 'Database not configured.' }
   }
-  const cfg = supabaseAdmin(env)
-  if (!cfg) {
-    return { ok: false, error: 'Database admin access is not configured.' }
-  }
-  try {
-    const res = await sbFetch(
-      cfg,
-      `connections?user_id=eq.${encodeURIComponent(userId)}&provider=eq.github&select=*`,
-      { method: 'GET', userJwt }
-    )
-    if (!res.ok) {
-      console.error('github connection lookup failed', res.status)
-      return { ok: false, error: 'Could not read GitHub connection state.' }
-    }
-    const rows = (await res.json()) as unknown
-    if (!Array.isArray(rows)) {
-      return { ok: false, error: 'Could not read GitHub connection state.' }
-    }
-    return { ok: true, row: (rows[0] as Record<string, unknown> | undefined) || null }
-  } catch (e) {
-    console.error('github connection lookup threw', e instanceof Error ? e.name : 'unknown')
-    return { ok: false, error: 'Could not read GitHub connection state.' }
-  }
+  return d1LookupGitHub(env, userId)
 }
 
 /** Convenience wrapper for read paths: a failed query is reported as no row. */
@@ -609,7 +544,7 @@ export async function getAccessTokenForUser(
       ok: false,
       code: 'CONFIG',
       error:
-        'Server configuration error: SUPABASE_SERVICE_ROLE_KEY is required for GitHub connections.',
+        'Server configuration error: D1 database is required for GitHub connections.',
     }
   }
   if (!env.CONNECTOR_TOKEN_SECRET) {
@@ -642,6 +577,28 @@ export async function getAccessTokenForUser(
   }
 }
 
+async function d1DisconnectGitHub(
+  env: GitHubEnv,
+  userId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!env.DB) return { ok: false, error: 'Database not configured.' }
+  const now = new Date().toISOString()
+  try {
+    await env.DB.prepare(
+      `UPDATE oauth_connections SET status = 'disconnected', token_ciphertext = NULL,
+           account_label = NULL, scopes = NULL, metadata_json = '{}', updated_at = ?
+       WHERE user_id = ? AND provider = 'github'`
+    ).bind(now, userId).run()
+    await env.DB.prepare(
+      `DELETE FROM oauth_connections WHERE user_id = ? AND provider = 'github'`
+    ).bind(userId).run()
+    return { ok: true }
+  } catch (e) {
+    console.error('d1 github disconnect failed', e instanceof Error ? e.name : 'unknown')
+    return { ok: false, error: 'Could not disconnect GitHub connection in the database.' }
+  }
+}
+
 export async function disconnectGitHub(
   env: GitHubEnv,
   userId: string,
@@ -654,12 +611,9 @@ export async function disconnectGitHub(
     return {
       ok: false,
       code: 'CONFIG',
-      error:
-        'Server configuration error: SUPABASE_SERVICE_ROLE_KEY is required to disconnect GitHub.',
+      error: 'Server configuration error: D1 database is required to disconnect GitHub.',
     }
   }
-
-  // Best-effort provider revoke — failure does not equal DB failure
   let revoked = false
   const tokenResult = await getAccessTokenForUser(env, userId, userJwt)
   if (tokenResult.ok && env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET) {
@@ -669,9 +623,7 @@ export async function disconnectGitHub(
         {
           method: 'DELETE',
           headers: {
-            Authorization:
-              'Basic ' +
-              btoa(`${env.GITHUB_CLIENT_ID}:${env.GITHUB_CLIENT_SECRET}`),
+            Authorization: 'Basic ' + btoa(`${env.GITHUB_CLIENT_ID}:${env.GITHUB_CLIENT_SECRET}`),
             Accept: 'application/vnd.github+json',
             'User-Agent': 'NYVEN',
           },
@@ -683,33 +635,14 @@ export async function disconnectGitHub(
       revoked = false
     }
   }
-
-  const cfg = supabaseAdmin(env)
-  if (!cfg) {
-    return {
-      ok: false,
-      code: 'CONFIG',
-      error: 'Server configuration error: database admin access is not configured.',
-    }
+  const written = await d1DisconnectGitHub(env, userId)
+  if (!written.ok) {
+    return { ok: false, code: 'DB_DISCONNECT', error: written.error }
   }
-
-  const filter = `connections?user_id=eq.${encodeURIComponent(userId)}&provider=eq.github`
-
-  // Write attempt (PATCH, then DELETE if PATCH fails). Its result is not trusted on its own:
-  // the outcome is decided by the verification read below.
-  await writeGitHubDisconnect(cfg, filter)
-
-  // Success requires a successful read showing no active connected row.
-  // A failed read is treated as unverified, never as disconnected.
   const verified = await verifyGitHubDisconnected(env, userId)
   if (!verified.ok) {
-    return {
-      ok: false,
-      code: 'DB_DISCONNECT',
-      error: 'Could not disconnect GitHub connection in the database.',
-    }
+    return { ok: false, code: 'DB_DISCONNECT', error: 'Could not disconnect GitHub connection in the database.' }
   }
-
   return { ok: true, revoked }
 }
 

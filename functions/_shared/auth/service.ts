@@ -542,35 +542,35 @@ export async function resetPasswordWithToken(
   return { ok: true }
 }
 
+
 export async function updateDisplayName(
   env: AuthServiceEnv,
-  userId: string,
-  displayName: string
-): Promise<{ ok: true; user: PublicUser } | { ok: false; code: string; message: string; httpStatus: number }> {
+  request: Request,
+  displayNameRaw: string
+): Promise<
+  | { ok: true; user: PublicUser }
+  | { ok: false; code: string; message: string; httpStatus: number }
+> {
   if (!env.DB) {
-    return {
-      ok: false,
-      code: 'AUTH_CONFIG',
-      message: 'Auth storage unavailable.',
-      httpStatus: 503,
-    }
+    return { ok: false, code: 'QUOTA_STORE_UNAVAILABLE', message: 'Service unavailable.', httpStatus: 503 }
   }
-  const cleaned = (displayName || '').trim().slice(0, 80)
-  if (!cleaned) {
-    return {
-      ok: false,
-      code: 'VALIDATION',
-      message: 'Display name cannot be empty.',
-      httpStatus: 400,
-    }
+  const user = await resolveSessionUser(env, request)
+  if (!user) {
+    return { ok: false, code: 'UNAUTHORIZED', message: 'Sign in required.', httpStatus: 401 }
+  }
+  let name = (displayNameRaw || '').replace(/[\u0000-\u001F\u007F]/g, '').trim()
+  if (!name) {
+    return { ok: false, code: 'VALIDATION', message: 'Display name cannot be empty.', httpStatus: 400 }
+  }
+  if (name.length > 80) {
+    return { ok: false, code: 'VALIDATION', message: 'Display name must be at most 80 characters.', httpStatus: 400 }
   }
   const now = new Date().toISOString()
-  await env.DB.prepare(`UPDATE auth_users SET display_name = ?, updated_at = ? WHERE id = ?`)
-    .bind(cleaned, now, userId)
-    .run()
-  const row = await env.DB.prepare(`SELECT * FROM auth_users WHERE id = ?`).bind(userId).first<AuthUserRow>()
-  if (!row) {
-    return { ok: false, code: 'NOT_FOUND', message: 'User not found.', httpStatus: 404 }
+  try {
+    await env.DB.prepare(`UPDATE auth_users SET display_name = ?, updated_at = ? WHERE id = ?`)
+      .bind(name, now, user.id).run()
+  } catch {
+    return { ok: false, code: 'DB_ERROR', message: 'Could not update profile.', httpStatus: 500 }
   }
-  return { ok: true, user: toPublic(row) }
+  return { ok: true, user: { ...user, displayName: name } }
 }

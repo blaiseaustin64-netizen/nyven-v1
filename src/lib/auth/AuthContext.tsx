@@ -30,7 +30,6 @@ type AuthState = {
   ) => Promise<{ error?: string; message?: string; emailDelivery?: string }>
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
-  updateProfile: (displayName: string) => Promise<{ error?: string }>
   requestPasswordReset: (email: string) => Promise<{ error?: string; message?: string }>
   resetPassword: (token: string, password: string) => Promise<{ error?: string }>
   verifyEmail: (token: string) => Promise<{ error?: string }>
@@ -76,30 +75,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })()
     return () => {
       mounted = false
-    }
-  }, [])
-
-
-  const updateProfile = useCallback(async (displayName: string) => {
-    try {
-      const res = await fetch('/api/auth/profile', {
-        method: 'PATCH',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ displayName }),
-      })
-      const data = (await res.json().catch(() => ({}))) as {
-        success?: boolean
-        user?: NyvenUser
-        error?: string
-      }
-      if (!res.ok || !data.success || !data.user) {
-        return { error: data.error || 'Could not update profile.' }
-      }
-      setUser(data.user)
-      return {}
-    } catch {
-      return { error: 'Could not update profile.' }
     }
   }, [])
 
@@ -254,7 +229,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signUp,
       signOut,
       refreshProfile,
-      updateProfile,
       requestPasswordReset,
       resetPassword,
       verifyEmail,
@@ -269,7 +243,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signUp,
       signOut,
       refreshProfile,
-      updateProfile,
       requestPasswordReset,
       resetPassword,
       verifyEmail,

@@ -79,7 +79,7 @@ function Toast({ message }: { message: string | null }) {
 }
 
 export function Settings() {
-  const { user, profile, configured, loading: authLoading, signOut, refreshProfile, updateProfile } =
+  const { user, profile, configured, loading: authLoading, signOut, refreshProfile } =
     useAuth()
   const userId = user?.id ?? null
   const [params, setParams] = useSearchParams()
@@ -132,6 +132,8 @@ export function Settings() {
   const [password, setPassword] = useState('')
   const [password2, setPassword2] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState('')
+  const [deletePassword, setDeletePassword] = useState('')
+  const [deletingAccount, setDeletingAccount] = useState(false)
 
   const showToast = (msg: string) => {
     setToast(msg)
@@ -198,17 +200,20 @@ export function Settings() {
 
   const saveProfile = async () => {
     if (!userId) return
-    const name = displayName.trim().slice(0, 80)
-    if (!name) {
-      showToast('Display name cannot be empty')
-      return
-    }
-    const res = await updateProfile(name)
-    if (res.error) showToast(res.error)
-    else {
-      showToast('Profile saved')
-      await refreshProfile()
-    }
+    const name = displayName.trim()
+    if (!name) { showToast('Display name cannot be empty'); return }
+    if (name.length > 80) { showToast('Display name must be at most 80 characters'); return }
+    setSaving(true)
+    try {
+      const res = await fetch('/api/auth/profile', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        body: JSON.stringify({ displayName: name }),
+      })
+      const data = await res.json().catch(() => ({})) as { success?: boolean; error?: string }
+      if (!res.ok || !data.success) showToast(data.error || 'Could not update profile')
+      else { await refreshProfile(); showToast('Profile updated') }
+    } catch { showToast('Could not update profile') }
+    finally { setSaving(false) }
   }
 
   const changePassword = async () => {
@@ -236,13 +241,29 @@ export function Settings() {
   }
 
   const requestAccountDelete = async () => {
-    if (deleteConfirm !== 'DELETE') {
-      showToast('Type DELETE to confirm')
-      return
-    }
-    // Safe entry point: sign out and instruct; full server delete needs service role
-    showToast('Account deletion is permanent. Use Report a Bug to request deletion of your account and associated data, or contact the site operator.')
-    await signOut()
+    if (deleteConfirm !== 'DELETE') { showToast('Type DELETE to confirm'); return }
+    if (!deletePassword) { showToast('Enter your current password'); return }
+    setDeletingAccount(true)
+    try {
+      const res = await fetch('/api/auth/delete-account', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        body: JSON.stringify({ password: deletePassword, confirmation: 'DELETE' }),
+      })
+      const data = await res.json().catch(() => ({})) as { success?: boolean; error?: string }
+      if (!res.ok || !data.success) { showToast(data.error || 'Could not delete account'); return }
+      try {
+        const keys = [
+          userId ? `nyven_chat_history_v1:user:${userId}` : null,
+          'nyven_chat_history_v1', 'nyven_pinned_chats_v1', 'nyven_chat_projects_v1',
+          'nyven_builder_projects_v1', 'nyven_sync_queue_v1', 'nyven_pending_deletes_v1',
+        ].filter(Boolean) as string[]
+        for (const k of keys) localStorage.removeItem(k)
+        try { sessionStorage.removeItem('nyven_builder_projects_v1') } catch { /* */ }
+      } catch { /* */ }
+      await signOut()
+      window.location.href = '/auth?deleted=1'
+    } catch { showToast('Could not delete account') }
+    finally { setDeletingAccount(false) }
   }
 
   const sectionMeta: Record<Section, { label: string; hint: string }> = {
@@ -461,25 +482,22 @@ export function Settings() {
                       </button>
                     </Card>
                     <Card>
-                      <h3 className="text-sm font-medium mb-2 text-red-300/90">
-                        Delete account
-                      </h3>
+                      <h3 className="text-sm font-medium mb-2 text-red-300/90">Delete account</h3>
                       <p className="text-xs text-nyven-text-secondary mb-3">
-                        Type DELETE to confirm. Full account erasure may require
-                        dashboard support until a dedicated delete endpoint ships.
+                        Permanently deletes your account, chats, connections, and projects.
+                        Enter your password and type DELETE to confirm.
                       </p>
-                      <input
-                        value={deleteConfirm}
-                        onChange={(e) => setDeleteConfirm(e.target.value)}
-                        placeholder="DELETE"
-                        className="w-full bg-nyven-bg border border-white/[0.08] rounded-xl px-3 py-2 text-sm mb-2 outline-none"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => void requestAccountDelete()}
-                        className="text-sm text-red-400/90 hover:text-red-400"
-                      >
-                        Request account deletion
+                      <Field label="Current password">
+                        <input type="password" value={deletePassword} onChange={(e) => setDeletePassword(e.target.value)}
+                          className="w-full bg-nyven-bg border border-white/[0.08] rounded-xl px-3 py-2 text-sm outline-none focus:border-red-400/40"
+                          autoComplete="current-password" />
+                      </Field>
+                      <input value={deleteConfirm} onChange={(e) => setDeleteConfirm(e.target.value)}
+                        placeholder="Type DELETE"
+                        className="w-full bg-nyven-bg border border-white/[0.08] rounded-xl px-3 py-2 text-sm mb-2 mt-2 outline-none" />
+                      <button type="button" disabled={deletingAccount} onClick={() => void requestAccountDelete()}
+                        className="text-sm text-red-400/90 hover:text-red-400 disabled:opacity-50">
+                        {deletingAccount ? 'Deleting…' : 'Delete my account'}
                       </button>
                     </Card>
                     <button
@@ -713,9 +731,8 @@ export function Settings() {
                 />
                 <Card>
                   <p className="text-sm text-nyven-text-secondary">
-                    GitHub can be connected now for development (pre-account phase). Tokens stay
-                    secure session storage. Full NYVEN accounts will attach
-                    connections to each user later.
+                    Connect your GitHub account to let NYVEN Code read your repositories, issues and
+                    pull requests. NYVEN never stores your password and only requests read access.
                   </p>
                 </Card>
                 {INTEGRATIONS.map((integ) => {

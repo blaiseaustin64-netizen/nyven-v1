@@ -174,41 +174,51 @@ export function Chat() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Sync messages when the user selects a conversation in the sidebar.
-  // Do NOT clear messages for brand-new conversation ids (Home initialMessage / New Chat).
-  // Clearing here previously raced Home submit and wiped the in-flight user+assistant rows.
+  // Messages are a function of activeId.
   useEffect(() => {
     if (skipNextActiveLoadRef.current) {
       skipNextActiveLoadRef.current = false
       return
     }
     let cancelled = false
+    const abortInFlight = () => {
+      voiceRef.current?.stopAll()
+      abortControllerRef.current?.abort()
+      abortControllerRef.current = null
+      if (flushTimerRef.current) { clearTimeout(flushTimerRef.current); flushTimerRef.current = null }
+      tokenBufferRef.current = ''
+      streamContentRef.current = ''
+      streamMsgIdRef.current = null
+      setIsGenerating(false)
+      isGeneratingRef.current = false
+      fromVoiceRef.current = false
+      voiceSubmitInFlightRef.current = false
+      setFromVoice(false)
+      setReadingMessageId(null)
+      setReadAloudLoading(false)
+      stickToBottomRef.current = true
+      setShowJumpLatest(false)
+    }
     void (async () => {
       const fromList = conversations.find((c) => c.id === activeId)
       if (fromList?.messages?.length) {
+        abortInFlight()
         if (!cancelled) setMessages(fromList.messages)
         return
       }
       if (!fromList) {
-        // Brand-new conversation id (New Chat / after delete) — always blank canvas
+        abortInFlight()
         if (!cancelled) setMessages([])
         return
       }
+      abortInFlight()
       const msgs = await loadConversationMessages(userId, activeId)
       if (!cancelled) setMessages(msgs)
     })()
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId, userId])
 
-  const startNewChat = () => {
-    skipNextActiveLoadRef.current = true
-    const newId = contextNewChat()
-    activeIdRef.current = newId
-    setMessages([])
-  }
 
 
   const openConversation = async (c: Conversation) => {
