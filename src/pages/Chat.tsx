@@ -190,7 +190,8 @@ export function Chat() {
         return
       }
       if (!fromList) {
-        // New id not persisted yet — leave current messages alone
+        // Brand-new conversation id (New Chat / after delete) — always blank canvas
+        if (!cancelled) setMessages([])
         return
       }
       const msgs = await loadConversationMessages(userId, activeId)

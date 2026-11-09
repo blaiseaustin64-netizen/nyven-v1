@@ -53,7 +53,21 @@ export async function authorizeGitHubRoute(
     if (result.ok) {
       return { ok: true, userId: identity.identity.userId, token: result.token }
     }
-    // Fall through to pre-account cookie if DB has no connection
+    // Authenticated users must NEVER fall back to pre-account/guest GitHub cookies.
+    return {
+      ok: false,
+      response: jsonResponse(
+        {
+          success: false,
+          code: result.code === 'CONFIG' ? 'CONFIG' : 'NOT_CONNECTED',
+          error:
+            result.code === 'CONFIG'
+              ? result.error || 'GitHub connector storage is unavailable.'
+              : 'GitHub is not connected for this account. Connect GitHub to continue.',
+        },
+        result.code === 'CONFIG' ? 503 : 400
+      ),
+    }
   }
 
   if (!env.CONNECTOR_TOKEN_SECRET) {

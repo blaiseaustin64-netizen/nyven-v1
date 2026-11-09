@@ -74,6 +74,15 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
         connection: row && connected ? toPublicConnection(row) : null,
       })
     }
+    // Authenticated but D1 oauth table unavailable — never use pre-account cookie
+    return json({
+      success: true,
+      configured: configured,
+      connected: false,
+      mode: 'account',
+      connection: null,
+      error: 'GitHub connector storage is unavailable for this account.',
+    })
   }
 
   if (!env.CONNECTOR_TOKEN_SECRET) {

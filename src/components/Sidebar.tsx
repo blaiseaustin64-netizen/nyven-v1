@@ -291,82 +291,161 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
       <div
         key={c.id}
         className={clsx(
-          'group relative flex items-center rounded-[14px] px-1 transition-opacity',
-          menuId && !menuOpen && 'opacity-40',
-          active || menuOpen ? 'bg-white/[0.08]' : 'hover:bg-white/[0.04]'
+          'relative rounded-[14px] transition-colors',
+          menuOpen && 'bg-white/[0.06] ring-1 ring-white/10',
+          active && !menuOpen && 'bg-white/[0.08]',
+          menuId && !menuOpen && 'opacity-45'
         )}
       >
-        <button
-          type="button"
-          onClick={() => handleSelect(c)}
-          onContextMenu={(e) => {
-            e.preventDefault()
-            openMenu(c.id, e.currentTarget)
-          }}
-          onTouchStart={(e) => {
-            const target = e.currentTarget
-            holdRef.current = { id: c.id, timer: 0, moved: false }
-            holdRef.current.timer = window.setTimeout(() => {
-              if (holdRef.current && !holdRef.current.moved) {
-                openMenu(c.id, target)
+        <div className="group flex items-center min-h-[56px]">
+          <button
+            type="button"
+            onClick={() => {
+              if (holdRef.current?.moved) return
+              if (menuId === c.id) {
+                setMenuId(null)
+                return
               }
-            }, 500)
-          }}
-          onTouchMove={() => {
-            if (holdRef.current) holdRef.current.moved = true
-          }}
-          onTouchEnd={() => {
-            if (holdRef.current) {
-              window.clearTimeout(holdRef.current.timer)
-              holdRef.current = null
-            }
-          }}
-          className="flex-1 flex items-center gap-2.5 text-left px-3 min-h-[52px] min-w-0"
-          aria-label={`Open chat ${c.title || 'Untitled'}`}
-        >
-          <MessageSquare
-            size={16}
-            className="shrink-0 text-[#6f7a90]"
-            strokeWidth={1.75}
-          />
-          <span className="flex-1 text-[16px] text-[#e9edf5] truncate leading-snug">
-            {c.title || 'Untitled'}
-          </span>
-          {pinned.has(c.id) && (
-            <Pin size={12} className="shrink-0 text-nyven-cyan/80" aria-label="Pinned" />
-          )}
-        </button>
-        <button
-          type="button"
-          aria-label="Conversation actions"
-          onClick={(e) => {
-            e.stopPropagation()
-            if (menuId === c.id) setMenuId(null)
-            else openMenu(c.id, e.currentTarget)
-          }}
-          className="p-2 rounded-lg opacity-100 sm:opacity-0 sm:group-hover:opacity-100 text-[#6f7a90] hover:text-[#e9edf5] hover:bg-white/[0.06] min-h-[40px] min-w-[40px] flex items-center justify-center shrink-0"
-        >
-          <MoreHorizontal size={16} />
-        </button>
+              handleSelect(c)
+            }}
+            onContextMenu={(e) => {
+              e.preventDefault()
+              openMenu(c.id, e.currentTarget)
+            }}
+            onTouchStart={(e) => {
+              const target = e.currentTarget
+              holdRef.current = { id: c.id, timer: 0, moved: false }
+              holdRef.current.timer = window.setTimeout(() => {
+                if (holdRef.current && !holdRef.current.moved) {
+                  holdRef.current.moved = true // prevent navigation
+                  openMenu(c.id, target)
+                }
+              }, 480)
+            }}
+            onTouchMove={() => {
+              if (holdRef.current) {
+                holdRef.current.moved = true
+                window.clearTimeout(holdRef.current.timer)
+              }
+            }}
+            onTouchEnd={() => {
+              if (holdRef.current) {
+                window.clearTimeout(holdRef.current.timer)
+                // delay clear so click handler sees moved flag
+                window.setTimeout(() => {
+                  holdRef.current = null
+                }, 50)
+              }
+            }}
+            className="flex-1 flex items-center gap-3 text-left px-3 py-3 min-h-[56px] min-w-0"
+            aria-label={`Open chat ${c.title || 'Untitled'}`}
+          >
+            <MessageSquare
+              size={18}
+              className="shrink-0 text-[#6f7a90]"
+              strokeWidth={1.75}
+            />
+            <span className="flex-1 text-[16px] text-[#e9edf5] truncate leading-snug">
+              {c.title || 'Untitled'}
+            </span>
+            {pinned.has(c.id) && (
+              <Pin size={14} className="shrink-0 text-[#62E6FF]" aria-label="Pinned" />
+            )}
+          </button>
+          {/* Desktop three-dot only */}
+          <button
+            type="button"
+            aria-label="Conversation actions"
+            onClick={(e) => {
+              e.stopPropagation()
+              if (menuId === c.id) setMenuId(null)
+              else openMenu(c.id, e.currentTarget)
+            }}
+            className="hidden lg:flex p-2 mr-1 rounded-lg opacity-0 group-hover:opacity-100 text-[#6f7a90] hover:text-[#e9edf5] hover:bg-white/[0.06] min-h-[40px] min-w-[40px] items-center justify-center shrink-0"
+          >
+            <MoreHorizontal size={16} />
+          </button>
+        </div>
+        {/* Mobile: action tray UNDER the row */}
+        {menuOpen && (
+          <div
+            className="lg:hidden mx-2 mb-2 overflow-hidden rounded-xl border border-white/10 bg-[#0C1018]/95"
+            style={{
+              animation: 'nyvenActionIn 180ms ease-out both',
+            }}
+            role="menu"
+          >
+            <div className="grid grid-cols-2 gap-0.5 p-1">
+              <button
+                type="button"
+                role="menuitem"
+                className="flex items-center gap-2 px-3 min-h-[48px] rounded-lg text-sm text-[#e9edf5] hover:bg-white/[0.06]"
+                onClick={() => {
+                  setRenameValue((c.title || '').slice(0, 80))
+                  setRenameId(c.id)
+                  setRenameError(null)
+                  setMenuId(null)
+                }}
+              >
+                <Pencil size={15} /> Rename
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className="flex items-center gap-2 px-3 min-h-[48px] rounded-lg text-sm text-[#e9edf5] hover:bg-white/[0.06]"
+                onClick={() => {
+                  togglePin(c.id)
+                  setMenuId(null)
+                }}
+              >
+                <Pin size={15} /> {pinned.has(c.id) ? 'Unpin' : 'Pin'}
+              </button>
+              {projectsAvailable && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="flex items-center gap-2 px-3 min-h-[48px] rounded-lg text-sm text-[#e9edf5] hover:bg-white/[0.06]"
+                  onClick={() => {
+                    setProjectSheetId(c.id)
+                    setMenuId(null)
+                  }}
+                >
+                  <FolderOpen size={15} /> Project
+                </button>
+              )}
+              <button
+                type="button"
+                role="menuitem"
+                className="flex items-center gap-2 px-3 min-h-[48px] rounded-lg text-sm text-[#F87171] hover:bg-white/[0.06]"
+                onClick={() => {
+                  setDeleteId(c.id)
+                  setMenuId(null)
+                }}
+              >
+                <Trash2 size={15} /> Delete
+              </button>
+            </div>
+          </div>
+        )}
+        {/* Desktop floating menu */}
         {menuOpen && (
           <>
             <button
               type="button"
-              className="fixed inset-0 z-40"
+              className="hidden lg:block fixed inset-0 z-40"
               aria-label="Close menu"
               onClick={() => setMenuId(null)}
             />
             <div
               className={clsx(
-                'absolute right-2 z-50 w-[220px] rounded-[20px] border border-white/10 bg-[#0C1018]/95 backdrop-blur-xl shadow-xl shadow-black/40 py-1.5 origin-top-right animate-in fade-in zoom-in-95 duration-150',
+                'hidden lg:block absolute right-2 z-50 w-[220px] rounded-[20px] border border-white/10 bg-[#0C1018]/95 backdrop-blur-xl shadow-xl shadow-black/40 py-1.5',
                 menuPos === 'above' ? 'bottom-full mb-1' : 'top-full mt-1'
               )}
               role="menu"
             >
               <button
                 type="button"
-                role="menuitem"
-                className="w-full flex items-center gap-2.5 px-3 min-h-[52px] text-sm text-[#e9edf5] hover:bg-white/[0.05]"
+                className="w-full flex items-center gap-2.5 px-3 min-h-[48px] text-sm text-[#e9edf5] hover:bg-white/[0.05]"
                 onClick={() => {
                   togglePin(c.id)
                   setMenuId(null)
@@ -377,8 +456,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
               </button>
               <button
                 type="button"
-                role="menuitem"
-                className="w-full flex items-center gap-2.5 px-3 min-h-[52px] text-sm text-[#e9edf5] hover:bg-white/[0.05]"
+                className="w-full flex items-center gap-2.5 px-3 min-h-[48px] text-sm text-[#e9edf5] hover:bg-white/[0.05]"
                 onClick={() => {
                   setRenameValue((c.title || '').slice(0, 80))
                   setRenameId(c.id)
@@ -386,35 +464,30 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
                   setMenuId(null)
                 }}
               >
-                <Pencil size={15} />
-                Rename
+                <Pencil size={15} /> Rename
               </button>
               {projectsAvailable && (
                 <button
                   type="button"
-                  role="menuitem"
-                  className="w-full flex items-center gap-2.5 px-3 min-h-[52px] text-sm text-[#e9edf5] hover:bg-white/[0.05]"
+                  className="w-full flex items-center gap-2.5 px-3 min-h-[48px] text-sm text-[#e9edf5] hover:bg-white/[0.05]"
                   onClick={() => {
                     setProjectSheetId(c.id)
                     setMenuId(null)
                   }}
                 >
-                  <FolderOpen size={15} />
-                  Add to project
+                  <FolderOpen size={15} /> Add to project
                 </button>
               )}
               <div className="h-px bg-white/10 my-1" />
               <button
                 type="button"
-                role="menuitem"
-                className="w-full flex items-center gap-2.5 px-3 min-h-[52px] text-sm text-[#F87171] hover:bg-white/[0.05]"
+                className="w-full flex items-center gap-2.5 px-3 min-h-[48px] text-sm text-[#F87171] hover:bg-white/[0.05]"
                 onClick={() => {
                   setDeleteId(c.id)
                   setMenuId(null)
                 }}
               >
-                <Trash2 size={15} />
-                Delete
+                <Trash2 size={15} /> Delete
               </button>
             </div>
           </>
@@ -423,10 +496,11 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
     )
   }
 
+
   const content = (
     <div className="flex flex-col h-full min-h-0 bg-[#0b0e15]">
       {/* Header */}
-      <div className="shrink-0 flex items-center gap-2 px-3 pt-[max(0.875rem,env(safe-area-inset-top))] pb-3">
+      <div className="shrink-0 flex items-center gap-2 px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-4">
         <div className="flex items-center gap-2.5 flex-1 min-w-0">
           <NIdentity state="white" size={28} />
           {!collapsed && (
@@ -522,7 +596,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         <div
           ref={listRef}
           onScroll={onListScroll}
-          className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-2 pb-24 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-2.5 pb-28 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           {loading && !collapsed && (
             <div className="space-y-2 px-1 py-2" aria-busy="true" aria-label="Loading chats">
@@ -580,10 +654,11 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
             <button
               type="button"
               onClick={handleNewChat}
-              className="shrink-0 inline-flex items-center gap-1.5 px-3 h-10 rounded-full bg-white/[0.06] border border-white/[0.1] text-xs font-medium text-[#e9edf5] hover:border-[#3de0ff]/30 min-h-[44px]"
+              className="shrink-0 inline-flex items-center justify-center w-10 h-10 rounded-full bg-white/[0.06] border border-white/[0.1] text-[#e9edf5] hover:border-[#3de0ff]/30 min-h-[44px] min-w-[44px]"
+              aria-label="New chat"
+              title="New chat"
             >
-              <Plus size={14} />
-              New chat
+              <Plus size={18} strokeWidth={2} />
             </button>
           </>
         )}
@@ -736,7 +811,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
             onClick={onMobileClose}
           />
           <aside
-            className="absolute left-0 top-0 bottom-0 w-[min(85vw,320px)] bg-[#0b0e15] border-r border-white/[0.07] shadow-2xl flex flex-col min-h-0"
+            className="absolute left-0 top-0 bottom-0 w-[min(100vw,420px)] sm:w-[min(92vw,380px)] bg-[#0b0e15] border-r border-white/[0.07] shadow-2xl flex flex-col min-h-0"
             style={{
               animation: 'nyvenDrawerIn 240ms cubic-bezier(0.3, 0.8, 0.2, 1) both',
             }}

@@ -79,7 +79,7 @@ function Toast({ message }: { message: string | null }) {
 }
 
 export function Settings() {
-  const { user, profile, configured, loading: authLoading, signOut, refreshProfile } =
+  const { user, profile, configured, loading: authLoading, signOut, refreshProfile, updateProfile } =
     useAuth()
   const userId = user?.id ?? null
   const [params, setParams] = useSearchParams()
@@ -198,9 +198,17 @@ export function Settings() {
 
   const saveProfile = async () => {
     if (!userId) return
-    // Display name is local-only until a profile update API is wired.
-    // Auth user.displayName comes from /api/auth/me session.
-    showToast('Profile name is stored for this browser session. Server profile update API is not enabled yet.')
+    const name = displayName.trim().slice(0, 80)
+    if (!name) {
+      showToast('Display name cannot be empty')
+      return
+    }
+    const res = await updateProfile(name)
+    if (res.error) showToast(res.error)
+    else {
+      showToast('Profile saved')
+      await refreshProfile()
+    }
   }
 
   const changePassword = async () => {

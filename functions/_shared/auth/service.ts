@@ -541,3 +541,36 @@ export async function resetPasswordWithToken(
 
   return { ok: true }
 }
+
+export async function updateDisplayName(
+  env: AuthServiceEnv,
+  userId: string,
+  displayName: string
+): Promise<{ ok: true; user: PublicUser } | { ok: false; code: string; message: string; httpStatus: number }> {
+  if (!env.DB) {
+    return {
+      ok: false,
+      code: 'AUTH_CONFIG',
+      message: 'Auth storage unavailable.',
+      httpStatus: 503,
+    }
+  }
+  const cleaned = (displayName || '').trim().slice(0, 80)
+  if (!cleaned) {
+    return {
+      ok: false,
+      code: 'VALIDATION',
+      message: 'Display name cannot be empty.',
+      httpStatus: 400,
+    }
+  }
+  const now = new Date().toISOString()
+  await env.DB.prepare(`UPDATE auth_users SET display_name = ?, updated_at = ? WHERE id = ?`)
+    .bind(cleaned, now, userId)
+    .run()
+  const row = await env.DB.prepare(`SELECT * FROM auth_users WHERE id = ?`).bind(userId).first<AuthUserRow>()
+  if (!row) {
+    return { ok: false, code: 'NOT_FOUND', message: 'User not found.', httpStatus: 404 }
+  }
+  return { ok: true, user: toPublic(row) }
+}

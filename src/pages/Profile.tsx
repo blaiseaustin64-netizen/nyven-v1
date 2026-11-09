@@ -4,28 +4,28 @@ import { NIdentity } from '../components/NIdentity'
 import { useAuth } from '../lib/auth/AuthContext'
 
 export function Profile() {
-  const { user, profile, configured, loading, signOut, refreshProfile } = useAuth()
+  const { user, profile, configured, loading, signOut, refreshProfile, updateProfile } = useAuth()
   const navigate = useNavigate()
   const [displayName, setDisplayName] = useState('')
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
 
   useEffect(() => {
-    setDisplayName(profile?.display_name || '')
-  }, [profile])
+    setDisplayName(profile?.display_name || user?.displayName || '')
+  }, [profile, user?.displayName])
 
   const save = async () => {
     if (!user) return
-    const sb = null
-    if (!sb) return
+    const name = displayName.trim().slice(0, 80)
+    if (!name) {
+      setMsg('Display name cannot be empty')
+      return
+    }
     setSaving(true)
     setMsg(null)
-    const { error } = await sb
-      .from('profiles')
-      .update({ display_name: displayName.trim() || null })
-      .eq('id', user.id)
+    const res = await updateProfile(name)
     setSaving(false)
-    if (error) setMsg(error.message)
+    if (res.error) setMsg(res.error)
     else {
       await refreshProfile()
       setMsg('Saved')
@@ -46,7 +46,7 @@ export function Profile() {
             <>
               <h1 className="font-display text-xl font-medium mb-1">
                 {user
-                  ? profile?.display_name || user.email?.split('@')[0] || 'Account'
+                  ? profile?.display_name || user.displayName || user.email?.split('@')[0] || 'Account'
                   : 'Guest'}
               </h1>
               <p className="text-sm text-nyven-text-secondary">
@@ -65,7 +65,8 @@ export function Profile() {
                 </label>
                 <input
                   value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
+                  onChange={(e) => setDisplayName(e.target.value.slice(0, 80))}
+                  maxLength={80}
                   className="w-full bg-nyven-bg border border-white/[0.08] rounded-xl px-3 py-2 text-sm outline-none focus:border-nyven-cyan/40"
                 />
               </div>
@@ -73,12 +74,6 @@ export function Profile() {
                 <span className="text-nyven-text-secondary">Email</span>
                 <span className="truncate ml-2">{user.email}</span>
               </div>
-              {profile?.created_at && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-nyven-text-secondary">Member since</span>
-                  <span>{new Date(profile.created_at).toLocaleDateString()}</span>
-                </div>
-              )}
               <button
                 type="button"
                 disabled={saving}

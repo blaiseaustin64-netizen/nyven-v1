@@ -375,11 +375,14 @@ export function MessageComposer({
     const el = textareaRef.current
     if (el) {
       el.style.height = 'auto'
-      const maxPx =
-        typeof window !== 'undefined'
-          ? Math.round(window.innerHeight * 0.4)
-          : 240
-      el.style.height = `${Math.min(el.scrollHeight, maxPx)}px`
+      // Cap growth so control row (plus/mic/voice/send) always stays visible on mobile
+      const vh = typeof window !== 'undefined' ? window.innerHeight : 600
+      const coarse =
+        typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches
+      const maxPx = coarse ? Math.min(160, Math.round(vh * 0.28)) : Math.min(280, Math.round(vh * 0.4))
+      const next = Math.min(el.scrollHeight, maxPx)
+      el.style.height = `${next}px`
+      el.style.overflowY = el.scrollHeight > maxPx ? 'auto' : 'hidden'
     }
   }
 
@@ -706,7 +709,7 @@ export function MessageComposer({
           onPaste={handlePaste}
           placeholder={placeholder}
           rows={1}
-          className="w-full min-w-0 bg-transparent border-0 outline-none resize-none text-base leading-[1.65] text-nyven-text placeholder:text-nyven-text-secondary/70 max-h-[40vh] overflow-y-auto py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="w-full min-w-0 bg-transparent border-0 outline-none resize-none text-base leading-[1.65] text-nyven-text placeholder:text-nyven-text-secondary/70 max-h-[160px] sm:max-h-[40vh] overflow-y-auto py-1.5"
           style={{ minHeight: '48px' }}
         />
 
