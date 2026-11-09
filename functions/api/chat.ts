@@ -20,6 +20,7 @@ import {
 
 interface Env {
   GEMINI_API_KEY: string
+  OPENROUTER_API_KEY?: string
   GEMINI_CHAT_MODEL?: string
   SERPER_API_KEY?: string
   BRAVE_API_KEY?: string
@@ -211,6 +212,8 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
           BRAVE_API_KEY: env.BRAVE_API_KEY,
           BRAVE_SEARCH_API_KEY: env.BRAVE_SEARCH_API_KEY,
           TAVILY_API_KEY: env.TAVILY_API_KEY,
+          OPENROUTER_API_KEY: env.OPENROUTER_API_KEY,
+          APP_URL: env.APP_URL,
         },
         coreRequest,
         emit,

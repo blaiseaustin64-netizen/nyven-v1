@@ -9,11 +9,12 @@ export type ProjectRow = {
   user_id: string
   slug: string
   title: string
-  description: string
-  instructions: string
-  status: string
-  metadata_json: string
-  archived_at: string | null
+  description?: string
+  instructions?: string
+  status?: string
+  data_json?: string
+  metadata_json?: string
+  archived_at?: string | null
   created_at: string
   updated_at: string
 }
@@ -55,14 +56,30 @@ function slugify(name: string): string {
 export function toPublicProject(row: ProjectRow, extras?: { chatCount?: number; fileCount?: number; taskCount?: number }) {
   let metadata: Record<string, unknown> = {}
   try { metadata = JSON.parse(row.metadata_json || '{}') } catch { /* */ }
+  let data: Record<string, unknown> = {}
+  try {
+    const raw = (row as { data_json?: string }).data_json
+    if (raw) data = JSON.parse(raw)
+  } catch { /* */ }
+  const description =
+    (row.description && String(row.description)) ||
+    (typeof data.description === 'string' ? data.description : '') ||
+    ''
+  const instructions =
+    (row.instructions && String(row.instructions)) ||
+    (typeof data.instructions === 'string' ? data.instructions : '') ||
+    ''
+  const status =
+    (row.status && String(row.status)) ||
+    (typeof data.status === 'string' ? data.status : 'active')
   return {
     id: row.id,
     slug: row.slug,
     name: row.title,
     title: row.title,
-    description: row.description || '',
-    instructions: row.instructions || '',
-    status: row.status || 'active',
+    description,
+    instructions,
+    status,
     archivedAt: row.archived_at,
     metadata,
     createdAt: row.created_at,
@@ -141,27 +158,83 @@ export async function createProject(
   const slug = slugify(title)
   const description = (input.description || '').trim().slice(0, 2000)
   const instructions = (input.instructions || '').trim().slice(0, 8000)
+  const dataJson = JSON.stringify({ description, instructions, status: 'active' })
+
+  // Always use base 0005 columns first (works before 0006 is applied).
+  let inserted = false
+  let lastErr: unknown = null
   try {
-    await db
-      .prepare(
-        `INSERT INTO projects (id, user_id, slug, title, description, instructions, status, data_json, metadata_json, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, 'active', '{}', '{}', ?, ?)`
-      )
-      .bind(id, userId, slug, title, description, instructions, now, now)
-      .run()
-  } catch {
-    // Fallback if columns from 0006 not applied yet
     await db
       .prepare(
         `INSERT INTO projects (id, user_id, slug, title, data_json, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?)`
       )
-      .bind(id, userId, slug, title, JSON.stringify({ description, instructions }), now, now)
+      .bind(id, userId, slug, title, dataJson, now, now)
       .run()
+    inserted = true
+  } catch (e) {
+    lastErr = e
   }
+
+  // Enrich with 0006 columns when available (best-effort).
+  if (inserted) {
+    try {
+      await db
+        .prepare(
+          `UPDATE projects SET description = ?, instructions = ?, status = 'active', metadata_json = '{}'
+           WHERE id = ? AND user_id = ?`
+        )
+        .bind(description, instructions, id, userId)
+        .run()
+    } catch {
+      /* columns may not exist until migration 0006 */
+    }
+  } else {
+    // Retry once with a unique slug if collision
+    const slug2 = slugify(title + '-' + Date.now().toString(36))
+    try {
+      await db
+        .prepare(
+          `INSERT INTO projects (id, user_id, slug, title, data_json, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`
+        )
+        .bind(id, userId, slug2, title, dataJson, now, now)
+        .run()
+      inserted = true
+    } catch (e) {
+      lastErr = e
+      console.error('createProject failed', e instanceof Error ? e.message : e)
+      return null
+    }
+  }
+
   try { await recordActivity(db, id, userId, 'project_created', { name: title }) } catch { /* */ }
   const row = await assertProjectOwner(db, id, userId)
-  return row ? toPublicProject(row) : null
+  if (!row) {
+    console.error('createProject: row missing after insert', lastErr instanceof Error ? lastErr.message : '')
+    // Synthesize public shape so client still navigates
+    return {
+      id,
+      slug,
+      name: title,
+      title,
+      description,
+      instructions,
+      status: 'active',
+      archivedAt: null,
+      metadata: {},
+      createdAt: now,
+      updatedAt: now,
+      chatCount: 0,
+      fileCount: 0,
+      taskCount: 0,
+    }
+  }
+  // Merge description/instructions from data_json if columns empty
+  const pub = toPublicProject(row)
+  if (!pub.description && description) pub.description = description
+  if (!pub.instructions && instructions) pub.instructions = instructions
+  return pub
 }
 
 export async function updateProject(

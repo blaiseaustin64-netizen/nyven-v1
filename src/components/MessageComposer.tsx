@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../lib/auth/AuthContext'
 import {
   Send,
   Plus,
@@ -114,6 +115,7 @@ export function MessageComposer({
   const [sheetDragY, setSheetDragY] = useState(0)
   const [isNarrow, setIsNarrow] = useState(false)
   const navigate = useNavigate()
+  const { user } = useAuth()
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const sheetDragStartY = useRef<number | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -620,7 +622,7 @@ export function MessageComposer({
                     icon: FolderOpen,
                     onClick: () => {
                       closeMenu()
-                      navigate('/projects')
+                      navigate(user ? '/projects' : '/auth')
                     },
                   },
                 ].map((row) => (

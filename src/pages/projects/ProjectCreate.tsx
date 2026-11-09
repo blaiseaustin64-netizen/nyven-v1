@@ -39,16 +39,16 @@ export function ProjectCreate() {
     setSaving(true)
     setError(null)
     try {
-      const project = await createProject({
+      const result = await createProject({
         name: n,
         description: description.trim(),
         instructions: instructions.trim(),
       })
-      if (!project) {
-        setError('Could not create project. Please try again.')
+      if (!result.project) {
+        setError(result.error || 'Could not create project. Please try again.')
         return
       }
-      navigate(`/projects/${project.id}`, { replace: true })
+      navigate(`/projects/${result.project.id}`, { replace: true })
     } catch {
       setError('Could not create project. Please try again.')
     } finally {

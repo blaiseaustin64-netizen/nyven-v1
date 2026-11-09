@@ -6,6 +6,8 @@
 
 import type { CoreEvent, CoreRequest, CoreResult, EmitFn } from './coreTypes'
 import { planWithTools, streamGeminiChat } from './geminiProvider'
+import { streamProjectChat, USER_FACING_AI_UNAVAILABLE } from './openrouter/stream'
+import type { OpenRouterMessage } from './openrouter/stream'
 import { toGeminiFunctionDeclarations } from './tools/registry'
 import { executeTool } from './tools/executor'
 import { NYVEN_SYSTEM_INSTRUCTION } from './nyvenPolicy'
@@ -35,6 +37,8 @@ export type CoreRuntimeEnv = {
   BRAVE_API_KEY?: string
   BRAVE_SEARCH_API_KEY?: string
   TAVILY_API_KEY?: string
+  OPENROUTER_API_KEY?: string
+  APP_URL?: string
 }
 
 function emit(emitFn: EmitFn, event: CoreEvent) {
@@ -129,6 +133,114 @@ export async function runCore(
       text: '',
       error: { code: normalized.code, message: normalized.message },
     }
+  }
+
+  // ── Project mode: OpenRouter Nemotron (real streaming + fallback) ──
+  const projectId =
+    typeof rawRequest.metadata?.projectId === 'string' ? rawRequest.metadata.projectId : ''
+  const projectContext =
+    typeof rawRequest.metadata?.projectContext === 'string'
+      ? rawRequest.metadata.projectContext.trim()
+      : ''
+
+  if (projectId) {
+    const orKey = (env.OPENROUTER_API_KEY || '').trim()
+    if (!orKey) {
+      const message = USER_FACING_AI_UNAVAILABLE
+      emit(emitFn, { type: 'error', code: 'CONFIG', message, timestamp: Date.now() })
+      return { messageId, text: '', error: { code: 'CONFIG', message } }
+    }
+
+    emit(emitFn, {
+      type: 'activity',
+      state: 'thinking',
+      detail: 'Working on your project',
+      timestamp: Date.now(),
+    })
+
+    const systemParts = [NYVEN_SYSTEM_INSTRUCTION]
+    if (projectContext) systemParts.push(projectContext)
+    systemParts.push(
+      'You are assisting inside a NYVEN Project workspace. Be professional, organized, and precise. Process the user\'s actual request dynamically. Do not invent completed work.'
+    )
+
+    const messages: OpenRouterMessage[] = [
+      { role: 'system', content: systemParts.join('\n\n') },
+    ]
+
+    const hist = Array.isArray(rawRequest.history) ? rawRequest.history.slice(-24) : []
+    for (const h of hist) {
+      if (!h?.content) continue
+      messages.push({
+        role: h.role === 'assistant' ? 'assistant' : 'user',
+        content: h.content,
+      })
+    }
+
+    // Multimodal: include image attachments when present (Nemotron VL fallback supports vision)
+    const atts = normalizeAttachments(rawRequest.attachments)
+    const imageParts: Array<{ type: 'image_url'; image_url: { url: string } }> = []
+    const textBits: string[] = []
+    if (normalized.request.message) textBits.push(normalized.request.message)
+    for (const a of atts) {
+      if (a.kind === 'image' && a.inlineBase64) {
+        const mime = a.mimeType || 'image/jpeg'
+        imageParts.push({
+          type: 'image_url',
+          image_url: { url: `data:${mime};base64,${a.inlineBase64}` },
+        })
+      } else if (a.extractedText) {
+        textBits.push(`[Attachment: ${a.name}]\n${a.extractedText.slice(0, 12000)}`)
+      } else if (a.name) {
+        textBits.push(`[Attachment: ${a.name}]`)
+      }
+    }
+
+    const userContent =
+      imageParts.length > 0
+        ? ([{ type: 'text', text: textBits.join('\n\n') || 'Please analyze the attached content.' }, ...imageParts] as OpenRouterMessage['content'])
+        : textBits.join('\n\n') || 'Continue.'
+
+    messages.push({ role: 'user', content: userContent })
+
+    emit(emitFn, {
+      type: 'activity',
+      state: 'generating',
+      detail: 'Generating',
+      timestamp: Date.now(),
+    })
+
+    let full = ''
+    const streamResult = await streamProjectChat(
+      {
+        apiKey: orKey,
+        siteUrl: env.APP_URL || 'https://nyven.vexdyn.tech',
+        siteName: 'NYVEN',
+      },
+      messages,
+      {
+        signal,
+        onToken: (text) => {
+          full += text
+          emit(emitFn, { type: 'token', text, timestamp: Date.now() })
+        },
+      }
+    )
+
+    if (!streamResult.ok && !full) {
+      const message = streamResult.message || USER_FACING_AI_UNAVAILABLE
+      emit(emitFn, {
+        type: 'error',
+        code: streamResult.code || 'MODEL_UNAVAILABLE',
+        message,
+        timestamp: Date.now(),
+      })
+      return { messageId, text: '', error: { code: streamResult.code || 'MODEL_UNAVAILABLE', message } }
+    }
+
+    emit(emitFn, { type: 'activity', state: 'completed', timestamp: Date.now() })
+    emit(emitFn, { type: 'done', messageId, timestamp: Date.now() })
+    return { messageId, text: full || streamResult.ok ? full : full }
   }
 
   const apiKey = (env.GEMINI_API_KEY || '').trim()
