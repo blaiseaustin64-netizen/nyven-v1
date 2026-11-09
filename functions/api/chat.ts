@@ -9,8 +9,10 @@ import { runCore } from '../_shared/coreRuntime'
 import { createSseStream } from '../_shared/sse'
 import { resolveIdentity } from '../_shared/auth'
 import { corsHeaders, optionsResponse, jsonWithCors } from '../_shared/cors'
-import { buildProjectContextBlock } from '../_shared/projects/service'
+import { buildProjectContextBlock, loadProjectImageAttachments } from '../_shared/projects/service'
 import type { D1Database } from '../_shared/db/types'
+
+type R2Bucket = { get(key: string): Promise<{ arrayBuffer(): Promise<ArrayBuffer> } | null> }
 import { resolveUsageSubject, guestCookieHeader } from '../_shared/db/guestKey'
 import {
   checkBurst,
@@ -34,6 +36,7 @@ interface Env {
   APP_URL?: string
   ALLOWED_ORIGINS?: string
   DB?: D1Database
+  PROJECT_FILES?: R2Bucket
   PROVIDER_BUDGET_GEMINI?: string
   PROVIDER_BUDGET_OPENROUTER?: string
   PROVIDER_BUDGET_OPENROUTER_TTS?: string
@@ -205,6 +208,43 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     streamAbort.addEventListener('abort', onAbort)
 
     try {
+      // Multimodal: include a few owned project images from R2 (bounded)
+      if (
+        env.DB &&
+        identity.authenticated &&
+        identity.userId &&
+        metadata?.projectId &&
+        env.PROJECT_FILES
+      ) {
+        try {
+          const imgs = await loadProjectImageAttachments(
+            env.DB,
+            { PROJECT_FILES: env.PROJECT_FILES },
+            identity.userId,
+            String(metadata.projectId),
+            3
+          )
+          if (imgs.length) {
+            const existing = Array.isArray(coreRequest.attachments)
+              ? coreRequest.attachments
+              : []
+            coreRequest.attachments = [
+              ...existing,
+              ...imgs.map((im, i) => ({
+                id: `proj_img_${i}`,
+                name: im.name,
+                mimeType: im.mimeType,
+                size: 0,
+                kind: 'image' as const,
+                inlineBase64: im.inlineBase64,
+              })),
+            ]
+          }
+        } catch (e) {
+          console.error('project R2 images', e instanceof Error ? e.message : e)
+        }
+      }
+
       await runCore(
         {
           GEMINI_API_KEY: env.GEMINI_API_KEY,

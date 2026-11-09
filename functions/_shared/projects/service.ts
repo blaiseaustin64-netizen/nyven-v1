@@ -2,6 +2,7 @@
  * AI Projects service — D1-backed, ownership enforced on every call.
  * Isolated from builder/forge sessionStorage projects.
  */
+type R2Bucket = { get(key: string): Promise<{ arrayBuffer(): Promise<ArrayBuffer> } | null>; put?: unknown; delete?: unknown }
 import type { D1Database } from '../db/types'
 
 export type ProjectRow = {
@@ -862,4 +863,58 @@ export async function buildProjectContextBlock(
     '[/NYVEN PROJECT CONTEXT]',
   ].filter(Boolean)
   return lines.join('\n')
+}
+
+
+/** Load a few recent project images from R2 for multimodal project chat (ownership already checked). */
+export async function loadProjectImageAttachments(
+  db: D1Database,
+  env: { PROJECT_FILES?: R2Bucket },
+  userId: string,
+  projectId: string,
+  limit = 3
+): Promise<Array<{ name: string; mimeType: string; inlineBase64: string }>> {
+  if (!env.PROJECT_FILES) return []
+  const owned = await assertProjectOwner(db, projectId, userId)
+  if (!owned) return []
+  let rows: { results?: Array<{ name: string; mime_type: string; r2_key?: string; storage_key?: string; size_bytes?: number }> }
+  try {
+    rows = await db
+      .prepare(
+        `SELECT name, mime_type, r2_key, storage_key, size_bytes FROM project_files
+         WHERE project_id = ? AND user_id = ?
+         AND (mime_type LIKE 'image/%' OR lower(name) LIKE '%.png' OR lower(name) LIKE '%.jpg'
+              OR lower(name) LIKE '%.jpeg' OR lower(name) LIKE '%.webp' OR lower(name) LIKE '%.gif')
+         ORDER BY created_at DESC LIMIT ?`
+      )
+      .bind(projectId, userId, limit)
+      .all()
+  } catch {
+    return []
+  }
+  const out: Array<{ name: string; mimeType: string; inlineBase64: string }> = []
+  for (const r of rows.results || []) {
+    const key = r.r2_key || r.storage_key
+    if (!key) continue
+    const size = Number(r.size_bytes || 0)
+    if (size > 4 * 1024 * 1024) continue // keep multimodal payload bounded
+    try {
+      const obj = await env.PROJECT_FILES.get(key)
+      if (!obj) continue
+      const buf = await obj.arrayBuffer()
+      if (buf.byteLength > 4 * 1024 * 1024) continue
+      const bytes = new Uint8Array(buf)
+      let binary = ''
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
+      const b64 = btoa(binary)
+      out.push({
+        name: r.name,
+        mimeType: r.mime_type || 'image/jpeg',
+        inlineBase64: b64,
+      })
+    } catch {
+      /* skip */
+    }
+  }
+  return out
 }

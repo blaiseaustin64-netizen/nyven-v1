@@ -119,6 +119,7 @@ export function Chat() {
     onChatScroll,
   } = chatScroll
   const hideHeader = useHideOnScroll(24)
+  const readAloud = useReadAloud()
 
 
   useEffect(() => {
@@ -836,6 +837,13 @@ export function Chat() {
               </button>
             </div>
           )}
+          <ReadAloudPlayer
+            state={readAloud.state}
+            onTogglePause={readAloud.togglePause}
+            onSeek={readAloud.seek}
+            onCycleRate={readAloud.cycleRate}
+            onClose={readAloud.stop}
+          />
           <MessageComposer
             onSend={handleSend}
             isGenerating={isGenerating}

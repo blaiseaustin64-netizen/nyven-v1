@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { fetchTTS } from '../lib/voice/playback'
+import { getVoicePreferences } from '../lib/voice/preferences'
 
 export type ReadAloudState = {
   messageId: string | null
@@ -6,13 +8,16 @@ export type ReadAloudState = {
   loading: boolean
   rate: number
   elapsed: number
+  /** Total seconds when known from audio element */
+  duration: number
+  error?: string | null
 }
 
 const RATES = [1, 1.25, 1.5, 2, 0.75]
 
 /**
- * Shared read-aloud: starts on user tap, mini-player state, single active.
- * Uses Web Speech API when available (no provider names in UI).
+ * Shared read-aloud via backend POST /api/voice/tts (Fish Audio).
+ * No browser speechSynthesis fallback.
  */
 export function useReadAloud() {
   const [state, setState] = useState<ReadAloudState>({
@@ -21,67 +26,246 @@ export function useReadAloud() {
     loading: false,
     rate: 1,
     elapsed: 0,
+    duration: 0,
+    error: null,
   })
-  const utterRef = useRef<SpeechSynthesisUtterance | null>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const objectUrlRef = useRef<string | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
   const timerRef = useRef<number | null>(null)
-  const startTs = useRef(0)
-  const textRef = useRef('')
+  /** Cache generated audio per messageId (object URLs). */
+  const cacheRef = useRef<Map<string, string>>(new Map())
+  const rateRef = useRef(1)
 
-  const stop = useCallback(() => {
-    try {
-      window.speechSynthesis?.cancel()
-    } catch {
-      /* */
+  const clearTimer = () => {
+    if (timerRef.current != null) {
+      window.clearInterval(timerRef.current)
+      timerRef.current = null
     }
-    if (timerRef.current) window.clearInterval(timerRef.current)
-    timerRef.current = null
-    utterRef.current = null
-    setState((s) => ({ ...s, playing: false, loading: false, messageId: null, elapsed: 0 }))
+  }
+
+  const teardownAudio = useCallback((revokeCurrent = true) => {
+    clearTimer()
+    const a = audioRef.current
+    if (a) {
+      try {
+        a.onended = null
+        a.onerror = null
+        a.ontimeupdate = null
+        a.pause()
+        a.removeAttribute('src')
+        a.load()
+      } catch {
+        /* */
+      }
+      audioRef.current = null
+    }
+    if (revokeCurrent && objectUrlRef.current) {
+      // Do not revoke if still in cache
+      let inCache = false
+      for (const url of cacheRef.current.values()) {
+        if (url === objectUrlRef.current) {
+          inCache = true
+          break
+        }
+      }
+      if (!inCache) {
+        try {
+          URL.revokeObjectURL(objectUrlRef.current)
+        } catch {
+          /* */
+        }
+      }
+      objectUrlRef.current = null
+    }
   }, [])
 
-  useEffect(() => () => stop(), [stop])
+  const stop = useCallback(() => {
+    abortRef.current?.abort()
+    abortRef.current = null
+    teardownAudio(false)
+    setState((s) => ({
+      ...s,
+      playing: false,
+      loading: false,
+      messageId: null,
+      elapsed: 0,
+      duration: 0,
+      error: null,
+    }))
+  }, [teardownAudio])
+
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort()
+      teardownAudio(true)
+      for (const url of cacheRef.current.values()) {
+        try {
+          URL.revokeObjectURL(url)
+        } catch {
+          /* */
+        }
+      }
+      cacheRef.current.clear()
+    }
+  }, [teardownAudio])
+
+  const attachAndPlay = useCallback(
+    (messageId: string, url: string, rate: number) => {
+      teardownAudio(false)
+      const audio = new Audio()
+      audio.preload = 'auto'
+      audio.src = url
+      audio.playbackRate = rate
+      audioRef.current = audio
+      objectUrlRef.current = url
+
+      audio.onended = () => {
+        clearTimer()
+        setState((s) =>
+          s.messageId === messageId
+            ? { ...s, playing: false, loading: false, elapsed: 0 }
+            : s
+        )
+      }
+      audio.onerror = () => {
+        clearTimer()
+        setState((s) =>
+          s.messageId === messageId
+            ? {
+                ...s,
+                playing: false,
+                loading: false,
+                error: 'Could not play audio.',
+              }
+            : s
+        )
+      }
+      audio.onloadedmetadata = () => {
+        const d = Number.isFinite(audio.duration) ? audio.duration : 0
+        setState((s) =>
+          s.messageId === messageId ? { ...s, duration: d } : s
+        )
+      }
+      audio.ontimeupdate = () => {
+        setState((s) =>
+          s.messageId === messageId
+            ? {
+                ...s,
+                elapsed: Math.floor(audio.currentTime),
+                duration:
+                  Number.isFinite(audio.duration) && audio.duration > 0
+                    ? audio.duration
+                    : s.duration,
+              }
+            : s
+        )
+      }
+
+      const p = audio.play()
+      if (p && typeof p.then === 'function') {
+        p.then(() => {
+          setState((s) =>
+            s.messageId === messageId
+              ? { ...s, loading: false, playing: true, error: null }
+              : s
+          )
+        }).catch(() => {
+          setState((s) =>
+            s.messageId === messageId
+              ? {
+                  ...s,
+                  loading: false,
+                  playing: false,
+                  error: 'Playback was blocked. Tap play again.',
+                }
+              : s
+          )
+        })
+      } else {
+        setState((s) =>
+          s.messageId === messageId
+            ? { ...s, loading: false, playing: true, error: null }
+            : s
+        )
+      }
+    },
+    [teardownAudio]
+  )
 
   const play = useCallback(
     (messageId: string, content: string) => {
-      // Must call inside tap handler
-      stop()
       const text = (content || '').trim()
       if (!text) return
-      textRef.current = text
-      setState({ messageId, playing: true, loading: true, rate: 1, elapsed: 0 })
-      startTs.current = Date.now()
 
-      if (typeof window === 'undefined' || !window.speechSynthesis) {
-        setState((s) => ({ ...s, loading: false, playing: false }))
+      // Cancel any in-flight request / audio
+      abortRef.current?.abort()
+      teardownAudio(false)
+
+      const rate = rateRef.current
+      setState({
+        messageId,
+        playing: false,
+        loading: true,
+        rate,
+        elapsed: 0,
+        duration: 0,
+        error: null,
+      })
+
+      const cached = cacheRef.current.get(messageId)
+      if (cached) {
+        attachAndPlay(messageId, cached, rate)
         return
       }
 
-      const u = new SpeechSynthesisUtterance(text.slice(0, 12000))
-      u.rate = 1
-      utterRef.current = u
-      u.onstart = () => {
-        setState((s) => ({ ...s, loading: false, playing: true }))
-        timerRef.current = window.setInterval(() => {
-          setState((s) => ({
-            ...s,
-            elapsed: Math.floor((Date.now() - startTs.current) / 1000),
-          }))
-        }, 250)
-      }
-      u.onend = () => stop()
-      u.onerror = () => stop()
-      window.speechSynthesis.speak(u)
+      const ac = new AbortController()
+      abortRef.current = ac
+      const voiceId = getVoicePreferences().voiceId
+
+      void (async () => {
+        try {
+          const blob = await fetchTTS(text.slice(0, 12000), voiceId, ac.signal)
+          if (ac.signal.aborted) return
+          const url = URL.createObjectURL(blob)
+          cacheRef.current.set(messageId, url)
+          // Cap cache size
+          if (cacheRef.current.size > 12) {
+            const first = cacheRef.current.keys().next().value
+            if (first && first !== messageId) {
+              const old = cacheRef.current.get(first)
+              cacheRef.current.delete(first)
+              if (old) {
+                try {
+                  URL.revokeObjectURL(old)
+                } catch {
+                  /* */
+                }
+              }
+            }
+          }
+          attachAndPlay(messageId, url, rate)
+        } catch (e) {
+          if (ac.signal.aborted) return
+          const msg = e instanceof Error ? e.message : 'Could not generate speech.'
+          setState((s) =>
+            s.messageId === messageId
+              ? { ...s, loading: false, playing: false, error: msg }
+              : s
+          )
+        }
+      })()
     },
-    [stop]
+    [attachAndPlay, teardownAudio]
   )
 
   const togglePause = useCallback(() => {
-    if (!window.speechSynthesis) return
-    if (window.speechSynthesis.paused) {
-      window.speechSynthesis.resume()
-      setState((s) => ({ ...s, playing: true }))
+    const a = audioRef.current
+    if (!a) return
+    if (a.paused) {
+      void a.play().then(() => setState((s) => ({ ...s, playing: true }))).catch(() => {})
     } else {
-      window.speechSynthesis.pause()
+      a.pause()
       setState((s) => ({ ...s, playing: false }))
     }
   }, [])
@@ -90,20 +274,20 @@ export function useReadAloud() {
     setState((s) => {
       const idx = RATES.indexOf(s.rate)
       const next = RATES[(idx + 1) % RATES.length]
-      if (utterRef.current) utterRef.current.rate = next
-      // Restart at new rate for broader browser support
-      if (s.messageId && textRef.current) {
-        const id = s.messageId
-        const text = textRef.current
-        setTimeout(() => play(id, text), 0)
-      }
+      rateRef.current = next
+      if (audioRef.current) audioRef.current.playbackRate = next
       return { ...s, rate: next }
     })
-  }, [play])
+  }, [])
 
   const seek = useCallback((deltaSec: number) => {
-    // SpeechSynthesis has limited seek — approximate by elapsed display only
-    setState((s) => ({ ...s, elapsed: Math.max(0, s.elapsed + deltaSec) }))
+    const a = audioRef.current
+    if (!a || !Number.isFinite(a.duration)) {
+      setState((s) => ({ ...s, elapsed: Math.max(0, s.elapsed + deltaSec) }))
+      return
+    }
+    a.currentTime = Math.max(0, Math.min(a.duration, a.currentTime + deltaSec))
+    setState((s) => ({ ...s, elapsed: Math.floor(a.currentTime) }))
   }, [])
 
   return {

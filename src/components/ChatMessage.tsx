@@ -163,7 +163,9 @@ export function ChatMessage({
         ) : null}
 
         {!active && message.content && (
-          <div className="flex flex-wrap items-center gap-0.5 mt-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100 transition-opacity">
+          <div className={`flex flex-wrap items-center gap-0.5 mt-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100 transition-opacity ${
+            isReadingAloud || isReadAloudLoading ? 'sm:opacity-100' : ''
+          }`}>
             <button
               type="button"
               onClick={handleCopy}
@@ -248,9 +250,9 @@ export function ChatMessage({
                     onReadAloud(message.id, message.content)
                   }
                 }}
-                className={`p-2 rounded-lg hover:bg-white/[0.05] min-h-[36px] min-w-[36px] flex items-center justify-center ${
+                className={`p-2 rounded-lg hover:bg-white/[0.05] min-h-[36px] min-w-[36px] flex items-center justify-center transition-colors ${
                   isReadingAloud || isReadAloudLoading
-                    ? 'text-nyven-cyan'
+                    ? 'text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.35)]'
                     : 'text-nyven-text-secondary hover:text-nyven-text'
                 }`}
                 aria-label={
