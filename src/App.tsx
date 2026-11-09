@@ -21,6 +21,42 @@ import { Auth } from './pages/Auth'
 import { AuthProvider } from './lib/auth/AuthContext'
 import { ConversationHistoryProvider } from './lib/chat/ConversationHistoryContext'
 
+import { Component, type ErrorInfo, type ReactNode } from 'react'
+
+class AppErrorBoundary extends Component<
+  { children: ReactNode },
+  { error: Error | null }
+> {
+  state = { error: null as Error | null }
+  static getDerivedStateFromError(error: Error) {
+    return { error }
+  }
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error('App crash', error, info.componentStack)
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="min-h-[100dvh] flex flex-col items-center justify-center gap-4 p-6 bg-nyven-bg text-nyven-text">
+          <p className="text-sm font-medium">Something went wrong</p>
+          <pre className="text-xs text-red-300/90 max-w-lg whitespace-pre-wrap break-words opacity-90">
+            {this.state.error.message}
+          </pre>
+          <button
+            type="button"
+            className="px-4 h-10 rounded-xl bg-nyven-cyan text-nyven-bg text-sm font-medium"
+            onClick={() => window.location.reload()}
+          >
+            Reload
+          </button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
+
 const INTRO_KEY = 'nyven_intro_seen'
 
 /** NYVEN Code has its own workspace; the generic Create Agent form redirects it there. */
@@ -133,6 +169,7 @@ export default function App() {
         )}
 
         <main className="flex-1 min-h-0 overflow-hidden">
+          <AppErrorBoundary>
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/chat" element={<Chat />} />
@@ -151,6 +188,7 @@ export default function App() {
             <Route path="/profile" element={<Profile />} />
             <Route path="/preview/:slug" element={<Preview />} />
           </Routes>
+          </AppErrorBoundary>
         </main>
 
         

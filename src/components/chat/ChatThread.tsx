@@ -1,23 +1,28 @@
 import type { ReactNode } from 'react'
 import { ChatMessage } from '../ChatMessage'
 import type { Message } from '../../lib/types'
+import { AttachmentCard } from '../attachments/AttachmentCard'
 
 type Props = {
   messages: Message[]
   isGenerating?: boolean
+  conversationId?: string
   scrollRef?: React.RefObject<HTMLDivElement>
   bottomRef?: React.RefObject<HTMLDivElement>
   onScroll?: (e: React.UIEvent<HTMLDivElement>) => void
   paddingBottom?: number | string
   emptyState?: ReactNode
-  onFeedback?: (messageId: string, value: 'positive' | 'negative') => void
+  onFeedback?: (
+    messageId: string,
+    rating: 'positive' | 'negative',
+    note?: string
+  ) => void
   onReadAloud?: (messageId: string, content: string) => void
   onStopReadAloud?: () => void
   readingMessageId?: string | null
   readAloudLoading?: boolean
   onRegenerate?: () => void
-  attachmentSlot?: (message: Message) => ReactNode
-  /** When true, only renders message list (parent owns scroll container). */
+  onAttachmentClick?: (att: NonNullable<Message['attachments']>[number]) => void
   listOnly?: boolean
   className?: string
 }
@@ -25,6 +30,7 @@ type Props = {
 export function ChatThread({
   messages,
   isGenerating,
+  conversationId,
   scrollRef,
   bottomRef,
   onScroll,
@@ -36,43 +42,62 @@ export function ChatThread({
   readingMessageId,
   readAloudLoading,
   onRegenerate,
-  attachmentSlot,
+  onAttachmentClick,
   listOnly,
   className,
 }: Props) {
   const body = (
     <>
       {messages.length === 0 && emptyState}
-      {messages.map((msg, idx) => (
-        <div key={msg.id} className="space-y-2">
-          {attachmentSlot?.(msg)}
-          <ChatMessage
-            message={msg}
-            showActions={msg.role === 'nyven' && !msg.isThinking && !msg.isStreaming}
-            onRegenerate={
-              idx === messages.length - 1 &&
-              msg.role === 'nyven' &&
-              !msg.isStreaming &&
-              onRegenerate
-                ? onRegenerate
-                : undefined
-            }
-            onFeedback={
-              msg.role === 'nyven' && !msg.isStreaming && !msg.isThinking && onFeedback
-                ? (value) => onFeedback(msg.id, value)
-                : undefined
-            }
-            onReadAloud={
-              msg.role === 'nyven' && !msg.isStreaming && !msg.isThinking && onReadAloud
-                ? () => onReadAloud(msg.id, msg.content)
-                : undefined
-            }
-            onStopReadAloud={onStopReadAloud}
-            isReadingAloud={readingMessageId === msg.id && !readAloudLoading}
-            isReadAloudLoading={readingMessageId === msg.id && !!readAloudLoading}
-          />
-        </div>
-      ))}
+      {messages.map((msg, idx) => {
+        const isLast = idx === messages.length - 1
+        return (
+          <div key={msg.id} className="space-y-2">
+            {msg.role === 'user' && msg.attachments && msg.attachments.length > 0 && (
+              <div className="flex flex-wrap gap-2 justify-end">
+                {msg.attachments.map((a) => (
+                  <AttachmentCard
+                    key={a.id || a.name}
+                    align="right"
+                    item={{
+                      id: a.id,
+                      name: a.name || 'File',
+                      mimeType: a.mimeType,
+                      size: a.size,
+                      kind: a.kind,
+                      previewUrl: a.previewDataUrl,
+                    }}
+                    onClick={() => onAttachmentClick?.(a)}
+                  />
+                ))}
+              </div>
+            )}
+            <ChatMessage
+              message={msg}
+              isLast={isLast}
+              conversationId={conversationId}
+              onRegenerate={
+                isLast && msg.role === 'nyven' && !msg.isStreaming && onRegenerate
+                  ? onRegenerate
+                  : undefined
+              }
+              onFeedback={
+                msg.role === 'nyven' && !msg.isStreaming && !msg.isThinking && onFeedback
+                  ? onFeedback
+                  : undefined
+              }
+              onReadAloud={
+                msg.role === 'nyven' && !msg.isStreaming && !msg.isThinking && onReadAloud
+                  ? onReadAloud
+                  : undefined
+              }
+              onStopReadAloud={onStopReadAloud}
+              isReadingAloud={readingMessageId === msg.id && !readAloudLoading}
+              isReadAloudLoading={readingMessageId === msg.id && !!readAloudLoading}
+            />
+          </div>
+        )
+      })}
       {messages.length > 0 &&
         messages[messages.length - 1]?.role === 'nyven' &&
         messages[messages.length - 1]?.activityState === 'error' &&

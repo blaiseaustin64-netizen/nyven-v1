@@ -99,7 +99,6 @@ export function Chat() {
   const fromVoiceRef = useRef(false)
   const voiceSubmitInFlightRef = useRef(false)
   const [composerPad, setComposerPad] = useState(96)
-  const [memoryChip, setMemoryChip] = useState<{ ids: string[] } | null>(null)
   const composerWrapRef = useRef<HTMLDivElement>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
   const streamMsgIdRef = useRef<string | null>(null)
@@ -518,12 +517,8 @@ export function Chat() {
             fromVoiceRef.current = false
             voiceSubmitInFlightRef.current = false
             setFromVoice(false)
-            // Background memory extract (never blocks the reply)
-            const spokenForMem = streamContentRef.current
-            void extractMemoriesFromExchange(userId, text, spokenForMem, {
+            void extractMemoriesFromExchange(userId, text, streamContentRef.current, {
               conversationId: activeIdRef.current,
-            }).then((r) => {
-              if (r.count > 0) setMemoryChip({ ids: r.ids })
             })
           },
           onError: (_code, message) => {
@@ -799,14 +794,16 @@ export function Chat() {
               <ChatThread
                 messages={messages}
                 isGenerating={isGenerating}
-                onFeedback={(id, value) => {
-                  void submitFeedback(id, value)
+                conversationId={activeId}
+                onFeedback={(messageId, rating, note) => {
+                  void submitFeedback(messageId, rating)
                 }}
                 onReadAloud={(id, content) => void handleReadAloud(id, content)}
                 onStopReadAloud={stopReadAloud}
                 readingMessageId={readingMessageId}
                 readAloudLoading={readAloudLoading}
                 onRegenerate={handleRegenerate}
+                listOnly
                 className="contents"
               />
             )}
@@ -816,29 +813,6 @@ export function Chat() {
         </div>
 
         {/* Dictation wave lives on the composer mic (MicWaveCircle). Full Liquid Voice is Voice Chat only. */}
-        {memoryChip && (
-          <div className="flex justify-center py-1">
-            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-xs">
-              Memory updated
-              <button
-                type="button"
-                className="underline text-nyven-cyan"
-                onClick={() => {
-                  const ids = memoryChip.ids
-                  setMemoryChip(null)
-                  for (const id of ids) {
-                    void fetch(`/api/memories?id=${encodeURIComponent(id)}`, {
-                      method: 'DELETE',
-                      credentials: 'include',
-                    })
-                  }
-                }}
-              >
-                Undo
-              </button>
-            </span>
-          </div>
-        )}
         {voiceError && !voiceChatOpen && (
           <p className="text-center text-xs text-red-300 px-4 py-1 max-w-xl mx-auto">{voiceError}</p>
         )}

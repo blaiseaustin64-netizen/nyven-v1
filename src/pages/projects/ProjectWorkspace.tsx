@@ -163,12 +163,31 @@ export function ProjectWorkspace() {
         const data = await res.json().catch(() => ({}))
         if (!cancelled && res.ok && Array.isArray(data.messages)) {
           setMessages(
-            data.messages.map((m: any) => ({
-              id: m.id,
-              role: m.role === 'assistant' ? 'nyven' : m.role,
-              content: m.content,
-              timestamp: m.timestamp || Date.now(),
-            }))
+            data.messages.map((m: any) => {
+              let attachments = m.attachments
+              if (!attachments && m.metadata) {
+                try {
+                  const meta = typeof m.metadata === 'string' ? JSON.parse(m.metadata) : m.metadata
+                  attachments = meta?.attachments
+                } catch { /* */ }
+              }
+              return {
+                id: m.id,
+                role: m.role === 'assistant' ? 'nyven' : m.role === 'user' ? 'user' : 'nyven',
+                content: m.content || '',
+                timestamp: m.timestamp || m.created_at || Date.now(),
+                attachments: Array.isArray(attachments)
+                  ? attachments.map((a: any) => ({
+                      id: a.id || crypto.randomUUID(),
+                      name: a.name || 'File',
+                      mimeType: a.mimeType || a.mime_type || 'application/octet-stream',
+                      size: a.size || 0,
+                      kind: a.kind || 'document',
+                      previewDataUrl: a.previewDataUrl || a.previewUrl,
+                    }))
+                  : undefined,
+              }
+            })
           )
         }
       } catch {
@@ -292,6 +311,7 @@ export function ProjectWorkspace() {
                 role: 'user',
                 content: userMsg.content,
                 createdAt: userMsg.timestamp,
+                metadata: { attachments: userMsg.attachments || [] },
               },
             ],
           }),
@@ -548,67 +568,72 @@ export function ProjectWorkspace() {
 
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
         {tab === 'chat' && (
-          <>
-            <div ref={chatScrollRef} onScroll={onChatScroll} className="flex-1 min-h-0 overflow-y-auto px-4 py-4">
-              <div className="max-w-3xl mx-auto space-y-4">
-                {messages.length === 0 && (
-                  <div className="py-12 text-center">
-                    <h2 className="font-display text-xl font-medium mb-2">{projectTitle}</h2>
-                    <p className="text-sm text-nyven-text-secondary leading-relaxed max-w-md mx-auto mb-6">
-                      {project.description || 'Ask anything about this project'}
-                    </p>
-                    <p className="text-xs text-nyven-text-secondary/80">Ask anything about this project</p>
-                  </div>
-                )}
-                {messages.map((m) => (
-                  <div key={m.id} className="space-y-2">
-                    {m.role === 'user' && m.attachments && m.attachments.length > 0 && (
-                      <div className="flex flex-wrap gap-2 justify-end">
-                        {m.attachments.map((a) => (
-                          <AttachmentCard
-                            key={a.id}
-                            align="right"
-                            item={{
-                              id: a.id,
-                              name: a.name,
-                              mimeType: a.mimeType,
-                              size: a.size,
-                              kind: a.kind,
-                              previewUrl: a.previewDataUrl,
-                            }}
-                            onClick={() =>
-                              setViewerItem({
-                                id: a.id,
-                                name: a.name,
-                                mimeType: a.mimeType,
-                                size: a.size,
-                                kind: a.kind,
-                                previewUrl: a.previewDataUrl,
-                              })
-                            }
-                          />
-                        ))}
-                      </div>
-                    )}
-                    <ChatMessage message={m} />
-                  </div>
-                ))}
-                <div ref={bottomRef} />
-                {showJumpLatest && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      stickToBottomRef.current = true
-                      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-                      setShowJumpLatest(false)
-                    }}
-                    className="sticky bottom-2 mx-auto block px-3 py-1.5 rounded-full bg-white/10 text-xs"
-                  >
-                    Jump to latest
-                  </button>
-                )}
-              </div>
-            </div>
+          <div className="flex-1 min-h-0 flex flex-col relative">
+            <ChatThread
+              messages={messages}
+              isGenerating={isGenerating}
+              conversationId={thread?.id || undefined}
+              scrollRef={chatScroll.scrollRef}
+              bottomRef={chatScroll.bottomRef}
+              onScroll={(e) => {
+                chatScroll.onChatScroll(e)
+                hideHeader.onScroll(e)
+              }}
+              emptyState={
+                <div className="py-12 text-center">
+                  <h2 className="font-display text-xl font-medium mb-2">{projectTitle}</h2>
+                  <p className="text-sm text-nyven-text-secondary leading-relaxed max-w-md mx-auto mb-2">
+                    {project.description || 'Ask anything about this project'}
+                  </p>
+                  <p className="text-xs text-nyven-text-secondary/80">Ask anything about this project</p>
+                </div>
+              }
+              onFeedback={(messageId, rating) => {
+                void fetch('/api/feedback', {
+                  method: 'POST',
+                  credentials: 'include',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    messageId,
+                    rating,
+                    conversationId: thread?.id,
+                  }),
+                }).catch(() => {})
+              }}
+              onReadAloud={(id, content) => {
+                setReadingMessageId(id)
+                setReadAloudLoading(true)
+                void voice.speakReply(content).finally(() => setReadAloudLoading(false))
+              }}
+              onStopReadAloud={() => {
+                try {
+                  voice.voiceRef.current?.stopAll?.()
+                } catch { /* */ }
+                setReadingMessageId(null)
+              }}
+              readingMessageId={readingMessageId}
+              readAloudLoading={readAloudLoading}
+              onAttachmentClick={(a) =>
+                setViewerItem({
+                  id: a.id,
+                  name: a.name || 'File',
+                  mimeType: a.mimeType,
+                  size: a.size,
+                  kind: a.kind,
+                  previewUrl: a.previewDataUrl,
+                })
+              }
+              className="flex-1 min-h-0 overflow-y-auto px-4 py-4"
+            />
+            {chatScroll.showJumpLatest && (
+              <button
+                type="button"
+                onClick={() => chatScroll.scrollToBottom(true, true)}
+                className="absolute bottom-24 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-full bg-white/10 text-xs z-10"
+              >
+                Jump to latest
+              </button>
+            )}
             {actionError && (
               <p className="px-4 text-xs text-red-300/90 text-center pb-1">{actionError}</p>
             )}
@@ -626,7 +651,7 @@ export function ProjectWorkspace() {
                 />
               </div>
             </div>
-          </>
+          </div>
         )}
 
         {tab === 'files' && (
@@ -797,7 +822,7 @@ export function ProjectWorkspace() {
                         <li key={a.id} className="flex justify-between gap-2 text-sm">
                           <span>{activityLabel(a.eventType)}</span>
                           <span className="text-[11px] text-nyven-text-secondary shrink-0">
-                            {formatRelative(a.createdAt)}
+                            {a.createdAt ? formatRelative(a.createdAt) : ''}
                           </span>
                         </li>
                       ))

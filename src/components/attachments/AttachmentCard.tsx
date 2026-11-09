@@ -4,15 +4,16 @@ import { File, Image as ImageIcon } from 'lucide-react'
 
 export type AttachmentCardData = {
   id?: string
-  name: string
+  name?: string
   mimeType?: string
   size?: number
   kind?: 'image' | 'document' | 'text' | string
   previewUrl?: string
 }
 
-function badgeFor(name: string, mime?: string): string {
-  const ext = name.includes('.') ? name.slice(name.lastIndexOf('.') + 1).toUpperCase() : ''
+function badgeFor(name?: string, mime?: string): string {
+  const n = name || ''
+  const ext = n.includes('.') ? n.slice(n.lastIndexOf('.') + 1).toUpperCase() : ''
   if (ext) return ext.slice(0, 5)
   if (mime?.startsWith('image/')) return 'IMG'
   if (mime?.includes('pdf')) return 'PDF'
@@ -26,13 +27,15 @@ export function AttachmentCard({
   className,
   align = 'left',
 }: {
-  item: AttachmentCardData
+  item: AttachmentCardData | null | undefined
   onClick?: () => void
   className?: string
   align?: 'left' | 'right'
 }) {
+  if (!item) return null
+  const name = item.name || 'File'
   const isImage = item.kind === 'image' || (item.mimeType || '').startsWith('image/')
-  const badge = badgeFor(item.name, item.mimeType)
+  const badge = badgeFor(name, item.mimeType)
   return (
     <button
       type="button"
@@ -56,7 +59,7 @@ export function AttachmentCard({
         </>
       )}
       <span className="absolute bottom-0 inset-x-0 px-2 py-1.5 bg-gradient-to-t from-black/80 to-transparent">
-        <span className="block text-[11px] leading-snug line-clamp-2 break-all">{item.name}</span>
+        <span className="block text-[11px] leading-snug line-clamp-2 break-all">{name}</span>
       </span>
     </button>
   )
