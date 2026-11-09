@@ -1,20 +1,30 @@
-/** Full-screen attachment viewer with edit / share / close. */
+/** Full-screen attachment viewer: PDF canvas preview, text edit, image crop/rotate. */
 import { useEffect, useRef, useState } from 'react'
 import { X, Pencil, Share2, Download, RotateCw } from 'lucide-react'
 import type { AttachmentCardData } from './AttachmentCard'
 import { getCachedAttachment } from '../../lib/attachments/fileCache'
+import { loadPdfJs, renderPdfPagesToCanvas } from '../../lib/attachments/pdfjsLoader'
 
 function isEditable(item: AttachmentCardData): boolean {
   const mime = item.mimeType || ''
-  const name = item.name.toLowerCase()
+  const name = (item.name || '').toLowerCase()
   if (mime.startsWith('image/')) return true
   if (mime.startsWith('text/') || mime === 'application/json') return true
   if (/\.(md|txt|json|csv|ts|tsx|js|jsx|css|html|yml|yaml)$/i.test(name)) return true
   return false
 }
 
+function isPdf(item: AttachmentCardData): boolean {
+  return (item.mimeType || '') === 'application/pdf' || (item.name || '').toLowerCase().endsWith('.pdf')
+}
+
 function isZip(item: AttachmentCardData): boolean {
-  return (item.mimeType || '').includes('zip') || item.name.toLowerCase().endsWith('.zip')
+  return (item.mimeType || '').includes('zip') || (item.name || '').toLowerCase().endsWith('.zip')
+}
+
+function isOffice(item: AttachmentCardData): boolean {
+  const n = (item.name || '').toLowerCase()
+  return n.endsWith('.docx') || n.endsWith('.xlsx') || (item.mimeType || '').includes('wordprocessingml') || (item.mimeType || '').includes('spreadsheetml')
 }
 
 export function AttachmentViewer({
@@ -34,14 +44,17 @@ export function AttachmentViewer({
   onUseInChat?: (blob: Blob, name: string) => void
   onSaveText?: (text: string) => void
 }) {
-  const [mode, setMode] = useState<'view' | 'edit'>('view')
+  const [mode, setMode] = useState<'view' | 'edit' | 'text'>('view')
   const [text, setText] = useState('')
   const [objectUrl, setObjectUrl] = useState<string | null>(null)
+  const [blob, setBlob] = useState<Blob | null>(null)
   const [missing, setMissing] = useState(false)
+  const [pdfFailed, setPdfFailed] = useState(false)
   const [rotation, setRotation] = useState(0)
   const [aspect, setAspect] = useState<'free' | '1:1' | '4:3' | '16:9'>('free')
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const imgRef = useRef<HTMLImageElement | null>(null)
+  const pdfContainerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!open) return
@@ -58,20 +71,25 @@ export function AttachmentViewer({
     setRotation(0)
     setText(textPreview || '')
     setMissing(false)
-    let url: string | null = item.previewUrl || null
+    setPdfFailed(false)
+    setBlob(null)
     let revoke: string | null = null
+    let url: string | null = item.previewUrl || null
     void (async () => {
       if (item.id && userId) {
         const cached = await getCachedAttachment(item.id, userId)
         if (cached) {
+          setBlob(cached.blob)
           revoke = URL.createObjectURL(cached.blob)
           url = revoke
           if ((cached.mime || '').startsWith('text/') || !textPreview) {
             try {
-              const t = await cached.blob.text()
-              if (t) setText(t.slice(0, 200_000))
+              if (!(cached.mime || '').includes('pdf') && !(cached.mime || '').includes('zip')) {
+                const t = await cached.blob.text()
+                if (t && !t.includes('\0')) setText(t.slice(0, 200_000))
+              }
             } catch {
-              /* */
+              /* binary */
             }
           }
         } else if (!item.previewUrl && !textPreview) {
@@ -85,17 +103,51 @@ export function AttachmentViewer({
     }
   }, [open, item, userId, textPreview])
 
+  // PDF canvas render — never decode as text
+  useEffect(() => {
+    if (!open || !item || !isPdf(item)) return
+    const el = pdfContainerRef.current
+    if (!el) return
+    let cancelled = false
+    void (async () => {
+      const lib = await loadPdfJs()
+      if (!lib || cancelled) {
+        if (!cancelled) setPdfFailed(true)
+        return
+      }
+      try {
+        let data: ArrayBuffer | null = null
+        if (blob) data = await blob.arrayBuffer()
+        else if (objectUrl) {
+          const res = await fetch(objectUrl)
+          data = await res.arrayBuffer()
+        }
+        if (!data || cancelled) {
+          setPdfFailed(true)
+          return
+        }
+        const result = await renderPdfPagesToCanvas(data, el, 30)
+        if (!result.ok) setPdfFailed(true)
+      } catch {
+        setPdfFailed(true)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [open, item, blob, objectUrl])
+
   if (!open || !item) return null
 
   const editable = isEditable(item)
   const zip = isZip(item)
+  const pdf = isPdf(item)
+  const office = isOffice(item)
   const image = (item.mimeType || '').startsWith('image/') || item.kind === 'image'
 
   const share = async () => {
     try {
-      if (navigator.share) {
-        await navigator.share({ title: item.name, text: item.name })
-      }
+      if (navigator.share) await navigator.share({ title: item.name, text: item.name })
     } catch {
       /* */
     }
@@ -105,7 +157,7 @@ export function AttachmentViewer({
     if (!objectUrl) return
     const a = document.createElement('a')
     a.href = objectUrl
-    a.download = item.name
+    a.download = item.name || 'download'
     a.click()
   }
 
@@ -115,7 +167,6 @@ export function AttachmentViewer({
     if (!img || !canvas) return
     const w = img.naturalWidth
     const h = img.naturalHeight
-    // Source crop rect from aspect
     let sx = 0
     let sy = 0
     let sw = w
@@ -144,9 +195,9 @@ export function AttachmentViewer({
     ctx.rotate(rad)
     ctx.drawImage(img, sx, sy, sw, sh, -sw / 2, -sh / 2, sw, sh)
     canvas.toBlob(
-      (blob) => {
-        if (!blob) return
-        onUseInChat?.(blob, item.name.replace(/(\.\w+)?$/, '-edited$1'))
+      (b) => {
+        if (!b) return
+        onUseInChat?.(b, (item.name || 'image').replace(/(\.\w+)?$/, '-edited$1'))
         onClose()
       },
       item.mimeType || 'image/jpeg',
@@ -154,31 +205,89 @@ export function AttachmentViewer({
     )
   }
 
-  if (zip || (!editable && !image && !(item.mimeType || '').includes('pdf'))) {
+  // Non-editable layouts: zip, failed pdf, office
+  if (zip || (pdf && (pdfFailed || mode === 'text')) || office || (!editable && !image && !pdf)) {
+    const showText = mode === 'text' || office || (pdf && pdfFailed)
     return (
       <div className="fixed inset-0 z-[80] bg-black flex flex-col">
         <header className="h-14 px-3 flex items-center gap-2">
           <button type="button" onClick={onClose} className="w-11 h-11 grid place-items-center" aria-label="Close">
             <X size={22} />
           </button>
-          <h2 className="flex-1 text-center text-sm font-medium truncate px-2">{item.name}</h2>
+          <h2 className="flex-1 text-center text-sm font-medium truncate px-2">{item.name || 'File'}</h2>
           <button type="button" onClick={() => void share()} className="w-11 h-11 grid place-items-center" aria-label="Share">
             <Share2 size={20} />
           </button>
         </header>
-        <div className="flex-1 flex flex-col items-center justify-center gap-3 px-6">
-          <div className="w-16 h-16 rounded-2xl bg-white/10 grid place-items-center text-sm tracking-wide">ZIP</div>
-          <p className="text-sm text-white/50">Preview unavailable</p>
-          {missing && <p className="text-xs text-white/40">Original not available on this device</p>}
-          <div className="flex flex-col gap-2 w-full max-w-xs mt-2">
-            <button type="button" onClick={download} className="h-11 rounded-full border border-white/20 text-sm">
+        {showText && text ? (
+          <pre className="flex-1 overflow-auto p-4 text-sm whitespace-pre-wrap break-words text-white/90 font-mono">
+            {text}
+          </pre>
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center gap-3 px-6">
+            <div className="w-16 h-16 rounded-2xl bg-white/10 grid place-items-center text-sm tracking-wide">
+              {zip ? 'ZIP' : pdf ? 'PDF' : office ? 'DOC' : 'FILE'}
+            </div>
+            <p className="text-sm text-white/50">Preview unavailable</p>
+            {missing && <p className="text-xs text-white/40">Original not available on this device</p>}
+            <div className="flex flex-col gap-2 w-full max-w-xs mt-2">
+              {objectUrl && (
+                <button type="button" onClick={download} className="h-11 rounded-full border border-white/20 text-sm">
+                  Download
+                </button>
+              )}
+              <button type="button" onClick={() => void share()} className="h-11 rounded-full border border-white/20 text-sm">
+                Share
+              </button>
+              {(text || textPreview) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setText(text || textPreview || '')
+                    setMode('text')
+                  }}
+                  className="h-11 rounded-full border border-white/20 text-sm"
+                >
+                  View extracted text
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // PDF with canvas pages
+  if (pdf && !pdfFailed) {
+    return (
+      <div className="fixed inset-0 z-[80] bg-black flex flex-col">
+        <header className="h-14 px-3 flex items-center gap-2">
+          <button type="button" onClick={onClose} className="w-11 h-11 grid place-items-center" aria-label="Close">
+            <X size={22} />
+          </button>
+          <h2 className="flex-1 text-center text-sm font-medium truncate px-2">{item.name || 'PDF'}</h2>
+          <button type="button" onClick={() => void share()} className="w-11 h-11 grid place-items-center" aria-label="Share">
+            <Share2 size={20} />
+          </button>
+        </header>
+        <div className="flex gap-2 justify-center px-4 pb-2">
+          {objectUrl && (
+            <button type="button" onClick={download} className="px-3 h-8 rounded-full text-xs border border-white/20">
               Download
             </button>
-            <button type="button" onClick={() => void share()} className="h-11 rounded-full border border-white/20 text-sm">
-              Share
+          )}
+          {text && (
+            <button type="button" onClick={() => setMode('text')} className="px-3 h-8 rounded-full text-xs border border-white/20">
+              View extracted text
             </button>
-          </div>
+          )}
         </div>
+        {mode === 'text' ? (
+          <pre className="flex-1 overflow-auto p-4 text-sm whitespace-pre-wrap font-mono text-white/90">{text}</pre>
+        ) : (
+          <div ref={pdfContainerRef} className="flex-1 overflow-auto p-4" />
+        )}
       </div>
     )
   }
@@ -216,18 +325,14 @@ export function AttachmentViewer({
               {a}
             </button>
           ))}
-          <button
-            type="button"
-            onClick={() => setRotation((r) => r + 90)}
-            className="px-3 h-8 rounded-full text-xs border border-white/15 inline-flex items-center gap-1"
-          >
+          <button type="button" onClick={() => setRotation((r) => r + 90)} className="px-3 h-8 rounded-full text-xs border border-white/15 inline-flex items-center gap-1">
             <RotateCw size={14} /> Rotate
           </button>
           <button type="button" onClick={applyImageEdit} className="px-3 h-8 rounded-full text-xs bg-white text-black">
             Use in chat
           </button>
-          <button type="button" onClick={download} className="px-3 h-8 rounded-full text-xs border border-white/15 inline-flex items-center gap-1">
-            <Download size={14} /> Download
+          <button type="button" onClick={download} className="px-3 h-8 rounded-full text-xs border border-white/15">
+            <Download size={14} className="inline" /> Download
           </button>
         </div>
       )}

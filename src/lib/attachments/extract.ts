@@ -9,12 +9,13 @@ export type ExtractMeta = {
   fileCount?: number
   truncated?: boolean
   scanned?: boolean
+  status?: string
 }
 
 export type ExtractResult = {
   text: string
   meta: ExtractMeta
-  /** Scanned PDF page images as data URLs (max 5) */
+  /** Scanned PDF page images as data URLs (max 5) for vision */
   pageImages?: string[]
 }
 
@@ -142,39 +143,43 @@ async function extractXlsx(file: File): Promise<ExtractResult> {
   return { text, meta: { kind: 'xlsx', truncated, fileCount: sheetFiles.length } }
 }
 
-function extractPdfRough(bytes: Uint8Array): string {
-  try {
-    const raw = new TextDecoder('latin1').decode(bytes)
-    const parts: string[] = []
-    const re = /\((?:\\.|[^\\()])*\)/g
-    let m: RegExpExecArray | null
-    while ((m = re.exec(raw)) !== null) {
-      let s = m[0].slice(1, -1)
-      s = s
-        .replace(/\\n/g, '\n')
-        .replace(/\\r/g, '')
-        .replace(/\\\(/g, '(')
-        .replace(/\\\)/g, ')')
-        .replace(/\\\\/g, '\\')
-      if (s.trim().length > 1) parts.push(s)
+async function extractPdf(file: File): Promise<ExtractResult> {
+  const { extractPdfWithPdfJs, isReadableText } = await import('./pdfjsLoader')
+  const result = await extractPdfWithPdfJs(file)
+  if (result.error && !result.pageImages?.length) {
+    return {
+      text: '',
+      meta: {
+        kind: 'pdf',
+        truncated: false,
+        scanned: true,
+        status: 'no readable content (could not open PDF)',
+      },
     }
-    return parts.join(' ').replace(/\s+/g, ' ').trim()
-  } catch {
-    return ''
+  }
+  if (result.scanned || !isReadableText(result.text)) {
+    return {
+      text: '',
+      meta: {
+        kind: 'pdf',
+        truncated: result.truncated,
+        scanned: true,
+        status: 'no readable content (scanned or image-based PDF)',
+      },
+      pageImages: result.pageImages,
+    }
+  }
+  return {
+    text: result.text,
+    meta: {
+      kind: 'pdf',
+      truncated: result.truncated,
+      scanned: false,
+      status: result.truncated ? 'partial' : 'text included',
+    },
   }
 }
 
-async function extractPdf(file: File): Promise<ExtractResult> {
-  const buf = await file.arrayBuffer()
-  const text = extractPdfRough(new Uint8Array(buf)).slice(0, MAX_TOTAL)
-  const scanned = text.replace(/\s/g, '').length < 40
-  return {
-    text: scanned
-      ? 'This PDF looks scanned and can\'t be read here. Try a text-based PDF, or describe what you need from it.'
-      : text,
-    meta: { kind: 'pdf', truncated: text.length >= MAX_TOTAL, scanned },
-  }
-}
 
 export async function extractAttachmentFile(file: File): Promise<ExtractResult> {
   const name = file.name.toLowerCase()

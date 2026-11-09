@@ -798,6 +798,7 @@ export async function buildProjectContextBlock(
         .all()
     }
     const parts: string[] = []
+    const statusLines: string[] = []
     let budget = 30000
     for (const r of rows.results || []) {
       let text = r.extracted_text || ''
@@ -807,16 +808,39 @@ export async function buildProjectContextBlock(
           text = m.extractedText || ''
         } catch { /* */ }
       }
+      let status = 'no readable content (no extractable text)'
+      const isImage = /\.(png|jpe?g|gif|webp|heic)$/i.test(r.name || '')
+      if (text && text.length > 20) {
+        status = isImage
+          ? 'image: description included'
+          : text.length > 7000
+            ? 'partial'
+            : 'text included'
+      } else if (isImage) {
+        status = 'no readable content (image not described yet)'
+      }
+      try {
+        const m = r.metadata_json ? (JSON.parse(r.metadata_json) as { status?: string }) : null
+        if (m?.status) status = m.status
+      } catch { /* */ }
+      statusLines.push(`- ${r.name}: ${status}`)
       const snippet = text ? text.slice(0, Math.min(8000, budget)) : ''
-      const line = snippet
-        ? `- ${r.name}:\n${snippet}`
-        : `- ${r.name}`
-      if (line.length > budget) break
-      parts.push(line)
-      budget -= line.length
-      if (budget <= 0) break
+      if (snippet) {
+        const line = `- ${r.name} [${status}]:\n${snippet}`
+        if (line.length > budget) break
+        parts.push(line)
+        budget -= line.length
+        if (budget <= 0) break
+      }
     }
-    if (parts.length) filesBlock = `Project files (newest first):\n${parts.join('\n\n')}`
+    if (statusLines.length) {
+      filesBlock =
+        `Project files (status + content; use readable files without asking the user to paste them):\n` +
+        statusLines.join('\n') +
+        (parts.length ? `\n\nFile contents:\n${parts.join('\n\n')}` : '')
+    } else if (parts.length) {
+      filesBlock = `Project files:\n${parts.join('\n\n')}`
+    }
   } catch { /* */ }
 
   const lines = [
@@ -834,7 +858,7 @@ export async function buildProjectContextBlock(
       ? `Recently completed:\n${doneTasks.map((tk) => `- ${tk.title}`).join('\n')}`
       : null,
     filesBlock,
-    'Behave as a professional project partner for this workspace. Prefer organized, decision-aware answers. Do not invent completed work.',
+    'Files: use listed readable content without asking the user to paste. If a file is marked unreadable, say why and suggest an alternative. Prefer project files over guessing.\nBehave as a professional project partner for this workspace. Prefer organized, decision-aware answers. Do not invent completed work.',
     '[/NYVEN PROJECT CONTEXT]',
   ].filter(Boolean)
   return lines.join('\n')

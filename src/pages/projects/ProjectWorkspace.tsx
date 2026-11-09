@@ -29,6 +29,7 @@ import {
 } from '../../lib/aiProjects/api'
 import { MessageComposer, type ComposerSendPayload } from '../../components/MessageComposer'
 import { ChatThread } from '../../components/chat/ChatThread'
+import { JumpToLatestButton } from '../../components/chat/JumpToLatestButton'
 import { streamCoreChat } from '../../lib/core/streamClient'
 import type { Message } from '../../lib/types'
 import type { ActivityState } from '../../lib/core/types'
@@ -112,6 +113,7 @@ export function ProjectWorkspace() {
   const hideHeader = useHideOnScroll(24)
   const [readingMessageId, setReadingMessageId] = useState<string | null>(null)
   const [readAloudLoading, setReadAloudLoading] = useState(false)
+  const [feedbackToast, setFeedbackToast] = useState<string | null>(null)
 
 
   const reload = useCallback(async () => {
@@ -217,9 +219,10 @@ export function ProjectWorkspace() {
     if (tab === 'files') void loadFiles()
   }, [tab, loadFiles])
 
+  // Only stick to bottom when user is already near bottom (scrollToBottom no-ops otherwise)
   useEffect(() => {
-    chatScroll.scrollToBottom()
-  }, [messages.length, isGenerating, chatScroll])
+    chatScroll.scrollToBottom(false, false)
+  }, [messages.length, chatScroll.scrollToBottom])
 
   const handleSend = useCallback(
     async (payload: ComposerSendPayload, opts?: { fromVoice?: boolean }) => {
@@ -467,11 +470,47 @@ export function ProjectWorkspace() {
     setBusyKind(kind)
     setActionError(null)
     try {
+      let uploadFile = file
+      // Downscale images for storage + vision
+      if ((file.type || '').startsWith('image/')) {
+        try {
+          const bmp = await createImageBitmap(file)
+          const max = 1024
+          const scale = Math.min(1, max / Math.max(bmp.width, bmp.height))
+          const w = Math.round(bmp.width * scale)
+          const h = Math.round(bmp.height * scale)
+          const canvas = document.createElement('canvas')
+          canvas.width = w
+          canvas.height = h
+          const ctx = canvas.getContext('2d')
+          if (ctx) {
+            ctx.drawImage(bmp, 0, 0, w, h)
+            const blob: Blob | null = await new Promise((res) =>
+              canvas.toBlob((b) => res(b), 'image/jpeg', 0.85)
+            )
+            if (blob) {
+              uploadFile = new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), {
+                type: 'image/jpeg',
+              })
+            }
+          }
+        } catch { /* keep original */ }
+      }
       const form = new FormData()
-      form.append('file', file)
+      form.append('file', uploadFile)
       try {
         const extracted = await extractAttachmentFile(file)
         if (extracted.text) form.append('extractedText', extracted.text)
+        // Image: mark for description; scanned PDF page images not uploaded as binary here
+        if ((file.type || '').startsWith('image/') && !extracted.text) {
+          form.append(
+            'extractedText',
+            '[Image attached — describe visible content and any text when answering.]'
+          )
+        }
+        if (extracted.meta?.status) {
+          form.append('status', extracted.meta.status)
+        }
       } catch { /* */ }
       const res = await fetch(`/api/projects/${projectId}/files`, {
         method: 'POST',
@@ -598,18 +637,32 @@ export function ProjectWorkspace() {
                     rating,
                     conversationId: thread?.id,
                   }),
-                }).catch(() => {})
+                })
+                  .then((r) => {
+                    if (r.ok) {
+                      setFeedbackToast('Thanks for your feedback')
+                      setTimeout(() => setFeedbackToast(null), 2500)
+                    }
+                  })
+                  .catch(() => {})
               }}
               onReadAloud={(id, content) => {
                 setReadingMessageId(id)
                 setReadAloudLoading(true)
-                void voice.speakReply(content).finally(() => setReadAloudLoading(false))
+                void voice
+                  .speakReply(content)
+                  .catch(() => {})
+                  .finally(() => {
+                    setReadAloudLoading(false)
+                    setReadingMessageId((cur) => (cur === id ? null : cur))
+                  })
               }}
               onStopReadAloud={() => {
                 try {
                   voice.voiceRef.current?.stopAll?.()
                 } catch { /* */ }
                 setReadingMessageId(null)
+                setReadAloudLoading(false)
               }}
               readingMessageId={readingMessageId}
               readAloudLoading={readAloudLoading}
@@ -625,14 +678,12 @@ export function ProjectWorkspace() {
               }
               className="flex-1 min-h-0 overflow-y-auto px-4 py-4"
             />
-            {chatScroll.showJumpLatest && (
-              <button
-                type="button"
-                onClick={() => chatScroll.scrollToBottom(true, true)}
-                className="absolute bottom-24 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-full bg-white/10 text-xs z-10"
-              >
-                Jump to latest
-              </button>
+            <JumpToLatestButton
+              visible={chatScroll.showJumpLatest}
+              onClick={() => chatScroll.scrollToBottom(true, true)}
+            />
+            {feedbackToast && (
+              <p className="px-4 text-xs text-nyven-cyan text-center pb-1">{feedbackToast}</p>
             )}
             {actionError && (
               <p className="px-4 text-xs text-red-300/90 text-center pb-1">{actionError}</p>

@@ -1,6 +1,6 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 
-/** Stick-to-bottom + jump-to-latest for message lists (shared by Chat and Project chat). */
+/** Stick-to-bottom + jump-to-latest. Stable callbacks; never forces scroll when user scrolled up. */
 export function useChatScroll() {
   const stickToBottomRef = useRef(true)
   const [showJumpLatest, setShowJumpLatest] = useState(false)
@@ -21,13 +21,17 @@ export function useChatScroll() {
     setShowJumpLatest(!nearBottom && el.scrollHeight > el.clientHeight + 40)
   }, [])
 
-  return {
-    stickToBottomRef,
-    showJumpLatest,
-    setShowJumpLatest,
-    bottomRef,
-    scrollRef,
-    scrollToBottom,
-    onChatScroll,
-  }
+  // Stable object identity so effects can depend on the hook return safely
+  return useMemo(
+    () => ({
+      stickToBottomRef,
+      showJumpLatest,
+      setShowJumpLatest,
+      bottomRef,
+      scrollRef,
+      scrollToBottom,
+      onChatScroll,
+    }),
+    [showJumpLatest, scrollToBottom, onChatScroll]
+  )
 }

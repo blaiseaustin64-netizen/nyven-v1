@@ -120,6 +120,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
   const id = crypto.randomUUID()
   const now = new Date().toISOString()
   const clientExtracted = String(form.get('extractedText') || '').slice(0, ATTACHMENT_LIMITS.MAX_EXTRACTED_TEXT_CHARS)
+  const clientStatus = String(form.get('status') || '').slice(0, 120)
   const buffer = await file.arrayBuffer()
   const processed = processFileBytes(file.name, file.type, buffer)
   const kind =
