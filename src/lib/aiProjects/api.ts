@@ -67,6 +67,21 @@ export async function createProject(input: {
   name: string
   description?: string
   instructions?: string
+}): Promise<{ project: AiProject | null; error?: string }> {
+  const r = await jsonFetch<{ success?: boolean; project?: AiProject; error?: string; code?: string }>('/api/projects', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+  if (r.status === 401 || r.data?.code === 'UNAUTHORIZED') {
+    return { project: null, error: 'Please sign in to create a project.' }
+  }
+  if ((r.ok || r.status === 201) && r.data?.project) {
+    return { project: r.data.project }
+  }
+  return {
+    project: null,
+    error: r.data?.error || (r.status === 0 ? 'Network error. Check your connection and try again.' : 'Could not create project. Please try again.'),
+  }
 }): Promise<AiProject | null> {
   const r = await jsonFetch<{ success?: boolean; project?: AiProject }>('/api/projects', {
     method: 'POST',

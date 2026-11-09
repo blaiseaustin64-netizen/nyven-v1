@@ -4,6 +4,7 @@ import { resolveSessionUser } from '../../_shared/auth/service'
 import {
   assertProjectOwner,
   deleteProject,
+  ensureProjectsSchema,
   listActivity,
   listProjectChats,
   listTasks,
@@ -25,6 +26,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, params })
   if (!env.DB) return jsonWithCors(request, env, { success: false, error: 'Database unavailable' }, 503)
   const user = await resolveSessionUser(env, request)
   if (!user) return jsonWithCors(request, env, { success: false, code: 'UNAUTHORIZED', error: 'Sign in required' }, 401)
+  await ensureProjectsSchema(env.DB)
   const id = String(params.id || '')
   const row = await assertProjectOwner(env.DB, id, user.id)
   if (!row) return jsonWithCors(request, env, { success: false, code: 'NOT_FOUND', error: 'Project not found' }, 404)
