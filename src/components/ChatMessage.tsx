@@ -103,17 +103,15 @@ export function ChatMessage({
   }
 
   if (isUser) {
+    // Attachments render once in ChatThread above this bubble — not inside it.
     return (
       <div className="flex justify-end group">
         <div className="max-w-[85%] sm:max-w-[75%] min-w-0">
-          <div className="bg-nyven-surface border border-white/[0.06] rounded-2xl rounded-br-md px-4 py-3 text-[15px] leading-relaxed text-nyven-text break-words">
-            
-                  </a>
-                ))}
-              </div>
-            )}
-            {message.content}
-          </div>
+          {message.content ? (
+            <div className="bg-nyven-surface border border-white/[0.06] rounded-2xl rounded-br-md px-4 py-3 text-[15px] leading-relaxed text-nyven-text break-words">
+              {message.content}
+            </div>
+          ) : null}
           <div className="flex justify-end gap-1 mt-1.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
             {onEdit && (
               <button
