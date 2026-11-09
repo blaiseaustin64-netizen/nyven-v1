@@ -12,9 +12,7 @@ import {
   Loader2,
   AudioLines,
   Camera,
-  Code2,
   FolderOpen,
-  Github,
   ChevronRight,
 } from 'lucide-react'
 import { MicWaveCircle } from './MicWaveCircle'
@@ -617,30 +615,12 @@ export function MessageComposer({
               <div className="px-3 pb-2 space-y-0.5">
                 {[
                   {
-                    label: 'Nyven Code',
-                    hint: 'Repos and coding workspace',
-                    icon: Code2,
-                    onClick: () => {
-                      closeMenu()
-                      navigate('/chat')
-                    },
-                  },
-                  {
                     label: 'Projects',
-                    hint: 'Your workspaces',
+                    hint: 'Your AI workspaces',
                     icon: FolderOpen,
                     onClick: () => {
                       closeMenu()
                       navigate('/projects')
-                    },
-                  },
-                  {
-                    label: 'Connected services',
-                    hint: 'GitHub and more',
-                    icon: Github,
-                    onClick: () => {
-                      closeMenu()
-                      navigate('/settings?section=connections')
                     },
                   },
                 ].map((row) => (

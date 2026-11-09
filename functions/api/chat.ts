@@ -9,6 +9,7 @@ import { runCore } from '../_shared/coreRuntime'
 import { createSseStream } from '../_shared/sse'
 import { resolveIdentity } from '../_shared/auth'
 import { corsHeaders, optionsResponse, jsonWithCors } from '../_shared/cors'
+import { buildProjectContextBlock } from '../_shared/projects/service'
 import type { D1Database } from '../_shared/db/types'
 import { resolveUsageSubject, guestCookieHeader } from '../_shared/db/guestKey'
 import {
@@ -143,6 +144,27 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     )
   }
 
+  const metadata = { ...(body.metadata || {}) } as {
+    messageId?: string
+    conversationId?: string
+    client?: string
+    projectId?: string
+    projectContext?: string
+  }
+  if (
+    metadata.projectId &&
+    identity.authenticated &&
+    identity.userId &&
+    env.DB
+  ) {
+    try {
+      const block = await buildProjectContextBlock(env.DB, identity.userId, metadata.projectId)
+      if (block) metadata.projectContext = block
+    } catch {
+      /* non-fatal */
+    }
+  }
+
   const coreRequest: CoreRequest = {
     message: hasMessage ? body.message! : '',
     attachments: hasAttachments ? body.attachments : [],
@@ -162,7 +184,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
           }))
       : [],
     mode: 'chat',
-    metadata: body.metadata || {},
+    metadata,
     identity: {
       authenticated: identity.authenticated,
       userId: identity.authenticated ? identity.userId : undefined,

@@ -221,10 +221,12 @@ export async function runCore(
   const searchReady = isSearchConfigured(searchEnv)
   // Only expose web_search when a provider key is actually configured
   const functionDeclarations = searchReady ? toGeminiFunctionDeclarations() : []
-  if (searchReady) {
-    providerConfig.systemInstruction =
-      NYVEN_SYSTEM_INSTRUCTION + '\n' + WEB_SEARCH_SYSTEM_ADDENDUM
-  }
+  let systemParts = [NYVEN_SYSTEM_INSTRUCTION]
+  if (searchReady) systemParts.push(WEB_SEARCH_SYSTEM_ADDENDUM)
+  const projectContext =
+    typeof req.metadata?.projectContext === 'string' ? req.metadata.projectContext.trim() : ''
+  if (projectContext) systemParts.push(projectContext)
+  providerConfig.systemInstruction = systemParts.join('\n\n')
   const toolContextBlocks: string[] = []
   const allCitations: Array<{ id: string; title: string; url: string; source?: string }> = []
   const seenQueries = new Set<string>()

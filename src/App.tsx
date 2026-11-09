@@ -9,6 +9,8 @@ import { Chat } from './pages/Chat'
 import { Build } from './pages/Build'
 import { Builder } from './pages/Builder'
 import { Projects } from './pages/Projects'
+import { ProjectCreate } from './pages/projects/ProjectCreate'
+import { ProjectWorkspace } from './pages/projects/ProjectWorkspace'
 import { NyvenPlus } from './pages/NyvenPlus'
 import { Settings } from './pages/Settings'
 import { Profile } from './pages/Profile'
@@ -137,6 +139,8 @@ export default function App() {
             <Route path="/build" element={<Build />} />
             <Route path="/builder" element={<Builder />} />
             <Route path="/projects" element={<Projects />} />
+            <Route path="/projects/new" element={<ProjectCreate />} />
+            <Route path="/projects/:projectId" element={<ProjectWorkspace />} />
             <Route path="/agents" element={<Agents />} />
             <Route path="/agents/create" element={<CreateAgentRoute />} />
             <Route path="/code" element={<Navigate to="/chat" replace />} />

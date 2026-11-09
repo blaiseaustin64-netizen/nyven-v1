@@ -19,6 +19,8 @@ export type ChatStreamRequest = {
   /** @deprecated Session is cookie-based; accessToken ignored if cookie present */
   accessToken?: string | null
   signal?: AbortSignal
+  /** Optional client metadata (e.g. projectId, conversationId) */
+  metadata?: Record<string, unknown>
 }
 
 /**
@@ -121,6 +123,7 @@ export async function streamCoreChat(
       message: req.message,
       history: req.history,
       attachments: req.attachments || [],
+      metadata: req.metadata || {},
     }),
     signal: req.signal,
   })

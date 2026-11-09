@@ -1,173 +1,191 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
-import { MoreHorizontal, ExternalLink, Pencil, Trash2, FolderOpen } from 'lucide-react'
-import { getProjectBySlug, listProjects } from '../lib/projectStore'
-import type { Project } from '../lib/types'
+import { FolderOpen, Plus, Search, MessageSquare, ListTodo, FileText } from 'lucide-react'
+import { useAuth } from '../lib/auth/AuthContext'
+import {
+  fetchProjects,
+  formatRelative,
+  type AiProject,
+} from '../lib/aiProjects/api'
 
+/**
+ * NYVEN AI Projects — persistent workspaces (not builder/forge sessionStorage projects).
+ */
 export function Projects() {
   const navigate = useNavigate()
-  const [projects, setProjects] = useState<Project[]>([])
-  const [menuOpen, setMenuOpen] = useState<string | null>(null)
+  const { user, loading: authLoading } = useAuth()
+  const [projects, setProjects] = useState<AiProject[]>([])
+  const [loading, setLoading] = useState(true)
+  const [query, setQuery] = useState('')
+  const [error, setError] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    if (!user?.id) {
+      setProjects([])
+      setLoading(false)
+      return
+    }
+    setLoading(true)
+    setError(null)
+    try {
+      const list = await fetchProjects()
+      setProjects(list)
+    } catch {
+      setError('Could not load projects.')
+    } finally {
+      setLoading(false)
+    }
+  }, [user?.id])
 
   useEffect(() => {
-    const session = listProjects().map((p) => ({
-      id: p.id,
-      name: p.name,
-      type: p.websiteType,
-      lastEdited: 'Just now',
-      description: p.description,
-      slug: p.slug,
-    }))
-    setProjects(session)
-  }, [])
+    void load()
+  }, [load])
 
-  const handleDelete = (id: string) => {
-    setProjects((prev) => prev.filter((p) => p.id !== id))
-    setMenuOpen(null)
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return projects
+    return projects.filter(
+      (p) =>
+        (p.name || p.title || '').toLowerCase().includes(q) ||
+        (p.description || '').toLowerCase().includes(q)
+    )
+  }, [projects, query])
+
+  if (authLoading) {
+    return (
+      <div className="h-full flex items-center justify-center text-sm text-nyven-text-secondary">
+        Loading…
+      </div>
+    )
   }
 
-  const handleRename = (id: string) => {
-    const name = prompt('Rename project')
-    if (name?.trim()) {
-      setProjects((prev) =>
-        prev.map((p) => (p.id === id ? { ...p, name: name.trim() } : p))
-      )
-    }
-    setMenuOpen(null)
+  if (!user) {
+    return (
+      <div className="h-full overflow-y-auto">
+        <div className="max-w-lg mx-auto px-4 py-16 text-center">
+          <FolderOpen className="mx-auto mb-4 text-nyven-text-secondary opacity-70" size={32} />
+          <h1 className="font-display text-2xl font-medium mb-2">Projects</h1>
+          <p className="text-sm text-nyven-text-secondary mb-6 leading-relaxed">
+            Sign in to create persistent AI workspaces for conversations, instructions, tasks, and files.
+          </p>
+          <button
+            type="button"
+            onClick={() => navigate('/auth')}
+            className="px-5 py-2.5 rounded-xl bg-nyven-cyan text-nyven-bg text-sm font-medium min-h-[44px]"
+          >
+            Sign in
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (
     <div className="h-full overflow-y-auto">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="font-display text-2xl sm:text-3xl font-medium">My Projects</h1>
-            <p className="text-nyven-text-secondary text-sm mt-1">
-              Your workspaces and creations with NYVEN
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
+          <div className="min-w-0">
+            <h1 className="font-display text-2xl sm:text-3xl font-medium tracking-tight">Projects</h1>
+            <p className="text-nyven-text-secondary text-sm mt-1.5 max-w-xl leading-relaxed">
+              Persistent AI workspaces for ongoing work — instructions, chats, tasks, and context that
+              stay with the project.
             </p>
           </div>
           <button
             type="button"
-            onClick={() => navigate('/chat')}
-            className="px-4 py-2.5 rounded-xl bg-nyven-cyan text-nyven-bg text-sm font-medium hover:bg-nyven-cyan/90 transition-colors min-h-[44px]"
+            onClick={() => navigate('/projects/new')}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-nyven-cyan text-nyven-bg text-sm font-medium hover:bg-nyven-cyan/90 transition-colors min-h-[44px] shrink-0"
           >
-            + New project
+            <Plus size={18} strokeWidth={2.25} />
+            New Project
           </button>
         </div>
 
-        {projects.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 sm:py-24 text-center px-4 min-w-0">
+        <div className="relative mb-6">
+          <Search
+            size={16}
+            className="absolute left-3.5 top-1/2 -translate-y-1/2 text-nyven-text-secondary pointer-events-none"
+          />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search projects"
+            className="w-full h-11 pl-10 pr-4 rounded-xl bg-white/[0.03] border border-white/[0.08] text-sm text-nyven-text placeholder:text-nyven-text-secondary outline-none focus:border-nyven-cyan/35"
+            aria-label="Search projects"
+          />
+        </div>
+
+        {error && (
+          <p className="text-sm text-red-300/90 mb-4">{error}</p>
+        )}
+
+        {loading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-36 rounded-2xl bg-white/[0.03] border border-white/[0.06] animate-pulse" />
+            ))}
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center px-4">
             <div className="w-16 h-16 rounded-2xl bg-nyven-surface border border-white/[0.08] flex items-center justify-center mb-5">
               <FolderOpen size={28} className="text-nyven-text-secondary opacity-70" />
             </div>
-            <p className="text-nyven-text font-medium mb-2">No projects yet</p>
-            <p className="text-nyven-text-secondary text-sm mb-6 max-w-sm leading-relaxed">
-              Create a project to organize your conversations, ideas, files, and work with NYVEN.
+            <p className="text-nyven-text font-medium mb-2">
+              {query ? 'No matching projects' : 'No projects yet'}
             </p>
-            <button
-              type="button"
-              onClick={() => navigate('/chat')}
-              className="px-5 py-2.5 rounded-xl bg-nyven-cyan text-nyven-bg text-sm font-medium hover:bg-nyven-cyan/90 transition-colors min-h-[44px]"
-            >
-              + New project
-            </button>
+            <p className="text-nyven-text-secondary text-sm mb-6 max-w-sm leading-relaxed">
+              {query
+                ? 'Try a different search.'
+                : 'Create a project to organize chats, instructions, tasks, and ongoing work with NYVEN.'}
+            </p>
+            {!query && (
+              <button
+                type="button"
+                onClick={() => navigate('/projects/new')}
+                className="px-5 py-2.5 rounded-xl bg-nyven-cyan text-nyven-bg text-sm font-medium min-h-[44px]"
+              >
+                + New Project
+              </button>
+            )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {projects.map((project, i) => (
-              <motion.article
-                key={project.id}
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05, duration: 0.35 }}
-                className="group relative bg-nyven-surface border border-white/[0.06] rounded-2xl overflow-hidden hover:border-white/[0.1] transition-colors"
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {filtered.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => navigate(`/projects/${p.id}`)}
+                className="text-left rounded-2xl border border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.04] hover:border-white/[0.12] transition-colors p-5 min-h-[140px] flex flex-col"
               >
-                <div className="h-36 bg-gradient-to-br from-nyven-bg-secondary to-nyven-bg relative">
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-16 h-10 rounded-md border border-white/[0.08] bg-white/[0.03]" />
-                  </div>
-                  <div className="absolute top-3 left-3 px-2 py-0.5 rounded-md bg-black/40 text-[10px] uppercase tracking-wider text-nyven-text-secondary">
-                    {project.type}
-                  </div>
+                <div className="flex items-start justify-between gap-3 mb-2">
+                  <h2 className="font-medium text-[15px] text-nyven-text truncate">
+                    {p.name || p.title}
+                  </h2>
+                  <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-md bg-white/[0.04] text-nyven-text-secondary shrink-0">
+                    {p.status || 'active'}
+                  </span>
                 </div>
-
-                <div className="p-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <h3 className="font-medium text-[15px] truncate">{project.name}</h3>
-                      <p className="text-xs text-nyven-text-secondary mt-0.5">
-                        Edited {project.lastEdited}
-                      </p>
-                    </div>
-                    <div className="relative">
-                      <button
-                        onClick={() =>
-                          setMenuOpen(menuOpen === project.id ? null : project.id)
-                        }
-                        className="p-1.5 rounded-lg text-nyven-text-secondary hover:text-nyven-text hover:bg-white/[0.05]"
-                        aria-label="More options"
-                      >
-                        <MoreHorizontal size={16} />
-                      </button>
-                      {menuOpen === project.id && (
-                        <div className="absolute right-0 top-8 z-10 w-36 py-1 rounded-xl bg-nyven-surface border border-white/[0.1] shadow-xl">
-                          <button
-                            onClick={() => handleRename(project.id)}
-                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-nyven-text-secondary hover:text-nyven-text hover:bg-white/[0.05]"
-                          >
-                            <Pencil size={13} /> Rename
-                          </button>
-                          <button
-                            onClick={() => handleDelete(project.id)}
-                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-white/[0.05]"
-                          >
-                            <Trash2 size={13} /> Delete
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {project.description && (
-                    <p className="text-xs text-nyven-text-secondary mt-2 line-clamp-2">
-                      {project.description}
-                    </p>
-                  )}
-
-                  <div className="flex gap-2 mt-4">
-                    <button
-                      onClick={() => {
-                        const stored = project.slug ? getProjectBySlug(project.slug) : null
-                        if (stored) {
-                          navigate(`/preview/${stored.slug}`)
-                        }
-                      }}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-white/[0.05] text-sm font-medium hover:bg-white/[0.08] transition-colors"
-                    >
-                      <ExternalLink size={14} />
-                      Open
-                    </button>
-                    <button
-                      onClick={() => {
-                        const stored = project.slug ? getProjectBySlug(project.slug) : null
-                        navigate('/builder', {
-                          state: stored
-                            ? { project: stored, description: stored.description, type: stored.websiteType }
-                            : { description: project.description, type: project.type },
-                        })
-                      }}
-                      className="flex-1 py-2 rounded-xl bg-nyven-cyan/15 text-nyven-cyan text-sm font-medium border border-nyven-cyan/20 hover:bg-nyven-cyan/25 transition-colors"
-                    >
-                      Continue
-                    </button>
-                  </div>
+                <p className="text-sm text-nyven-text-secondary line-clamp-2 leading-relaxed flex-1">
+                  {p.description || 'No description'}
+                </p>
+                <div className="flex flex-wrap items-center gap-3 mt-4 text-[11px] text-nyven-text-secondary">
+                  <span className="inline-flex items-center gap-1">
+                    <MessageSquare size={12} /> {p.chatCount ?? 0} chats
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <ListTodo size={12} /> {p.taskCount ?? 0} tasks
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <FileText size={12} /> {p.fileCount ?? 0} files
+                  </span>
+                  <span className="ml-auto">{formatRelative(p.updatedAt)}</span>
                 </div>
-              </motion.article>
+              </button>
             ))}
           </div>
         )}
       </div>
     </div>
   )
-                  }
+}

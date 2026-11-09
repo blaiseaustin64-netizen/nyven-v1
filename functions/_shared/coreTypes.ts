@@ -57,6 +57,8 @@ export type CoreRequest = {
     messageId?: string
     conversationId?: string
     client?: string
+    projectId?: string
+    projectContext?: string
   }
 }
 
