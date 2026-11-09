@@ -67,16 +67,12 @@ export async function createProject(input: {
   name: string
   description?: string
   instructions?: string
-}): Promise<{ project: AiProject | null; error?: string }> {
-  const r = await jsonFetch<{ success?: boolean; project?: AiProject; error?: string }>('/api/projects', {
+}): Promise<AiProject | null> {
+  const r = await jsonFetch<{ success?: boolean; project?: AiProject }>('/api/projects', {
     method: 'POST',
     body: JSON.stringify(input),
   })
-  if (r.ok && r.data.project) return { project: r.data.project }
-  return {
-    project: null,
-    error: (r.data as { error?: string }).error || 'Could not create project. Please try again.',
-  }
+  return r.ok && r.data.project ? r.data.project : null
 }
 
 export async function fetchProject(id: string): Promise<{

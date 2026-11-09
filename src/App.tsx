@@ -20,7 +20,6 @@ import { AgentEditor } from './pages/AgentEditor'
 import { Auth } from './pages/Auth'
 import { AuthProvider } from './lib/auth/AuthContext'
 import { ConversationHistoryProvider } from './lib/chat/ConversationHistoryContext'
-import { RequireAuth } from './components/RequireAuth'
 
 const INTRO_KEY = 'nyven_intro_seen'
 
@@ -139,9 +138,9 @@ export default function App() {
             <Route path="/chat" element={<Chat />} />
             <Route path="/build" element={<Build />} />
             <Route path="/builder" element={<Builder />} />
-            <Route path="/projects" element={<RequireAuth><Projects /></RequireAuth>} />
-            <Route path="/projects/new" element={<RequireAuth><ProjectCreate /></RequireAuth>} />
-            <Route path="/projects/:projectId" element={<RequireAuth><ProjectWorkspace /></RequireAuth>} />
+            <Route path="/projects" element={<Projects />} />
+            <Route path="/projects/new" element={<ProjectCreate />} />
+            <Route path="/projects/:projectId" element={<ProjectWorkspace />} />
             <Route path="/agents" element={<Agents />} />
             <Route path="/agents/create" element={<CreateAgentRoute />} />
             <Route path="/code" element={<Navigate to="/chat" replace />} />

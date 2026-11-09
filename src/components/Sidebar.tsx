@@ -498,9 +498,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
 
       {/* Nav */}
       <nav className="shrink-0 px-3 pt-3 pb-2 space-y-0.5" aria-label="Workspace">
-        {mainNav
-          .filter((item) => item.to !== '/projects' || !!user)
-          .map(({ to, label, icon: Icon }) => (
+        {mainNav.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}

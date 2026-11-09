@@ -135,7 +135,7 @@ export async function runCore(
     }
   }
 
-  // ── Project mode: OpenRouter Nemotron (real streaming + fallback) ──
+  // Declared once for both Project OpenRouter path and Gemini system instruction path.
   const projectId =
     typeof rawRequest.metadata?.projectId === 'string' ? rawRequest.metadata.projectId : ''
   const projectContext =
@@ -143,6 +143,7 @@ export async function runCore(
       ? rawRequest.metadata.projectContext.trim()
       : ''
 
+  // ── Project mode: OpenRouter Nemotron (real streaming + fallback) ──
   if (projectId) {
     const orKey = (env.OPENROUTER_API_KEY || '').trim()
     if (!orKey) {
@@ -158,14 +159,14 @@ export async function runCore(
       timestamp: Date.now(),
     })
 
-    const systemParts = [NYVEN_SYSTEM_INSTRUCTION]
-    if (projectContext) systemParts.push(projectContext)
-    systemParts.push(
-      'You are assisting inside a NYVEN Project workspace. Be professional, organized, and precise. Process the user\'s actual request dynamically. Do not invent completed work.'
+    const systemPartsProject = [NYVEN_SYSTEM_INSTRUCTION]
+    if (projectContext) systemPartsProject.push(projectContext)
+    systemPartsProject.push(
+      "You are assisting inside a NYVEN Project workspace. Be professional, organized, and precise. Process the user's actual request dynamically. Do not invent completed work."
     )
 
     const messages: OpenRouterMessage[] = [
-      { role: 'system', content: systemParts.join('\n\n') },
+      { role: 'system', content: systemPartsProject.join('\n\n') },
     ]
 
     const hist = Array.isArray(rawRequest.history) ? rawRequest.history.slice(-24) : []
@@ -177,7 +178,6 @@ export async function runCore(
       })
     }
 
-    // Multimodal: include image attachments when present (Nemotron VL fallback supports vision)
     const atts = normalizeAttachments(rawRequest.attachments)
     const imageParts: Array<{ type: 'image_url'; image_url: { url: string } }> = []
     const textBits: string[] = []
@@ -240,7 +240,7 @@ export async function runCore(
 
     emit(emitFn, { type: 'activity', state: 'completed', timestamp: Date.now() })
     emit(emitFn, { type: 'done', messageId, timestamp: Date.now() })
-    return { messageId, text: full || streamResult.ok ? full : full }
+    return { messageId, text: full }
   }
 
   const apiKey = (env.GEMINI_API_KEY || '').trim()
@@ -335,8 +335,7 @@ export async function runCore(
   const functionDeclarations = searchReady ? toGeminiFunctionDeclarations() : []
   let systemParts = [NYVEN_SYSTEM_INSTRUCTION]
   if (searchReady) systemParts.push(WEB_SEARCH_SYSTEM_ADDENDUM)
-  const projectContext =
-    typeof req.metadata?.projectContext === 'string' ? req.metadata.projectContext.trim() : ''
+  // Reuse projectContext declared once at start of runCore.
   if (projectContext) systemParts.push(projectContext)
   providerConfig.systemInstruction = systemParts.join('\n\n')
   const toolContextBlocks: string[] = []

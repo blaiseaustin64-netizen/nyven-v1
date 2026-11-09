@@ -44,21 +44,10 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       description: body.description,
       instructions: body.instructions,
     })
-    if (!project) {
-      return jsonWithCors(
-        request,
-        env,
-        {
-          success: false,
-          error:
-            'Could not create project. Ensure you are signed in and D1 migrations (0005/0006) are applied.',
-        },
-        500
-      )
-    }
+    if (!project) return jsonWithCors(request, env, { success: false, error: 'Could not create project' }, 500)
     return jsonWithCors(request, env, { success: true, project }, 201)
   } catch (e) {
-    console.error('create project', e instanceof Error ? e.message : e)
-    return jsonWithCors(request, env, { success: false, error: 'Could not create project. Please try again.' }, 500)
+    console.error('create project', e instanceof Error ? e.name : 'unknown')
+    return jsonWithCors(request, env, { success: false, error: 'Could not create project' }, 500)
   }
 }
