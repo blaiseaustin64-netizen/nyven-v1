@@ -241,7 +241,10 @@ export async function runCore(
             `[File "${a.name}" has no readable text extract (may be scanned or unsupported). Say so plainly if asked.]`
           )
         }
+      } else if (a.name) {
+        textBits.push(`[Attachment: ${a.name}]`)
       }
+    }
 
     const userContent =
       imageParts.length > 0
