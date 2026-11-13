@@ -72,7 +72,7 @@ export function Home() {
                   }
                 }}
                 placeholder="Ask NYVEN anything..."
-                className="w-full bg-nyven-surface border border-white/[0.08] rounded-2xl px-5 py-4 pr-14 text-[15px] sm:text-base text-nyven-text placeholder:text-nyven-text-secondary/60 focus:outline-none focus:border-nyven-cyan/35 transition-colors"
+                className="w-full bg-nyven-surface border border-[var(--nyven-border)] rounded-2xl px-5 py-4 pr-14 text-[15px] sm:text-base text-nyven-text placeholder:text-nyven-text-secondary/60 focus:outline-none focus:border-nyven-cyan/35 transition-colors"
               />
               <button
                 onClick={() => input.trim() && handleSend(input.trim())}
@@ -91,7 +91,7 @@ export function Home() {
               <button
                 key={id}
                 onClick={() => handleQuick(path, prompt)}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-nyven-surface/80 border border-white/[0.06] text-sm font-medium text-nyven-text-secondary hover:text-nyven-text hover:border-nyven-cyan/25 hover:bg-nyven-surface transition-all duration-200"
+                className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-nyven-surface/80 border border-[var(--nyven-border)] text-sm font-medium text-nyven-text-secondary hover:text-nyven-text hover:border-nyven-cyan/25 hover:bg-nyven-surface transition-all duration-200"
               >
                 <Icon size={15} strokeWidth={1.75} />
                 {label}

@@ -174,7 +174,7 @@ export function AgentInstallWizard({
                   ? 'bg-nyven-cyan text-nyven-bg'
                   : step > s.n
                     ? 'bg-emerald-400/20 text-emerald-300'
-                    : 'bg-white/[0.06] text-nyven-text-secondary'
+                    : 'bg-[var(--nyven-surface)] text-nyven-text-secondary'
               )}
               aria-current={step === s.n ? 'step' : undefined}
             >
@@ -192,7 +192,7 @@ export function AgentInstallWizard({
               <div
                 className={clsx(
                   'h-px flex-1 mx-1',
-                  step > s.n ? 'bg-emerald-400/30' : 'bg-white/[0.06]'
+                  step > s.n ? 'bg-emerald-400/30' : 'bg-[var(--nyven-surface)]'
                 )}
               />
             )}
@@ -208,9 +208,9 @@ export function AgentInstallWizard({
 
       {/* STEP 1 */}
       {step === 1 && (
-        <div className="rounded-2xl border border-white/[0.08] bg-nyven-surface/50 p-5 sm:p-6 space-y-4">
+        <div className="rounded-2xl border border-[var(--nyven-border)] bg-nyven-surface/50 p-5 sm:p-6 space-y-4">
           <div className="flex items-start gap-3">
-            <div className="h-10 w-10 rounded-xl bg-white/[0.04] flex items-center justify-center shrink-0">
+            <div className="h-10 w-10 rounded-xl bg-[var(--nyven-input-bg)] flex items-center justify-center shrink-0">
               <Globe size={18} className="text-nyven-cyan" />
             </div>
             <div>
@@ -227,7 +227,7 @@ export function AgentInstallWizard({
               onChange={(e) => setDomainInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && connectDomain()}
               placeholder="yourwebsite.com"
-              className="flex-1 px-3.5 py-2.5 rounded-xl bg-nyven-bg border border-white/[0.08] text-sm outline-none focus:border-nyven-cyan/40"
+              className="flex-1 px-3.5 py-2.5 rounded-xl bg-nyven-bg border border-[var(--nyven-border)] text-sm outline-none focus:border-nyven-cyan/40"
             />
             <button
               type="button"
@@ -251,7 +251,7 @@ export function AgentInstallWizard({
                         setSelectedId(d.id)
                         setStep(2)
                       }}
-                      className="w-full text-left px-3 py-2 rounded-xl text-sm border border-white/[0.06] hover:bg-white/[0.04] flex items-center justify-between"
+                      className="w-full text-left px-3 py-2 rounded-xl text-sm border border-[var(--nyven-border)] hover:bg-[var(--nyven-input-bg)] flex items-center justify-between"
                     >
                       <span>{d.domain}</span>
                       <span className="text-[10px] uppercase text-nyven-text-secondary">
@@ -268,9 +268,9 @@ export function AgentInstallWizard({
 
       {/* STEP 2 */}
       {step === 2 && selected && (
-        <div className="rounded-2xl border border-white/[0.08] bg-nyven-surface/50 p-5 sm:p-6 space-y-4">
+        <div className="rounded-2xl border border-[var(--nyven-border)] bg-nyven-surface/50 p-5 sm:p-6 space-y-4">
           <div className="flex items-start gap-3">
-            <div className="h-10 w-10 rounded-xl bg-white/[0.04] flex items-center justify-center shrink-0">
+            <div className="h-10 w-10 rounded-xl bg-[var(--nyven-input-bg)] flex items-center justify-center shrink-0">
               <Shield size={18} className="text-nyven-cyan" />
             </div>
             <div>
@@ -280,7 +280,7 @@ export function AgentInstallWizard({
               </p>
             </div>
           </div>
-          <div className="rounded-xl border border-white/[0.06] bg-nyven-bg/60 px-4 py-3 text-sm">
+          <div className="rounded-xl border border-[var(--nyven-border)] bg-nyven-bg/60 px-4 py-3 text-sm">
             <p className="text-nyven-text-secondary leading-relaxed">
               Automatic domain ownership challenges are not enabled yet. Status stays{' '}
               <strong className="text-nyven-text">Pending</strong> until you confirm you control
@@ -303,7 +303,7 @@ export function AgentInstallWizard({
               <button
                 type="button"
                 onClick={markVerified}
-                className="px-4 py-2.5 rounded-xl border border-white/[0.1] text-sm text-nyven-text hover:bg-white/[0.04]"
+                className="px-4 py-2.5 rounded-xl border border-[var(--nyven-border)] text-sm text-nyven-text hover:bg-[var(--nyven-input-bg)]"
               >
                 I control this domain — mark verified
               </button>
@@ -328,9 +328,9 @@ export function AgentInstallWizard({
 
       {/* STEP 3 */}
       {step === 3 && selected && (
-        <div className="rounded-2xl border border-white/[0.08] bg-nyven-surface/50 p-5 sm:p-6 space-y-4">
+        <div className="rounded-2xl border border-[var(--nyven-border)] bg-nyven-surface/50 p-5 sm:p-6 space-y-4">
           <div className="flex items-start gap-3">
-            <div className="h-10 w-10 rounded-xl bg-white/[0.04] flex items-center justify-center shrink-0">
+            <div className="h-10 w-10 rounded-xl bg-[var(--nyven-input-bg)] flex items-center justify-center shrink-0">
               <Sparkles size={18} className="text-nyven-cyan" />
             </div>
             <div>
@@ -382,7 +382,7 @@ export function AgentInstallWizard({
                     ) : active ? (
                       <span className="h-3.5 w-3.5 rounded-full border-2 border-nyven-cyan/40 border-t-nyven-cyan animate-spin" />
                     ) : (
-                      <span className="h-3.5 w-3.5 rounded-full border border-white/10" />
+                      <span className="h-3.5 w-3.5 rounded-full border border-[var(--nyven-border)]" />
                     )}
                     {label}
                   </div>
@@ -410,7 +410,7 @@ export function AgentInstallWizard({
           </div>
 
           {/* Advanced / manual */}
-          <div className="pt-2 border-t border-white/[0.06]">
+          <div className="pt-2 border-t border-[var(--nyven-border)]">
             <button
               type="button"
               onClick={() => setShowAdvanced((v) => !v)}
@@ -427,13 +427,13 @@ export function AgentInstallWizard({
                   pages that should show the agent. Host:{' '}
                   <code className="text-[10px] text-nyven-cyan/80">{widgetOrigin}</code>
                 </p>
-                <pre className="text-[11px] sm:text-xs bg-nyven-bg border border-white/[0.08] rounded-xl p-3 overflow-x-auto text-nyven-text-secondary whitespace-pre-wrap">
+                <pre className="text-[11px] sm:text-xs bg-nyven-bg border border-[var(--nyven-border)] rounded-xl p-3 overflow-x-auto text-nyven-text-secondary whitespace-pre-wrap">
                   {embedCode}
                 </pre>
                 <button
                   type="button"
                   onClick={onCopyEmbed}
-                  className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-white/[0.1] text-xs font-medium"
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-[var(--nyven-border)] text-xs font-medium"
                 >
                   {copied ? <Check size={12} /> : <Copy size={12} />}
                   {copied ? 'Copied' : 'Copy installation code'}
@@ -484,7 +484,7 @@ export function AgentInstallWizard({
                 updateDomain(selected.id, { enabled: false })
                 refresh()
               }}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-white/[0.1] text-sm text-nyven-text-secondary"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[var(--nyven-border)] text-sm text-nyven-text-secondary"
             >
               <Ban size={14} /> Disable
             </button>

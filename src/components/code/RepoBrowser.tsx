@@ -21,7 +21,7 @@ type Props = {
 export function RepoBrowser(p: Props) {
   return (
     <Panel className="flex flex-col min-h-[320px] lg:min-h-0 overflow-hidden">
-      <div className="p-3 border-b border-white/[0.06] flex items-center gap-2">
+      <div className="p-3 border-b border-[var(--nyven-border)] flex items-center gap-2">
         <div className="relative flex-1 min-w-0">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-nyven-text-secondary" />
           <input
@@ -30,14 +30,14 @@ export function RepoBrowser(p: Props) {
             value={p.query}
             onChange={(e) => p.onQueryChange(e.target.value)}
             placeholder="Search loaded repositories"
-            className="w-full bg-nyven-bg border border-white/[0.08] rounded-lg pl-9 pr-3 py-2 text-sm placeholder:text-nyven-text-secondary/60 focus:outline-none focus:border-nyven-cyan/40 min-h-[38px]"
+            className="w-full bg-nyven-bg border border-[var(--nyven-border)] rounded-lg pl-9 pr-3 py-2 text-sm placeholder:text-nyven-text-secondary/60 focus:outline-none focus:border-nyven-cyan/40 min-h-[38px]"
           />
         </div>
         <button
           type="button"
           onClick={p.onReload}
           aria-label="Reload repositories"
-          className="p-2 rounded-lg border border-white/[0.08] text-nyven-text-secondary hover:text-nyven-text min-h-[38px] min-w-[38px] flex items-center justify-center"
+          className="p-2 rounded-lg border border-[var(--nyven-border)] text-nyven-text-secondary hover:text-nyven-text min-h-[38px] min-w-[38px] flex items-center justify-center"
         >
           <RefreshCw size={14} />
         </button>
@@ -82,7 +82,7 @@ export function RepoBrowser(p: Props) {
                   onClick={() => p.onSelect(r)}
                   aria-current={active ? 'true' : undefined}
                   className={`w-full text-left px-4 py-3 transition-colors min-h-[56px] ${
-                    active ? 'bg-nyven-cyan/[0.07] border-l-2 border-nyven-cyan' : 'hover:bg-white/[0.03] border-l-2 border-transparent'
+                    active ? 'bg-nyven-cyan/[0.07] border-l-2 border-nyven-cyan' : 'hover:bg-[var(--nyven-input-bg)] border-l-2 border-transparent'
                   }`}
                 >
                   <div className="flex items-center gap-2 min-w-0">
@@ -98,7 +98,7 @@ export function RepoBrowser(p: Props) {
       </div>
 
       {p.hasMore && p.repos !== null && (
-        <div className="p-3 border-t border-white/[0.06]">
+        <div className="p-3 border-t border-[var(--nyven-border)]">
           <SecondaryButton onClick={p.onLoadMore} disabled={p.loading}>
             {p.loading ? 'Loading…' : 'Load more repositories'}
           </SecondaryButton>

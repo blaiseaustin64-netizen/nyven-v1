@@ -567,7 +567,7 @@ export function AgentEditor() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => navigate('/agents')}
-              className="p-2 -ml-2 rounded-lg text-nyven-text-secondary hover:text-nyven-text hover:bg-white/[0.04] transition-colors"
+              className="p-2 -ml-2 rounded-lg text-nyven-text-secondary hover:text-nyven-text hover:bg-[var(--nyven-input-bg)] transition-colors"
               aria-label="Back"
             >
               <ArrowLeft size={20} />
@@ -605,7 +605,7 @@ export function AgentEditor() {
               <button
                 onClick={handleStatusToggle}
                 disabled={saving}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-white/[0.08] text-sm text-nyven-text-secondary hover:text-nyven-text hover:bg-white/[0.03] transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[var(--nyven-border)] text-sm text-nyven-text-secondary hover:text-nyven-text hover:bg-[var(--nyven-input-bg)] transition-colors disabled:opacity-50"
               >
                 {form.status === 'active' ? (
                   <>
@@ -621,7 +621,7 @@ export function AgentEditor() {
             {isEdit && form.status === 'draft' && (
               <button
                 onClick={() => update('status', 'active')}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-white/[0.08] text-sm text-nyven-text-secondary hover:text-nyven-text hover:bg-white/[0.03] transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[var(--nyven-border)] text-sm text-nyven-text-secondary hover:text-nyven-text hover:bg-[var(--nyven-input-bg)] transition-colors"
               >
                 <Play size={14} /> Mark Active
               </button>
@@ -650,7 +650,7 @@ export function AgentEditor() {
           </div>
         )}
 
-        <div className="flex gap-1 mb-6 p-1 rounded-xl bg-nyven-surface/60 border border-white/[0.05] w-fit flex-wrap">
+        <div className="flex gap-1 mb-6 p-1 rounded-xl bg-nyven-surface/60 border border-[var(--nyven-border)] w-fit flex-wrap">
           {(
               [
                 { id: 'configure' as const, label: 'Configure', icon: Save },
@@ -702,7 +702,7 @@ export function AgentEditor() {
                           'text-left p-4 rounded-xl border transition-colors',
                           form.agentType === t.id && t.available
                             ? 'border-nyven-cyan/40 bg-nyven-cyan/5'
-                            : 'border-white/[0.06] bg-nyven-surface/50',
+                            : 'border-[var(--nyven-border)] bg-nyven-surface/50',
                           !t.available && 'opacity-50 cursor-not-allowed'
                         )}
                       >
@@ -765,7 +765,7 @@ export function AgentEditor() {
                             'w-10 h-10 rounded-xl text-sm font-semibold border transition-colors',
                             form.avatar === a
                               ? 'border-nyven-cyan/50 bg-nyven-cyan/10'
-                              : 'border-white/[0.08] bg-nyven-surface hover:border-white/[0.14]'
+                              : 'border-[var(--nyven-border)] bg-nyven-surface hover:border-[var(--nyven-border)]'
                           )}
                           style={form.avatar === a ? { color: form.color } : undefined}
                         >
@@ -809,7 +809,7 @@ export function AgentEditor() {
                             'px-3 py-1.5 rounded-lg text-sm border transition-colors',
                             form.tone === t
                               ? 'border-nyven-cyan/40 bg-nyven-cyan/10 text-nyven-cyan'
-                              : 'border-white/[0.08] text-nyven-text-secondary hover:text-nyven-text hover:border-white/[0.12]'
+                              : 'border-[var(--nyven-border)] text-nyven-text-secondary hover:text-nyven-text hover:border-[var(--nyven-border)]'
                           )}
                         >
                           {t}
@@ -828,7 +828,7 @@ export function AgentEditor() {
                             'px-3 py-1.5 rounded-lg text-sm border transition-colors',
                             form.communicationStyle === s
                               ? 'border-nyven-violet/40 bg-nyven-violet/10 text-nyven-violet'
-                              : 'border-white/[0.08] text-nyven-text-secondary hover:text-nyven-text hover:border-white/[0.12]'
+                              : 'border-[var(--nyven-border)] text-nyven-text-secondary hover:text-nyven-text hover:border-[var(--nyven-border)]'
                           )}
                         >
                           {s}
@@ -915,7 +915,7 @@ export function AgentEditor() {
                         <button
                           type="button"
                           onClick={() => setConfirmDelete(false)}
-                          className="px-3 py-1.5 rounded-lg text-sm border border-white/[0.08] text-nyven-text-secondary hover:text-nyven-text"
+                          className="px-3 py-1.5 rounded-lg text-sm border border-[var(--nyven-border)] text-nyven-text-secondary hover:text-nyven-text"
                         >
                           Cancel
                         </button>
@@ -973,17 +973,17 @@ export function AgentEditor() {
               <button
                 type="button"
                 onClick={resetPlayground}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs border border-white/[0.08] text-nyven-text-secondary hover:text-nyven-text"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs border border-[var(--nyven-border)] text-nyven-text-secondary hover:text-nyven-text"
               >
                 <RotateCcw size={12} />
                 Reset
               </button>
             </div>
 
-            <div className="bg-nyven-surface border border-white/[0.06] rounded-2xl overflow-hidden flex flex-col h-[min(520px,70vh)]">
-              <div className="px-4 py-3 border-b border-white/[0.06] flex items-center gap-3 bg-nyven-bg-secondary/50">
+            <div className="bg-nyven-surface border border-[var(--nyven-border)] rounded-2xl overflow-hidden flex flex-col h-[min(520px,70vh)]">
+              <div className="px-4 py-3 border-b border-[var(--nyven-border)] flex items-center gap-3 bg-nyven-bg-secondary/50">
                 <div
-                  className="w-9 h-9 rounded-xl flex items-center justify-center text-sm font-semibold border border-white/[0.1]"
+                  className="w-9 h-9 rounded-xl flex items-center justify-center text-sm font-semibold border border-[var(--nyven-border)]"
                   style={{ backgroundColor: `${form.color}22`, color: form.color }}
                 >
                   {form.avatar}
@@ -997,7 +997,7 @@ export function AgentEditor() {
                 </div>
               </div>
               {form.agentType === 'inbox' && savedInstance && (
-                <div className="px-3 py-2 border-b border-white/[0.05] flex flex-wrap gap-1.5 bg-nyven-bg/30">
+                <div className="px-3 py-2 border-b border-[var(--nyven-border)] flex flex-wrap gap-1.5 bg-nyven-bg/30">
                   {(
                     [
                       { label: 'Recent inbox', action: 'search', query: 'in:inbox newer_than:7d' },
@@ -1009,7 +1009,7 @@ export function AgentEditor() {
                       key={btn.label}
                       type="button"
                       disabled={playLoading}
-                      className="text-[11px] px-2.5 py-1 rounded-lg border border-white/[0.08] text-nyven-text-secondary hover:text-nyven-text hover:border-white/[0.14] disabled:opacity-40"
+                      className="text-[11px] px-2.5 py-1 rounded-lg border border-[var(--nyven-border)] text-nyven-text-secondary hover:text-nyven-text hover:border-[var(--nyven-border)] disabled:opacity-40"
                       onClick={async () => {
                         if (!savedInstance) return
                         setPlayLoading(true)
@@ -1075,7 +1075,7 @@ export function AgentEditor() {
                       m.role === 'user' &&
                         'ml-auto bg-nyven-cyan/10 border border-nyven-cyan/20 rounded-br-md',
                       m.role === 'agent' &&
-                        'bg-white/[0.04] border border-white/[0.08] rounded-bl-md',
+                        'bg-[var(--nyven-input-bg)] border border-[var(--nyven-border)] rounded-bl-md',
                       m.role === 'error' &&
                         'mx-auto bg-red-500/10 border border-red-500/20 text-red-300 text-xs',
                       m.thinking && 'italic opacity-70'
@@ -1098,7 +1098,7 @@ export function AgentEditor() {
                 </div>
               )}
 
-              <div className="p-3 border-t border-white/[0.06] flex gap-2 bg-nyven-bg-secondary/40">
+              <div className="p-3 border-t border-[var(--nyven-border)] flex gap-2 bg-nyven-bg-secondary/40">
                 <input
                   type="text"
                   value={playInput}
@@ -1113,7 +1113,7 @@ export function AgentEditor() {
                     savedInstance ? 'Ask the agent something…' : 'Save the agent to start testing'
                   }
                   disabled={playLoading || !savedInstance}
-                  className="flex-1 px-3.5 py-2.5 rounded-xl bg-nyven-bg border border-white/[0.08] text-sm outline-none focus:border-nyven-cyan/40 disabled:opacity-50"
+                  className="flex-1 px-3.5 py-2.5 rounded-xl bg-nyven-bg border border-[var(--nyven-border)] text-sm outline-none focus:border-nyven-cyan/40 disabled:opacity-50"
                 />
                 <button
                   type="button"
@@ -1156,7 +1156,7 @@ export function AgentEditor() {
         {activeTab === 'connections' && (
           <div>
             {form.agentType === 'code' ? (
-              <div className="rounded-2xl border border-white/[0.06] bg-nyven-surface p-4 text-sm text-nyven-text-secondary space-y-3">
+              <div className="rounded-2xl border border-[var(--nyven-border)] bg-nyven-surface p-4 text-sm text-nyven-text-secondary space-y-3">
                 <p className="leading-relaxed">
                   GitHub for NYVEN Code is managed in the dedicated NYVEN Code workspace, where you connect, browse repositories, and review issues and pull requests.
                 </p>
@@ -1213,7 +1213,7 @@ export function AgentEditor() {
             </div>
 
             {!savedInstance ? (
-              <div className="p-5 rounded-2xl border border-dashed border-white/[0.1] text-center text-sm text-nyven-text-secondary">
+              <div className="p-5 rounded-2xl border border-dashed border-[var(--nyven-border)] text-center text-sm text-nyven-text-secondary">
                 Create and save the agent first to install it on a website.
               </div>
             ) : (
@@ -1244,7 +1244,7 @@ export function AgentEditor() {
 }
 
 const inputClass =
-  'w-full px-3.5 py-2.5 rounded-xl bg-nyven-bg border border-white/[0.08] text-sm text-nyven-text placeholder:text-nyven-text-secondary/50 focus:border-nyven-cyan/40 focus:ring-1 focus:ring-nyven-cyan/20 outline-none transition-colors resize-y'
+  'w-full px-3.5 py-2.5 rounded-xl bg-nyven-bg border border-[var(--nyven-border)] text-sm text-nyven-text placeholder:text-nyven-text-secondary/50 focus:border-nyven-cyan/40 focus:ring-1 focus:ring-nyven-cyan/20 outline-none transition-colors resize-y'
 
 function Section({
   title,
@@ -1256,7 +1256,7 @@ function Section({
   children: ReactNode
 }) {
   return (
-    <section className="bg-nyven-surface border border-white/[0.06] rounded-2xl p-5 sm:p-6">
+    <section className="bg-nyven-surface border border-[var(--nyven-border)] rounded-2xl p-5 sm:p-6">
       <h2 className="font-display text-base font-medium mb-1">{title}</h2>
       {subtitle && <p className="text-xs text-nyven-text-secondary mb-4">{subtitle}</p>}
       {!subtitle && <div className="mb-4" />}
@@ -1296,10 +1296,10 @@ function WidgetPreview({ form, typeName }: { form: FormState; typeName?: string 
 
   return (
     <div className="relative">
-      <div className="bg-nyven-surface border border-white/[0.08] rounded-2xl overflow-hidden shadow-nyven">
-        <div className="px-4 py-3.5 border-b border-white/[0.06] flex items-center gap-3 bg-nyven-bg-secondary/40">
+      <div className="bg-nyven-surface border border-[var(--nyven-border)] rounded-2xl overflow-hidden shadow-nyven">
+        <div className="px-4 py-3.5 border-b border-[var(--nyven-border)] flex items-center gap-3 bg-nyven-bg-secondary/40">
           <div
-            className="w-10 h-10 rounded-xl flex items-center justify-center text-base font-semibold border border-white/[0.1]"
+            className="w-10 h-10 rounded-xl flex items-center justify-center text-base font-semibold border border-[var(--nyven-border)]"
             style={{ backgroundColor: `${form.color}22`, color: form.color }}
           >
             {form.avatar || 'N'}
@@ -1327,25 +1327,25 @@ function WidgetPreview({ form, typeName }: { form: FormState; typeName?: string 
         <div className="p-4 space-y-3 min-h-[140px] bg-nyven-bg/30">
           <div className="flex gap-2.5">
             <div
-              className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-semibold shrink-0 border border-white/[0.08]"
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-semibold shrink-0 border border-[var(--nyven-border)]"
               style={{ backgroundColor: `${form.color}18`, color: form.color }}
             >
               {form.avatar || 'N'}
             </div>
             <div className="flex-1">
-              <div className="inline-block px-3.5 py-2.5 rounded-2xl rounded-tl-md bg-white/[0.04] border border-white/[0.06] text-sm leading-relaxed">
+              <div className="inline-block px-3.5 py-2.5 rounded-2xl rounded-tl-md bg-[var(--nyven-input-bg)] border border-[var(--nyven-border)] text-sm leading-relaxed">
                 {greeting}
               </div>
             </div>
           </div>
         </div>
-        <div className="px-3 py-2.5 border-t border-white/[0.05] flex gap-2 bg-black/20">
-          <div className="flex-1 h-9 rounded-xl bg-nyven-bg border border-white/[0.06]" />
+        <div className="px-3 py-2.5 border-t border-[var(--nyven-border)] flex gap-2 bg-black/20">
+          <div className="flex-1 h-9 rounded-xl bg-nyven-bg border border-[var(--nyven-border)]" />
           <div className="w-9 h-9 rounded-xl" style={{ backgroundColor: form.color }} />
         </div>
       </div>
       <div
-        className="absolute -bottom-3 -right-3 w-12 h-12 rounded-2xl flex items-center justify-center text-sm font-semibold border border-white/10 shadow-lg"
+        className="absolute -bottom-3 -right-3 w-12 h-12 rounded-2xl flex items-center justify-center text-sm font-semibold border border-[var(--nyven-border)] shadow-lg"
         style={{ backgroundColor: `${form.color}30`, color: form.color }}
       >
         {form.avatar || 'N'}

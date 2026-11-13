@@ -91,7 +91,7 @@ export function DomainsPanel({ agentId }: Props) {
 
   return (
     <div className="max-w-2xl space-y-6">
-      <div className="mb-5 p-4 rounded-2xl border border-white/[0.06] bg-nyven-bg/50 space-y-2">
+      <div className="mb-5 p-4 rounded-2xl border border-[var(--nyven-border)] bg-nyven-bg/50 space-y-2">
         <p className="text-sm font-medium">Website installation flow</p>
         <ol className="text-xs text-nyven-text-secondary space-y-1 list-decimal pl-4">
           <li>Add each website domain (example.com).</li>
@@ -130,7 +130,7 @@ export function DomainsPanel({ agentId }: Props) {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="example.com"
-          className="flex-1 px-3.5 py-2.5 rounded-xl bg-nyven-bg border border-white/[0.08] text-sm outline-none focus:border-nyven-cyan/40"
+          className="flex-1 px-3.5 py-2.5 rounded-xl bg-nyven-bg border border-[var(--nyven-border)] text-sm outline-none focus:border-nyven-cyan/40"
           onKeyDown={(e) => {
             if (e.key === 'Enter') handleAdd()
           }}
@@ -145,7 +145,7 @@ export function DomainsPanel({ agentId }: Props) {
       </div>
 
       {domains.length === 0 ? (
-        <div className="flex flex-col items-center py-12 rounded-2xl border border-dashed border-white/[0.08] text-center">
+        <div className="flex flex-col items-center py-12 rounded-2xl border border-dashed border-[var(--nyven-border)] text-center">
           <Globe className="text-nyven-text-secondary mb-3 opacity-50" size={28} />
           <p className="text-sm text-nyven-text-secondary max-w-sm">
             No domains yet. Without a list, the widget accepts any origin. Add domains to
@@ -157,7 +157,7 @@ export function DomainsPanel({ agentId }: Props) {
           {domains.map((d) => (
             <li
               key={d.id}
-              className="p-4 rounded-xl border border-white/[0.06] bg-nyven-surface flex flex-col sm:flex-row sm:items-center gap-3"
+              className="p-4 rounded-xl border border-[var(--nyven-border)] bg-nyven-surface flex flex-col sm:flex-row sm:items-center gap-3"
             >
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium">{d.domain}</div>
@@ -168,7 +168,7 @@ export function DomainsPanel({ agentId }: Props) {
                       d.status === 'verified' && 'bg-emerald-400/10 text-emerald-400',
                       d.status === 'pending' && 'bg-amber-400/10 text-amber-400',
                       d.status === 'blocked' && 'bg-red-400/10 text-red-300',
-                      d.status === 'disabled' && 'bg-white/[0.06] text-nyven-text-secondary'
+                      d.status === 'disabled' && 'bg-[var(--nyven-surface)] text-nyven-text-secondary'
                     )}
                   >
                     {STATUS_LABEL[d.status]}
@@ -185,7 +185,7 @@ export function DomainsPanel({ agentId }: Props) {
                 <button
                   type="button"
                   onClick={() => toggleEnabled(d)}
-                  className="text-xs px-2 py-1 rounded-lg border border-white/[0.08] text-nyven-text-secondary hover:text-nyven-text"
+                  className="text-xs px-2 py-1 rounded-lg border border-[var(--nyven-border)] text-nyven-text-secondary hover:text-nyven-text"
                 >
                   {d.enabled ? 'Disable' : 'Enable'}
                 </button>
@@ -193,7 +193,7 @@ export function DomainsPanel({ agentId }: Props) {
                   <button
                     type="button"
                     onClick={() => setStatus(d.id, 'verified')}
-                    className="text-xs px-2 py-1 rounded-lg border border-white/[0.08] text-nyven-text-secondary hover:text-nyven-text"
+                    className="text-xs px-2 py-1 rounded-lg border border-[var(--nyven-border)] text-nyven-text-secondary hover:text-nyven-text"
                     title="Manual mark only — not automatic DNS verification"
                   >
                     Mark verified
@@ -202,7 +202,7 @@ export function DomainsPanel({ agentId }: Props) {
                 <button
                   type="button"
                   onClick={() => setStatus(d.id, 'blocked')}
-                  className="text-xs px-2 py-1 rounded-lg border border-white/[0.08] text-nyven-text-secondary"
+                  className="text-xs px-2 py-1 rounded-lg border border-[var(--nyven-border)] text-nyven-text-secondary"
                 >
                   Block
                 </button>

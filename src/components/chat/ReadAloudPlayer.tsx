@@ -86,7 +86,7 @@ export function ReadAloudPlayer({
         >
           <div
             className="relative w-full max-w-[22rem] flex items-center gap-0.5 rounded-full pl-2.5 pr-1 py-1
-              bg-[#11151d]/90 border border-white/[0.08]
+              bg-[#11151d]/90 border border-[var(--nyven-border)]
               backdrop-blur-xl
               shadow-[0_12px_40px_rgba(0,0,0,0.45),0_0_24px_rgba(34,211,238,0.06)]"
           >
@@ -94,7 +94,7 @@ export function ReadAloudPlayer({
             <button
               type="button"
               onClick={seekOnTrack}
-              className="absolute top-0 left-3 right-3 h-[3px] -translate-y-1/2 rounded-full bg-white/[0.08] overflow-hidden"
+              className="absolute top-0 left-3 right-3 h-[3px] -translate-y-1/2 rounded-full bg-[var(--nyven-input-bg)] overflow-hidden"
               aria-label="Seek"
             >
               <span
@@ -127,7 +127,7 @@ export function ReadAloudPlayer({
             <button
               type="button"
               onClick={() => onSeek(-15)}
-              className="relative w-8 h-8 shrink-0 rounded-full grid place-items-center text-white/75 hover:bg-white/[0.08] active:scale-95"
+              className="relative w-8 h-8 shrink-0 rounded-full grid place-items-center text-white/75 hover:bg-[var(--nyven-surface)] active:scale-95"
               aria-label="Back 15 seconds"
             >
               <RotateCcw size={15} strokeWidth={2} />
@@ -143,7 +143,7 @@ export function ReadAloudPlayer({
               aria-label={state.playing ? 'Pause' : 'Play'}
             >
               {state.loading ? (
-                <span className="w-3.5 h-3.5 rounded-full border-2 border-white/25 border-t-cyan-400 animate-spin" />
+                <span className="w-3.5 h-3.5 rounded-full border-2 border-[var(--nyven-border)] border-t-cyan-400 animate-spin" />
               ) : state.playing ? (
                 <Pause size={16} fill="currentColor" />
               ) : (
@@ -154,7 +154,7 @@ export function ReadAloudPlayer({
             <button
               type="button"
               onClick={() => onSeek(15)}
-              className="relative w-8 h-8 shrink-0 rounded-full grid place-items-center text-white/75 hover:bg-white/[0.08] active:scale-95"
+              className="relative w-8 h-8 shrink-0 rounded-full grid place-items-center text-white/75 hover:bg-[var(--nyven-surface)] active:scale-95"
               aria-label="Forward 15 seconds"
             >
               <RotateCw size={15} strokeWidth={2} />
@@ -166,7 +166,7 @@ export function ReadAloudPlayer({
             <button
               type="button"
               onClick={onCycleRate}
-              className="h-7 min-w-[1.9rem] shrink-0 px-1 rounded-full text-[11px] font-medium text-white/80 hover:bg-white/[0.08]"
+              className="h-7 min-w-[1.9rem] shrink-0 px-1 rounded-full text-[11px] font-medium text-white/80 hover:bg-[var(--nyven-surface)]"
               aria-label="Playback speed"
             >
               {state.rate}x
@@ -175,7 +175,7 @@ export function ReadAloudPlayer({
             <button
               type="button"
               onClick={onClose}
-              className="w-8 h-8 shrink-0 rounded-full grid place-items-center text-white/55 hover:text-white/90 hover:bg-white/[0.08]"
+              className="w-8 h-8 shrink-0 rounded-full grid place-items-center text-white/55 hover:text-white/90 hover:bg-[var(--nyven-surface)]"
               aria-label="Close"
             >
               <X size={15} />

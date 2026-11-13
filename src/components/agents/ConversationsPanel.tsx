@@ -50,7 +50,7 @@ export function ConversationsPanel({ agentId }: Props) {
           {conv?.source} · {conv?.messageCount ?? 0} messages ·{' '}
           {conv ? new Date(conv.updatedAt).toLocaleString() : ''}
         </p>
-        <div className="space-y-3 bg-nyven-surface border border-white/[0.06] rounded-2xl p-4 max-h-[60vh] overflow-y-auto">
+        <div className="space-y-3 bg-nyven-surface border border-[var(--nyven-border)] rounded-2xl p-4 max-h-[60vh] overflow-y-auto">
           {messages.length === 0 && (
             <p className="text-sm text-nyven-text-secondary text-center py-8">
               No messages in this conversation.
@@ -64,7 +64,7 @@ export function ConversationsPanel({ agentId }: Props) {
                 m.role === 'user' &&
                   'ml-auto bg-nyven-cyan/10 border border-nyven-cyan/20 rounded-br-md',
                 m.role === 'assistant' &&
-                  'bg-white/[0.04] border border-white/[0.08] rounded-bl-md',
+                  'bg-[var(--nyven-input-bg)] border border-[var(--nyven-border)] rounded-bl-md',
                 m.role === 'system' && 'mx-auto text-xs text-nyven-text-secondary'
               )}
             >
@@ -91,7 +91,7 @@ export function ConversationsPanel({ agentId }: Props) {
       </div>
 
       {list.length === 0 ? (
-        <div className="flex flex-col items-center py-14 px-6 rounded-2xl border border-dashed border-white/[0.08] text-center">
+        <div className="flex flex-col items-center py-14 px-6 rounded-2xl border border-dashed border-[var(--nyven-border)] text-center">
           <MessageSquare className="text-nyven-text-secondary mb-3 opacity-50" size={28} />
           <p className="text-sm text-nyven-text-secondary">
             No conversations yet. Use the Playground or website widget to start one.
@@ -104,12 +104,12 @@ export function ConversationsPanel({ agentId }: Props) {
               <button
                 type="button"
                 onClick={() => setSelectedId(c.id)}
-                className="w-full text-left p-4 rounded-xl border border-white/[0.06] bg-nyven-surface hover:border-white/[0.12] transition-colors flex items-center gap-3"
+                className="w-full text-left p-4 rounded-xl border border-[var(--nyven-border)] bg-nyven-surface hover:border-[var(--nyven-border)] transition-colors flex items-center gap-3"
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium truncate">{c.title}</span>
-                    <span className="text-[10px] uppercase tracking-wider text-nyven-text-secondary/70 bg-white/[0.04] px-1.5 py-0.5 rounded">
+                    <span className="text-[10px] uppercase tracking-wider text-nyven-text-secondary/70 bg-[var(--nyven-input-bg)] px-1.5 py-0.5 rounded">
                       {c.source}
                     </span>
                     <span
@@ -117,7 +117,7 @@ export function ConversationsPanel({ agentId }: Props) {
                         'text-[10px] px-1.5 py-0.5 rounded',
                         c.status === 'open'
                           ? 'text-emerald-400/90 bg-emerald-400/10'
-                          : 'text-nyven-text-secondary bg-white/[0.04]'
+                          : 'text-nyven-text-secondary bg-[var(--nyven-input-bg)]'
                       )}
                     >
                       {c.status}

@@ -499,7 +499,7 @@ export function MessageComposer({
           'relative rounded-[24px] border bg-nyven-surface/95 backdrop-blur-sm transition-colors', isExpanded ? 'p-3' : 'px-2 py-1.5 sm:p-3',
           dragOver
             ? 'border-nyven-cyan/40 bg-nyven-cyan/[0.04]'
-            : 'border-white/[0.08] focus-within:border-white/[0.14]'
+            : 'border-[var(--nyven-border)] focus-within:border-[var(--nyven-border)]'
         )}
       >
         {/* Row 1 — attachment tiles */}
@@ -511,10 +511,10 @@ export function MessageComposer({
                 <div
                   key={a.id}
                   className={clsx(
-                    'relative shrink-0 w-[104px] h-[104px] rounded-2xl overflow-hidden border bg-white/[0.04]',
+                    'relative shrink-0 w-[104px] h-[104px] rounded-2xl overflow-hidden border bg-[var(--nyven-input-bg)]',
                     a.status === 'error'
                       ? 'border-red-400/60'
-                      : 'border-white/[0.08]'
+                      : 'border-[var(--nyven-border)]'
                   )}
                 >
                   {a.kind === 'image' && a.previewUrl ? (
@@ -555,7 +555,7 @@ export function MessageComposer({
                   <button
                     type="button"
                     onClick={() => removeAttachment(a.id)}
-                    className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-[#0c1018] border border-white/20 text-nyven-text flex items-center justify-center shadow"
+                    className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-[var(--nyven-surface)] border border-white/20 text-nyven-text flex items-center justify-center shadow"
                     aria-label={`Remove ${a.name}`}
                   >
                     <X size={12} />
@@ -603,7 +603,7 @@ export function MessageComposer({
             />
             <div
               ref={menuRef}
-              className="absolute left-0 right-0 bottom-0 max-h-[min(88vh,640px)] flex flex-col rounded-t-[28px] border-t border-white/10 bg-[#0C1018]/95 backdrop-blur-xl shadow-[0_-12px_40px_rgba(0,0,0,0.45)] pb-[max(1rem,env(safe-area-inset-bottom))]"
+              className="absolute left-0 right-0 bottom-0 max-h-[min(88vh,640px)] flex flex-col rounded-t-[28px] border-t border-[var(--nyven-border)] bg-[var(--nyven-surface)]/95 backdrop-blur-xl shadow-[0_-12px_40px_rgba(0,0,0,0.45)] pb-[max(1rem,env(safe-area-inset-bottom))]"
               style={{
                 transform: `translateY(${sheetDragY}px)`,
                 transition:
@@ -630,13 +630,13 @@ export function MessageComposer({
               }}
             >
               <div className="flex justify-center pt-3 pb-1">
-                <div className="w-10 h-1 rounded-full bg-white/20" />
+                <div className="w-10 h-1 rounded-full bg-[var(--nyven-surface)]" />
               </div>
               <div className="relative flex items-center justify-center px-4 pb-3">
                 <button
                   type="button"
                   onClick={closeMenu}
-                  className="absolute left-3 w-10 h-10 rounded-full flex items-center justify-center text-nyven-text-secondary hover:bg-white/[0.06] active:bg-nyven-cyan/10"
+                  className="absolute left-3 w-10 h-10 rounded-full flex items-center justify-center text-nyven-text-secondary hover:bg-[var(--nyven-surface)] active:bg-nyven-cyan/10"
                   aria-label="Close"
                 >
                   <X size={20} />
@@ -654,9 +654,9 @@ export function MessageComposer({
                     key={tile.label}
                     type="button"
                     onClick={tile.action}
-                    className="h-24 rounded-2xl border border-white/[0.08] bg-white/[0.03] flex flex-col items-center justify-center gap-2 active:bg-nyven-cyan/10 transition-colors"
+                    className="h-24 rounded-2xl border border-[var(--nyven-border)] bg-[var(--nyven-input-bg)] flex flex-col items-center justify-center gap-2 active:bg-nyven-cyan/10 transition-colors"
                   >
-                    <span className="w-12 h-12 rounded-full bg-white/[0.06] flex items-center justify-center text-nyven-cyan">
+                    <span className="w-12 h-12 rounded-full bg-[var(--nyven-surface)] flex items-center justify-center text-nyven-cyan">
                       <tile.icon size={22} />
                     </span>
                     <span className="text-sm text-nyven-text">{tile.label}</span>
@@ -680,9 +680,9 @@ export function MessageComposer({
                     key={row.label}
                     type="button"
                     onClick={row.onClick}
-                    className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left min-h-[56px] active:bg-nyven-cyan/10 hover:bg-white/[0.04] transition-colors"
+                    className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left min-h-[56px] active:bg-nyven-cyan/10 hover:bg-[var(--nyven-input-bg)] transition-colors"
                   >
-                    <span className="w-10 h-10 rounded-xl bg-white/[0.06] flex items-center justify-center text-nyven-text-secondary shrink-0">
+                    <span className="w-10 h-10 rounded-xl bg-[var(--nyven-surface)] flex items-center justify-center text-nyven-text-secondary shrink-0">
                       <row.icon size={22} />
                     </span>
                     <span className="flex-1 min-w-0">
@@ -700,7 +700,7 @@ export function MessageComposer({
         {menuOpen && !isNarrow && (
           <div
             ref={menuRef}
-            className="absolute left-3 bottom-full mb-2 z-30 w-56 origin-bottom-left rounded-xl border border-white/[0.1] bg-[#0c1018]/95 backdrop-blur-md shadow-xl shadow-black/40 p-1.5"
+            className="absolute left-3 bottom-full mb-2 z-30 w-56 origin-bottom-left rounded-xl border border-[var(--nyven-border)] bg-[var(--nyven-surface)]/95 backdrop-blur-md shadow-xl shadow-black/40 p-1.5"
             role="menu"
             aria-label="Add to chat"
           >
@@ -717,7 +717,7 @@ export function MessageComposer({
                 type="button"
                 role="menuitem"
                 onClick={() => openPicker(item.kind)}
-                className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-nyven-text hover:bg-white/[0.06] transition-colors text-left min-h-[44px]"
+                className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-nyven-text hover:bg-[var(--nyven-surface)] transition-colors text-left min-h-[44px]"
               >
                 <item.icon size={16} className="text-nyven-text-secondary shrink-0" />
                 {item.label}
@@ -750,7 +750,7 @@ export function MessageComposer({
               'w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-colors',
               menuOpen
                 ? 'bg-nyven-cyan/15 text-nyven-cyan'
-                : 'text-nyven-text-secondary hover:text-nyven-text hover:bg-white/[0.06]'
+                : 'text-nyven-text-secondary hover:text-nyven-text hover:bg-[var(--nyven-surface)]'
             )}
             aria-label="Add to chat"
             aria-expanded={menuOpen}
@@ -781,7 +781,7 @@ export function MessageComposer({
                   (voicePhase === 'idle' ||
                     voicePhase === 'error' ||
                     voicePhase === 'requesting_permission') &&
-                    'text-nyven-text-secondary hover:text-nyven-text hover:bg-white/[0.05]',
+                    'text-nyven-text-secondary hover:text-nyven-text hover:bg-[var(--nyven-surface)]',
                   !onVoiceToggle && 'opacity-40 cursor-not-allowed'
                 )}
                 aria-label={
@@ -806,7 +806,7 @@ export function MessageComposer({
                 onClick={onOpenVoiceChat}
                 disabled={isGenerating}
                 className={clsx(
-                  'w-10 h-10 rounded-full flex items-center justify-center text-nyven-text-secondary hover:text-nyven-text hover:bg-white/[0.05] transition-colors',
+                  'w-10 h-10 rounded-full flex items-center justify-center text-nyven-text-secondary hover:text-nyven-text hover:bg-[var(--nyven-surface)] transition-colors',
                   isGenerating && 'opacity-40 cursor-not-allowed'
                 )}
                 aria-label="Voice chat"
@@ -820,7 +820,7 @@ export function MessageComposer({
               <button
                 type="button"
                 onClick={onStop}
-                className="w-10 h-10 rounded-full flex items-center justify-center bg-white/[0.08] text-nyven-text hover:bg-white/[0.12] transition-colors"
+                className="w-10 h-10 rounded-full flex items-center justify-center bg-[var(--nyven-input-bg)] text-nyven-text hover:bg-[var(--nyven-surface)] transition-colors"
                 aria-label="Stop generating"
               >
                 <Square size={16} fill="currentColor" />
@@ -834,7 +834,7 @@ export function MessageComposer({
                   'w-10 h-10 rounded-full flex items-center justify-center transition-colors',
                   canSend
                     ? 'bg-nyven-cyan text-nyven-bg hover:bg-nyven-cyan/90'
-                    : 'bg-white/[0.06] text-nyven-text-secondary opacity-50 cursor-not-allowed'
+                    : 'bg-[var(--nyven-surface)] text-nyven-text-secondary opacity-50 cursor-not-allowed'
                 )}
                 aria-label="Send message"
               >

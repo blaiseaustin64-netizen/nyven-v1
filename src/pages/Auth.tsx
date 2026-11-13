@@ -9,9 +9,9 @@ import { WordmarkIntro } from '../components/WordmarkIntro'
 type Mode = 'signin' | 'signup' | 'forgot' | 'reset' | 'verify'
 
 const INPUT =
-  'w-full h-12 rounded-xl bg-white/[0.04] border border-white/[0.1] px-3.5 text-base text-nyven-text ' +
+  'w-full h-12 rounded-xl bg-[var(--nyven-input-bg)] border border-[var(--nyven-border)] px-3.5 text-base text-nyven-text ' +
   'placeholder:text-nyven-text-secondary/60 outline-none transition-colors ' +
-  'focus:border-nyven-cyan/60 focus:bg-white/[0.06] focus:ring-2 focus:ring-nyven-cyan/20'
+  'focus:border-nyven-cyan/60 focus:bg-[var(--nyven-surface)] focus:ring-2 focus:ring-nyven-cyan/20'
 
 function EyeIcon({ off }: { off: boolean }) {
   return (
@@ -69,7 +69,7 @@ function PasswordField({
           onClick={() => setVisible((v) => !v)}
           aria-label={visible ? 'Hide password' : 'Show password'}
           aria-pressed={visible}
-          className="absolute right-1 top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center rounded-lg text-nyven-text-secondary hover:text-nyven-text active:bg-white/[0.06]"
+          className="absolute right-1 top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center rounded-lg text-nyven-text-secondary hover:text-nyven-text active:bg-[var(--nyven-surface)]"
         >
           <EyeIcon off={visible} />
         </button>
@@ -240,7 +240,7 @@ export function Auth() {
       </div>
 
       {/* Brand panel: desktop only */}
-      <aside className="relative hidden lg:flex lg:w-[46%] xl:w-1/2 flex-col justify-between p-12 border-r border-white/[0.06]">
+      <aside className="relative hidden lg:flex lg:w-[46%] xl:w-1/2 flex-col justify-between p-12 border-r border-[var(--nyven-border)]">
         <img src={wordmark} alt="NYVEN" className="h-5 w-auto self-start opacity-90" />
         <div className="space-y-6 max-w-md">
           <img src={nMark} alt="" aria-hidden className="h-24 w-auto opacity-90" />
@@ -294,7 +294,7 @@ export function Auth() {
   return shell(
     <>
       {showTabs && (
-        <div role="tablist" aria-label="Account" className="grid grid-cols-2 p-1 mb-6 rounded-xl bg-white/[0.04] border border-white/[0.08]">
+        <div role="tablist" aria-label="Account" className="grid grid-cols-2 p-1 mb-6 rounded-xl bg-[var(--nyven-input-bg)] border border-[var(--nyven-border)]">
           {(['signin', 'signup'] as const).map((m) => (
             <button
               key={m}
@@ -398,7 +398,7 @@ export function Auth() {
         <button
           type="submit"
           disabled={busy}
-          className="w-full h-12 rounded-xl bg-nyven-cyan text-[#04101a] font-semibold text-base transition active:scale-[0.99] hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full h-12 rounded-xl bg-nyven-cyan text-[#071018] font-semibold text-base transition active:scale-[0.99] hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {busy ? 'Please wait…' : submitLabel}
         </button>

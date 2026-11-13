@@ -54,7 +54,7 @@ export function RepoHeader(p: Props) {
               aria-label="Branch"
               value={p.ref_}
               onChange={(e) => p.onRefChange(e.target.value)}
-              className="bg-nyven-bg border border-white/[0.08] rounded-lg px-2 py-1.5 text-sm text-nyven-text min-h-[36px] focus:outline-none focus:border-nyven-cyan/40 max-w-[220px]"
+              className="bg-nyven-bg border border-[var(--nyven-border)] rounded-lg px-2 py-1.5 text-sm text-nyven-text min-h-[36px] focus:outline-none focus:border-nyven-cyan/40 max-w-[220px]"
             >
               {p.branches.map((b) => (
                 <option key={b.name} value={b.name}>
@@ -73,7 +73,7 @@ export function RepoHeader(p: Props) {
         </span>
       </div>
 
-      <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-[11px] text-nyven-text-secondary leading-relaxed">
+      <div className="rounded-xl border border-[var(--nyven-border)] bg-white/[0.02] px-3 py-2 text-[11px] text-nyven-text-secondary leading-relaxed">
         <span className="text-nyven-text">VEXDYN Forge:</span> not connected. {FORGE_STATUS.reason}
       </div>
     </Panel>

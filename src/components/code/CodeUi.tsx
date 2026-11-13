@@ -3,13 +3,13 @@ import { AlertTriangle, Loader2 } from 'lucide-react'
 
 export function Panel({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`bg-nyven-surface border border-white/[0.06] rounded-2xl ${className}`}>{children}</div>
+    <div className={`bg-nyven-surface border border-[var(--nyven-border)] rounded-2xl ${className}`}>{children}</div>
   )
 }
 
 export function Badge({ children, tone = 'neutral' }: { children: ReactNode; tone?: 'neutral' | 'good' | 'warn' | 'bad' | 'info' }) {
   const tones: Record<string, string> = {
-    neutral: 'bg-white/[0.04] text-nyven-text-secondary border-white/[0.06]',
+    neutral: 'bg-[var(--nyven-input-bg)] text-nyven-text-secondary border-[var(--nyven-border)]',
     good: 'bg-emerald-400/10 text-emerald-300 border-emerald-400/20',
     warn: 'bg-amber-400/10 text-amber-300 border-amber-400/20',
     bad: 'bg-red-400/10 text-red-300 border-red-400/20',
@@ -50,7 +50,7 @@ export function LoadingRows({ label, rows = 4 }: { label: string; rows?: number 
         <Loader2 size={12} className="animate-spin" /> {label}
       </p>
       {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="h-8 rounded-lg bg-white/[0.03] animate-pulse" />
+        <div key={i} className="h-8 rounded-lg bg-[var(--nyven-input-bg)] animate-pulse" />
       ))}
     </div>
   )
@@ -93,7 +93,7 @@ export function SecondaryButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-medium border border-white/[0.1] text-nyven-text-secondary hover:text-nyven-text hover:border-white/[0.2] disabled:opacity-50 transition-colors min-h-[36px]"
+      className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-medium border border-[var(--nyven-border)] text-nyven-text-secondary hover:text-nyven-text hover:border-white/[0.2] disabled:opacity-50 transition-colors min-h-[36px]"
     >
       {children}
     </button>

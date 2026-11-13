@@ -399,7 +399,7 @@ export function Code() {
                     }}
                   />
 
-                  <div role="tablist" aria-label="Repository sections" className="flex gap-1 border-b border-white/[0.06]">
+                  <div role="tablist" aria-label="Repository sections" className="flex gap-1 border-b border-[var(--nyven-border)]">
                     {(
                       [
                         ['files', 'Files'],

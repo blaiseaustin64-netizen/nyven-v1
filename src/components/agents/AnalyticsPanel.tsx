@@ -155,7 +155,7 @@ export function AnalyticsPanel({ agent }: Props) {
           </p>
         </div>
 
-        <section className="bg-nyven-surface border border-white/[0.06] rounded-2xl p-5">
+        <section className="bg-nyven-surface border border-[var(--nyven-border)] rounded-2xl p-5">
           <div className="flex items-end justify-between gap-4 mb-4">
             <div>
               <h3 className="text-sm font-medium text-nyven-text-secondary">Agent Health</h3>
@@ -183,7 +183,7 @@ export function AnalyticsPanel({ agent }: Props) {
             </p>
           )}
           {(health.suggestions || []).length > 0 && (
-            <div className="border-t border-white/[0.06] pt-3">
+            <div className="border-t border-[var(--nyven-border)] pt-3">
               <p className="text-xs font-medium text-nyven-text-secondary mb-1.5">Suggestions</p>
               <ul className="text-xs text-nyven-text-secondary space-y-1 list-disc pl-4">
                 {health.suggestions.map((s, i) => (
@@ -243,7 +243,7 @@ export function AnalyticsPanel({ agent }: Props) {
                 {topGaps.map((g, i) => (
                   <li
                     key={g.key}
-                    className="flex items-start justify-between gap-3 p-3 rounded-xl border border-white/[0.06] bg-nyven-surface text-sm"
+                    className="flex items-start justify-between gap-3 p-3 rounded-xl border border-[var(--nyven-border)] bg-nyven-surface text-sm"
                   >
                     <span className="text-nyven-text">
                       <span className="text-nyven-text-secondary mr-2">{i + 1}.</span>
@@ -268,7 +268,7 @@ export function AnalyticsPanel({ agent }: Props) {
               {errors.map((e) => (
                 <li
                   key={e.id}
-                  className="text-sm p-3 rounded-xl border border-white/[0.06] bg-nyven-surface"
+                  className="text-sm p-3 rounded-xl border border-[var(--nyven-border)] bg-nyven-surface"
                 >
                   <span className="text-[10px] uppercase tracking-wider text-amber-400/90">
                     {e.kind}
@@ -297,7 +297,7 @@ export function AnalyticsPanel({ agent }: Props) {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="p-4 rounded-xl border border-white/[0.06] bg-nyven-surface">
+    <div className="p-4 rounded-xl border border-[var(--nyven-border)] bg-nyven-surface">
       <div className="text-[11px] text-nyven-text-secondary">{label}</div>
       <div className="text-lg font-medium tabular-nums mt-1 text-nyven-text">{value}</div>
     </div>
@@ -306,7 +306,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 function Empty({ text }: { text: string }) {
   return (
-    <p className="text-sm text-nyven-text-secondary py-6 text-center border border-dashed border-white/[0.08] rounded-xl">
+    <p className="text-sm text-nyven-text-secondary py-6 text-center border border-dashed border-[var(--nyven-border)] rounded-xl">
       {text}
     </p>
   )

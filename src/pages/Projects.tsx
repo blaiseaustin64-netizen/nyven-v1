@@ -201,7 +201,7 @@ export function Projects() {
           <select
             value={filter}
             onChange={(e) => setFilter(e.target.value as Filter)}
-            className="h-9 px-3 rounded-full bg-white/[0.06] border border-white/[0.08] text-xs outline-none"
+            className="h-9 px-3 rounded-full bg-[var(--nyven-surface)] border border-[var(--nyven-border)] text-xs outline-none"
           >
             <option value="all">All</option>
             <option value="active">Active</option>
@@ -210,7 +210,7 @@ export function Projects() {
           <select
             value={sort}
             onChange={(e) => setSort(e.target.value as Sort)}
-            className="h-9 px-3 rounded-full bg-white/[0.06] border border-white/[0.08] text-xs outline-none"
+            className="h-9 px-3 rounded-full bg-[var(--nyven-surface)] border border-[var(--nyven-border)] text-xs outline-none"
           >
             <option value="edited">Last Edited</option>
             <option value="name">Name</option>
@@ -251,7 +251,7 @@ export function Projects() {
                     e.preventDefault()
                     openMenu(p)
                   }}
-                  className="w-full aspect-square rounded-2xl bg-white/[0.04] border border-white/[0.07] p-4 flex flex-col items-start text-left active:scale-[0.98] transition-transform"
+                  className="w-full aspect-square rounded-2xl bg-[var(--nyven-input-bg)] border border-[var(--nyven-border)] p-4 flex flex-col items-start text-left active:scale-[0.98] transition-transform"
                 >
                   <FolderOpen className="text-nyven-text-secondary mb-3" size={22} />
                   <span className="text-sm font-medium line-clamp-2">{p.name || p.title}</span>
@@ -280,9 +280,9 @@ export function Projects() {
       {menuProject && (
         <div className="fixed inset-0 z-50 flex flex-col justify-end">
           <button type="button" className="absolute inset-0 bg-black/50" onClick={() => setMenuProject(null)} />
-          <div className="relative rounded-t-2xl bg-[#12151c] border-t border-white/[0.08] pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <div className="relative rounded-t-2xl bg-[#12151c] border-t border-[var(--nyven-border)] pb-[max(1rem,env(safe-area-inset-bottom))]">
             <div className="flex justify-center py-2">
-              <span className="w-10 h-1 rounded-full bg-white/20" />
+              <span className="w-10 h-1 rounded-full bg-[var(--nyven-surface)]" />
             </div>
             <button
               type="button"
@@ -327,19 +327,19 @@ export function Projects() {
       {editProject && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
           <button type="button" className="absolute inset-0 bg-black/50" onClick={() => setEditProject(null)} />
-          <div className="relative w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl bg-[#12151c] border border-white/[0.08] p-4">
+          <div className="relative w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl bg-[#12151c] border border-[var(--nyven-border)] p-4">
             <h3 className="font-medium mb-3">Edit project</h3>
             <input
               value={editName}
               onChange={(e) => setEditName(e.target.value.slice(0, 120))}
-              className="w-full h-11 px-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-sm mb-2 outline-none"
+              className="w-full h-11 px-3 rounded-xl bg-[var(--nyven-input-bg)] border border-[var(--nyven-border)] text-sm mb-2 outline-none"
               placeholder="Name"
             />
             <textarea
               value={editDesc}
               onChange={(e) => setEditDesc(e.target.value.slice(0, 2000))}
               rows={3}
-              className="w-full px-3 py-2 rounded-xl bg-white/[0.04] border border-white/[0.08] text-sm mb-3 outline-none resize-y"
+              className="w-full px-3 py-2 rounded-xl bg-[var(--nyven-input-bg)] border border-[var(--nyven-border)] text-sm mb-3 outline-none resize-y"
               placeholder="Description"
             />
             <div className="flex gap-2 justify-end">
@@ -361,7 +361,7 @@ export function Projects() {
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <button type="button" className="absolute inset-0 bg-black/50" onClick={() => setDeleteTarget(null)} />
-          <div className="relative w-full max-w-sm rounded-2xl bg-[#12151c] border border-white/[0.08] p-4">
+          <div className="relative w-full max-w-sm rounded-2xl bg-[#12151c] border border-[var(--nyven-border)] p-4">
             <p className="text-sm mb-4">
               Delete <strong>{deleteTarget.name || deleteTarget.title}</strong>? This cannot be undone.
             </p>

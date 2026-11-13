@@ -117,7 +117,7 @@ export function ChatMessage({
         <div className="max-w-[85%] sm:max-w-[75%] min-w-0">
           {message.content ? (
             <div
-              className="bg-nyven-surface border border-white/[0.06] rounded-2xl rounded-br-md px-4 py-3 text-[15px] leading-relaxed text-nyven-text break-words"
+              className="bg-nyven-surface border border-[var(--nyven-border)] rounded-2xl rounded-br-md px-4 py-3 text-[15px] leading-relaxed text-nyven-text break-words"
               onContextMenu={(e) => { e.preventDefault(); setUserSheetOpen(true) }}
               onTouchStart={() => {
                 userLongPress.current = window.setTimeout(() => {
@@ -135,7 +135,7 @@ export function ChatMessage({
             {onEdit && (
               <button
                 onClick={onEdit}
-                className="p-2 rounded-lg text-nyven-text-secondary hover:text-nyven-text hover:bg-white/[0.05] min-h-[36px] min-w-[36px] flex items-center justify-center"
+                className="p-2 rounded-lg text-nyven-text-secondary hover:text-nyven-text hover:bg-[var(--nyven-surface)] min-h-[36px] min-w-[36px] flex items-center justify-center"
                 aria-label="Edit message"
               >
                 <Pencil size={14} />
@@ -170,17 +170,17 @@ export function ChatMessage({
           <button type="button" className="absolute inset-0 bg-black/50" aria-label="Close" onClick={() => setUserSheetOpen(false)} />
           <div className="absolute left-3 right-3 bottom-[max(1rem,env(safe-area-inset-bottom))] rounded-2xl border border-[var(--nyven-border)] bg-[var(--nyven-surface)]/95 backdrop-blur-xl shadow-2xl p-2">
             <p className="text-[12px] text-[var(--nyven-text-secondary)] px-3 py-2">{timeLabel}</p>
-            <button type="button" className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-[15px] text-[var(--nyven-text)] hover:bg-white/[0.05]" onClick={() => { void navigator.clipboard.writeText(message.content); setUserSheetOpen(false) }}>
+            <button type="button" className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-[15px] text-[var(--nyven-text)] hover:bg-[var(--nyven-surface)]" onClick={() => { void navigator.clipboard.writeText(message.content); setUserSheetOpen(false) }}>
               <Copy size={18} /> Copy
             </button>
-            <button type="button" className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-[15px] text-[var(--nyven-text)] hover:bg-white/[0.05]" onClick={() => {
+            <button type="button" className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-[15px] text-[var(--nyven-text)] hover:bg-[var(--nyven-surface)]" onClick={() => {
               setEditDraft(message.content)
               setEditingUser(true)
               setUserSheetOpen(false)
             }}>
               <Pencil size={18} /> Edit text
             </button>
-            <button type="button" className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-[15px] text-[var(--nyven-text)] hover:bg-white/[0.05]" onClick={() => { void handleShare(); setUserSheetOpen(false) }}>
+            <button type="button" className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-[15px] text-[var(--nyven-text)] hover:bg-[var(--nyven-surface)]" onClick={() => { void handleShare(); setUserSheetOpen(false) }}>
               <Share2 size={18} /> Share prompt
             </button>
           </div>
@@ -231,7 +231,7 @@ export function ChatMessage({
             <button
               type="button"
               onClick={handleCopy}
-              className="p-2 rounded-lg text-nyven-text-secondary hover:text-nyven-text hover:bg-white/[0.05] min-h-[36px] min-w-[36px] flex items-center justify-center"
+              className="p-2 rounded-lg text-nyven-text-secondary hover:text-nyven-text hover:bg-[var(--nyven-surface)] min-h-[36px] min-w-[36px] flex items-center justify-center"
               aria-label="Copy"
             >
               {copied ? <Check size={14} className="text-nyven-cyan" /> : <Copy size={14} />}
@@ -240,7 +240,7 @@ export function ChatMessage({
               <button
                 type="button"
                 onClick={onRegenerate}
-                className="p-2 rounded-lg text-nyven-text-secondary hover:text-nyven-text hover:bg-white/[0.05] min-h-[36px] min-w-[36px] flex items-center justify-center"
+                className="p-2 rounded-lg text-nyven-text-secondary hover:text-nyven-text hover:bg-[var(--nyven-surface)] min-h-[36px] min-w-[36px] flex items-center justify-center"
                 aria-label="Regenerate"
               >
                 <RotateCcw size={14} />
@@ -250,7 +250,7 @@ export function ChatMessage({
               <button
                 type="button"
                 onClick={onDelete}
-                className="p-2 rounded-lg text-nyven-text-secondary hover:text-nyven-text hover:bg-white/[0.05] min-h-[36px] min-w-[36px] flex items-center justify-center"
+                className="p-2 rounded-lg text-nyven-text-secondary hover:text-nyven-text hover:bg-[var(--nyven-surface)] min-h-[36px] min-w-[36px] flex items-center justify-center"
                 aria-label="Delete"
               >
                 <Trash2 size={14} />
@@ -264,7 +264,7 @@ export function ChatMessage({
                     setFeedback('positive')
                     onFeedback(message.id, 'positive')
                   }}
-                  className={`p-2 rounded-lg hover:bg-white/[0.05] min-h-[36px] min-w-[36px] flex items-center justify-center ${
+                  className={`p-2 rounded-lg hover:bg-[var(--nyven-surface)] min-h-[36px] min-w-[36px] flex items-center justify-center ${
                     feedback === 'positive' ? 'text-nyven-cyan' : 'text-nyven-text-secondary'
                   }`}
                   aria-label="Helpful"
@@ -277,7 +277,7 @@ export function ChatMessage({
                     setFeedback('negative')
                     onFeedback(message.id, 'negative')
                   }}
-                  className={`p-2 rounded-lg hover:bg-white/[0.05] min-h-[36px] min-w-[36px] flex items-center justify-center ${
+                  className={`p-2 rounded-lg hover:bg-[var(--nyven-surface)] min-h-[36px] min-w-[36px] flex items-center justify-center ${
                     feedback === 'negative' ? 'text-red-300' : 'text-nyven-text-secondary'
                   }`}
                   aria-label="Not helpful"
@@ -291,7 +291,7 @@ export function ChatMessage({
             <button
               type="button"
               onClick={() => void handleShare()}
-              className="p-2 rounded-lg text-nyven-text-secondary hover:text-nyven-text hover:bg-white/[0.05] min-h-[36px] min-w-[36px] flex items-center justify-center"
+              className="p-2 rounded-lg text-nyven-text-secondary hover:text-nyven-text hover:bg-[var(--nyven-surface)] min-h-[36px] min-w-[36px] flex items-center justify-center"
               aria-label="Share response"
               title={shareHint || 'Share'}
             >
@@ -312,7 +312,7 @@ export function ChatMessage({
                     onReadAloud(message.id, message.content)
                   }
                 }}
-                className={`p-2 rounded-lg hover:bg-white/[0.05] min-h-[36px] min-w-[36px] flex items-center justify-center transition-colors ${
+                className={`p-2 rounded-lg hover:bg-[var(--nyven-surface)] min-h-[36px] min-w-[36px] flex items-center justify-center transition-colors ${
                   isReadingAloud || isReadAloudLoading
                     ? 'text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.35)]'
                     : 'text-nyven-text-secondary hover:text-nyven-text'
@@ -349,8 +349,8 @@ export function ChatMessage({
       {sheetOpen && (
         <div className="fixed inset-0 z-[90] lg:hidden" role="dialog" aria-modal="true">
           <button type="button" className="absolute inset-0 bg-black/50" aria-label="Close" onClick={() => setSheetOpen(false)} />
-          <div className="absolute left-0 right-0 bottom-0 rounded-t-[24px] border-t border-white/10 bg-[#0C1018]/95 backdrop-blur-xl p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-            <div className="w-10 h-1 rounded-full bg-white/20 mx-auto mb-4" />
+          <div className="absolute left-0 right-0 bottom-0 rounded-t-[24px] border-t border-[var(--nyven-border)] bg-[var(--nyven-surface)]/95 backdrop-blur-xl p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <div className="w-10 h-1 rounded-full bg-[var(--nyven-surface)] mx-auto mb-4" />
             <p className="text-sm text-nyven-text-secondary mb-3 text-center">Message actions</p>
             <div className="space-y-1">
               <button type="button" className="w-full min-h-[48px] rounded-xl text-left px-4 text-nyven-text active:bg-nyven-cyan/10" onClick={() => { void handleCopy(); setSheetOpen(false) }}>Copy</button>

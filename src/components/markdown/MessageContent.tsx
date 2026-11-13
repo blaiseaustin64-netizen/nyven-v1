@@ -186,8 +186,8 @@ function CodeBlock({
   }, [code, language, isStreaming])
 
   return (
-    <div className="my-3 rounded-xl border border-white/[0.08] bg-black overflow-hidden min-w-0 max-w-full">
-      <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-white/[0.06] bg-white/[0.03]">
+    <div className="my-3 rounded-xl border border-[var(--nyven-border)] bg-black overflow-hidden min-w-0 max-w-full">
+      <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-[var(--nyven-border)] bg-[var(--nyven-input-bg)]">
         <span className="text-[11px] font-medium uppercase tracking-wide text-nyven-text-secondary truncate">
           {label}
         </span>
@@ -195,7 +195,7 @@ function CodeBlock({
           <button
             type="button"
             onClick={() => setWrap((w) => !w)}
-            className="hidden sm:inline-flex text-[11px] text-nyven-text-secondary hover:text-nyven-text px-2 py-1.5 rounded-lg hover:bg-white/[0.06] min-h-[44px] sm:min-h-0"
+            className="hidden sm:inline-flex text-[11px] text-nyven-text-secondary hover:text-nyven-text px-2 py-1.5 rounded-lg hover:bg-[var(--nyven-surface)] min-h-[44px] sm:min-h-0"
             aria-label={wrap ? 'Scroll long lines' : 'Wrap long lines'}
           >
             {wrap ? 'Unwrap' : 'Wrap'}
@@ -203,7 +203,7 @@ function CodeBlock({
           <button
             type="button"
             onClick={() => void onCopy()}
-            className="inline-flex items-center gap-1.5 text-[12px] text-nyven-text-secondary hover:text-nyven-text px-2 py-1.5 rounded-lg hover:bg-white/[0.06] min-h-[44px] sm:min-h-0"
+            className="inline-flex items-center gap-1.5 text-[12px] text-nyven-text-secondary hover:text-nyven-text px-2 py-1.5 rounded-lg hover:bg-[var(--nyven-surface)] min-h-[44px] sm:min-h-0"
             aria-label={copied ? 'Copied' : 'Copy code'}
           >
             {copied ? <Check size={14} className="text-nyven-cyan" /> : <Copy size={14} />}
@@ -279,24 +279,24 @@ export function MessageContent({ content, isStreaming, className }: Props) {
         )
       },
       table: ({ children }) => (
-        <div className="my-3 max-w-full overflow-x-auto rounded-2xl border border-white/10 [overflow-wrap:normal]">
+        <div className="my-3 max-w-full overflow-x-auto rounded-2xl border border-[var(--nyven-border)] [overflow-wrap:normal]">
           <table className="w-full text-left text-[14px] leading-normal [min-width:max-content] [overflow-wrap:normal] [word-break:normal] [hyphens:none]">
             {children}
           </table>
         </div>
       ),
-      thead: ({ children }) => <thead className="bg-white/[0.05]">{children}</thead>,
+      thead: ({ children }) => <thead className="bg-[var(--nyven-surface)]">{children}</thead>,
       th: ({ children }) => (
-        <th className="px-4 py-3 font-semibold text-nyven-text border-b border-white/[0.08] whitespace-nowrap align-top first:min-w-[130px]">
+        <th className="px-4 py-3 font-semibold text-nyven-text border-b border-[var(--nyven-border)] whitespace-nowrap align-top first:min-w-[130px]">
           {children}
         </th>
       ),
       td: ({ children }) => (
-        <td className="px-4 py-3 text-nyven-text-secondary border-b border-white/[0.08] align-top [overflow-wrap:normal] [word-break:normal] min-w-[90px]">
+        <td className="px-4 py-3 text-nyven-text-secondary border-b border-[var(--nyven-border)] align-top [overflow-wrap:normal] [word-break:normal] min-w-[90px]">
           {children}
         </td>
       ),
-      hr: () => <hr className="my-4 border-white/[0.08]" />,
+      hr: () => <hr className="my-4 border-[var(--nyven-border)]" />,
       strong: ({ children }) => <strong className="font-semibold text-nyven-text">{children}</strong>,
       em: ({ children }) => <em className="italic">{children}</em>,
       code: ({ className: cls, children, ...props }) => {
@@ -316,7 +316,7 @@ export function MessageContent({ content, isStreaming, className }: Props) {
         }
         return (
           <code
-            className="px-1.5 py-0.5 rounded-md bg-white/[0.08] text-[0.9em] text-nyven-cyan font-mono break-all"
+            className="px-1.5 py-0.5 rounded-md bg-[var(--nyven-input-bg)] text-[0.9em] text-nyven-cyan font-mono break-all"
           >
             {children}
           </code>

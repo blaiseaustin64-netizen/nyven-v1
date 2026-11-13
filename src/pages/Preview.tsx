@@ -32,7 +32,7 @@ export function Preview() {
 
   return (
     <div className="h-full flex flex-col min-h-0">
-      <header className="h-12 px-3 flex items-center gap-3 border-b border-white/[0.06] shrink-0">
+      <header className="h-12 px-3 flex items-center gap-3 border-b border-[var(--nyven-border)] shrink-0">
         <button
           onClick={() => navigate('/builder', { state: { project } })}
           className="p-2 rounded-lg text-nyven-text-secondary hover:text-nyven-text"

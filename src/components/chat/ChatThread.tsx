@@ -127,7 +127,7 @@ export function ChatThread({
             <button
               type="button"
               onClick={() => void onRegenerate()}
-              className="min-h-[44px] px-4 py-2 rounded-xl bg-nyven-surface border border-white/10 text-sm font-medium"
+              className="min-h-[44px] px-4 py-2 rounded-xl bg-nyven-surface border border-[var(--nyven-border)] text-sm font-medium"
             >
               Retry
             </button>

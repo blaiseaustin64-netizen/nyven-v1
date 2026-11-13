@@ -231,7 +231,7 @@ export function ConnectionsPanel({ agentId, agentType }: Props) {
       </div>
 
       {message && (
-        <div className="text-sm text-nyven-text-secondary bg-nyven-surface border border-white/[0.06] rounded-xl px-4 py-3">
+        <div className="text-sm text-nyven-text-secondary bg-nyven-surface border border-[var(--nyven-border)] rounded-xl px-4 py-3">
           {message}
         </div>
       )}
@@ -246,10 +246,10 @@ export function ConnectionsPanel({ agentId, agentType }: Props) {
           return (
             <li
               key={def.type}
-              className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4"
+              className="rounded-2xl border border-[var(--nyven-border)] bg-white/[0.02] p-4"
             >
               <div className="flex items-start gap-3">
-                <div className="p-2 rounded-xl bg-white/[0.04] border border-white/[0.06]">
+                <div className="p-2 rounded-xl bg-[var(--nyven-input-bg)] border border-[var(--nyven-border)]">
                   <Link2 size={16} className="text-nyven-cyan" />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -262,7 +262,7 @@ export function ConnectionsPanel({ agentId, agentType }: Props) {
                         st === 'pending' && 'bg-amber-400/10 text-amber-300',
                         st === 'error' && 'bg-red-400/10 text-red-300',
                         st === 'disconnected' &&
-                          'bg-white/[0.06] text-nyven-text-secondary'
+                          'bg-[var(--nyven-surface)] text-nyven-text-secondary'
                       )}
                     >
                       {st}
@@ -304,7 +304,7 @@ export function ConnectionsPanel({ agentId, agentType }: Props) {
                     <button
                       type="button"
                       onClick={disconnectGmail}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs border border-white/[0.08] text-nyven-text-secondary"
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs border border-[var(--nyven-border)] text-nyven-text-secondary"
                     >
                       <Unplug size={12} /> Disconnect
                     </button>
@@ -329,7 +329,7 @@ export function ConnectionsPanel({ agentId, agentType }: Props) {
                         type="button"
                         disabled={busy}
                         onClick={() => void doDisconnectGithub()}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs border border-white/[0.08] text-nyven-text-secondary"
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs border border-[var(--nyven-border)] text-nyven-text-secondary"
                       >
                         <Unplug size={12} /> Disconnect
                       </button>
@@ -347,7 +347,7 @@ export function ConnectionsPanel({ agentId, agentType }: Props) {
                           No repositories returned. Check GitHub permissions or try reconnecting.
                         </p>
                       )}
-                      <ul className="max-h-56 overflow-y-auto space-y-1 rounded-xl border border-white/[0.06] p-2">
+                      <ul className="max-h-56 overflow-y-auto space-y-1 rounded-xl border border-[var(--nyven-border)] p-2">
                         {repos.map((r) => (
                           <li key={r.id}>
                             <button
@@ -357,7 +357,7 @@ export function ConnectionsPanel({ agentId, agentType }: Props) {
                                 'w-full text-left px-3 py-2 rounded-lg text-xs transition-colors',
                                 selectedRepo === r.full_name
                                   ? 'bg-nyven-cyan/15 text-nyven-text'
-                                  : 'hover:bg-white/[0.04] text-nyven-text-secondary'
+                                  : 'hover:bg-[var(--nyven-input-bg)] text-nyven-text-secondary'
                               )}
                             >
                               <span className="font-medium text-nyven-text">{r.full_name}</span>

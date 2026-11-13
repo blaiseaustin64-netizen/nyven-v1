@@ -614,7 +614,7 @@ export function ProjectWorkspace() {
         <button
           type="button"
           onClick={() => navigate('/projects')}
-          className="w-11 h-11 rounded-xl grid place-items-center text-nyven-text-secondary hover:bg-white/[0.05]"
+          className="w-11 h-11 rounded-xl grid place-items-center text-nyven-text-secondary hover:bg-[var(--nyven-surface)]"
           aria-label="Back to projects"
         >
           <ArrowLeft size={20} />
@@ -623,7 +623,7 @@ export function ProjectWorkspace() {
         <button
           type="button"
           onClick={() => setTab('details')}
-          className="w-11 h-11 rounded-xl grid place-items-center text-nyven-text-secondary hover:bg-white/[0.05]"
+          className="w-11 h-11 rounded-xl grid place-items-center text-nyven-text-secondary hover:bg-[var(--nyven-surface)]"
           aria-label="Project details"
         >
           <MoreHorizontal size={20} />
@@ -783,7 +783,7 @@ export function ProjectWorkspace() {
         {tab === 'details' && (
           <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4">
             <div className="max-w-3xl mx-auto space-y-4">
-              <section className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-4">
+              <section className="rounded-2xl border border-[var(--nyven-border)] bg-white/[0.02] p-4">
                 <h3 className="text-xs uppercase tracking-wider text-nyven-text-secondary mb-2">Name</h3>
                 <input
                   value={nameDraft}
@@ -793,11 +793,11 @@ export function ProjectWorkspace() {
                       void saveDetails({ name: nameDraft.trim() })
                     }
                   }}
-                  className="w-full h-11 px-3 rounded-xl bg-white/[0.03] border border-white/[0.08] text-sm outline-none focus:border-nyven-cyan/35"
+                  className="w-full h-11 px-3 rounded-xl bg-[var(--nyven-input-bg)] border border-[var(--nyven-border)] text-sm outline-none focus:border-nyven-cyan/35"
                 />
               </section>
 
-              <section className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-4">
+              <section className="rounded-2xl border border-[var(--nyven-border)] bg-white/[0.02] p-4">
                 <h3 className="text-xs uppercase tracking-wider text-nyven-text-secondary mb-2">
                   Description
                 </h3>
@@ -806,11 +806,11 @@ export function ProjectWorkspace() {
                   onChange={(e) => setDescDraft(e.target.value.slice(0, 2000))}
                   onBlur={() => void saveDetails({ description: descDraft })}
                   rows={3}
-                  className="w-full px-3 py-2 rounded-xl bg-white/[0.03] border border-white/[0.08] text-sm outline-none focus:border-nyven-cyan/35 resize-y"
+                  className="w-full px-3 py-2 rounded-xl bg-[var(--nyven-input-bg)] border border-[var(--nyven-border)] text-sm outline-none focus:border-nyven-cyan/35 resize-y"
                 />
               </section>
 
-              <section className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-4">
+              <section className="rounded-2xl border border-[var(--nyven-border)] bg-white/[0.02] p-4">
                 <h3 className="text-xs uppercase tracking-wider text-nyven-text-secondary mb-2">
                   Instructions
                 </h3>
@@ -818,7 +818,7 @@ export function ProjectWorkspace() {
                   value={instrDraft}
                   onChange={(e) => setInstrDraft(e.target.value.slice(0, 8000))}
                   rows={5}
-                  className="w-full px-3 py-2 rounded-xl bg-white/[0.03] border border-white/[0.08] text-sm outline-none focus:border-nyven-cyan/35 resize-y min-h-[120px]"
+                  className="w-full px-3 py-2 rounded-xl bg-[var(--nyven-input-bg)] border border-[var(--nyven-border)] text-sm outline-none focus:border-nyven-cyan/35 resize-y min-h-[120px]"
                 />
                 <button
                   type="button"
@@ -830,19 +830,19 @@ export function ProjectWorkspace() {
                 </button>
               </section>
 
-              <section className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-4">
+              <section className="rounded-2xl border border-[var(--nyven-border)] bg-white/[0.02] p-4">
                 <h3 className="text-xs uppercase tracking-wider text-nyven-text-secondary mb-2">Tasks</h3>
                 <div className="flex gap-2 mb-2">
                   <input
                     value={newTaskTitle}
                     onChange={(e) => setNewTaskTitle(e.target.value)}
                     placeholder="New task"
-                    className="flex-1 h-10 px-3 rounded-xl bg-white/[0.03] border border-white/[0.08] text-sm outline-none"
+                    className="flex-1 h-10 px-3 rounded-xl bg-[var(--nyven-input-bg)] border border-[var(--nyven-border)] text-sm outline-none"
                   />
                   <button
                     type="button"
                     onClick={() => void addTask()}
-                    className="px-3 h-10 rounded-xl border border-white/[0.1] text-sm"
+                    className="px-3 h-10 rounded-xl border border-[var(--nyven-border)] text-sm"
                   >
                     Add
                   </button>
@@ -854,7 +854,7 @@ export function ProjectWorkspace() {
                         {t.status === 'done' ? (
                           <Check size={16} className="text-nyven-cyan" />
                         ) : (
-                          <span className="w-4 h-4 rounded border border-white/25 block" />
+                          <span className="w-4 h-4 rounded border border-[var(--nyven-border)] block" />
                         )}
                       </button>
                       <span className={clsx(t.status === 'done' && 'line-through opacity-60')}>
@@ -865,7 +865,7 @@ export function ProjectWorkspace() {
                 </ul>
               </section>
 
-              <section className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-4">
+              <section className="rounded-2xl border border-[var(--nyven-border)] bg-white/[0.02] p-4">
                 <button
                   type="button"
                   onClick={() => setActivityOpen((v) => !v)}
@@ -901,7 +901,7 @@ export function ProjectWorkspace() {
                   value={deleteConfirm}
                   onChange={(e) => setDeleteConfirm(e.target.value)}
                   placeholder="DELETE"
-                  className="w-full h-10 px-3 rounded-xl bg-white/[0.03] border border-white/[0.08] text-sm mb-2 outline-none"
+                  className="w-full h-10 px-3 rounded-xl bg-[var(--nyven-input-bg)] border border-[var(--nyven-border)] text-sm mb-2 outline-none"
                 />
                 <button
                   type="button"
@@ -945,7 +945,7 @@ export function ProjectWorkspace() {
             aria-label="Close"
             onClick={() => setFileSheetOpen(false)}
           />
-          <div className="relative rounded-t-2xl bg-[#0c1018] border-t border-white/[0.1] p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <div className="relative rounded-t-2xl bg-[var(--nyven-surface)] border-t border-[var(--nyven-border)] p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
             <div className="flex justify-between items-center mb-3">
               <h3 className="font-medium text-sm">Add to project</h3>
               <button type="button" onClick={() => setFileSheetOpen(false)} className="p-2">
@@ -974,7 +974,7 @@ export function ProjectWorkspace() {
                       }
                     })
                   }}
-                  className="h-24 rounded-2xl border border-white/[0.08] bg-white/[0.03] text-sm disabled:opacity-50"
+                  className="h-24 rounded-2xl border border-[var(--nyven-border)] bg-[var(--nyven-input-bg)] text-sm disabled:opacity-50"
                 >
                   {busyKind === opt.key ? '…' : opt.label}
                 </button>

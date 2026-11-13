@@ -17,7 +17,7 @@ export function FileExplorer(p: Props) {
   const crumbs = splitPath(p.path)
   return (
     <Panel className="overflow-hidden">
-      <nav aria-label="Path" className="flex items-center gap-1 flex-wrap px-4 py-3 border-b border-white/[0.06] text-xs text-nyven-text-secondary">
+      <nav aria-label="Path" className="flex items-center gap-1 flex-wrap px-4 py-3 border-b border-[var(--nyven-border)] text-xs text-nyven-text-secondary">
         {crumbs.map((c, i) => (
           <span key={c.path} className="inline-flex items-center gap-1">
             {i > 0 && <ChevronRight size={11} className="opacity-50" />}
@@ -40,7 +40,7 @@ export function FileExplorer(p: Props) {
           <ul className="divide-y divide-white/[0.04]" aria-label="Directory contents">
             {p.path && (
               <li>
-                <button type="button" onClick={() => p.onNavigateCrumb(parentPathOf(p.path))} className="w-full text-left px-4 py-2.5 text-sm text-nyven-text-secondary hover:bg-white/[0.03] min-h-[44px]">
+                <button type="button" onClick={() => p.onNavigateCrumb(parentPathOf(p.path))} className="w-full text-left px-4 py-2.5 text-sm text-nyven-text-secondary hover:bg-[var(--nyven-input-bg)] min-h-[44px]">
                   ..
                 </button>
               </li>
@@ -76,7 +76,7 @@ function EntryRow({ entry, onOpenDir }: { entry: ContentEntry; onOpenDir: (p: st
   return (
     <li>
       {isDir ? (
-        <button type="button" onClick={() => onOpenDir(entry.path)} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left hover:bg-white/[0.03] min-h-[44px]">
+        <button type="button" onClick={() => onOpenDir(entry.path)} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left hover:bg-[var(--nyven-input-bg)] min-h-[44px]">
           {body}
         </button>
       ) : (
@@ -96,7 +96,7 @@ function EntryRow({ entry, onOpenDir }: { entry: ContentEntry; onOpenDir: (p: st
 function FileView({ entry, file }: { entry: ContentEntry; file: Extract<ContentsResponse, { kind: 'file' }>['file'] }) {
   return (
     <div>
-      <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-white/[0.06] text-xs text-nyven-text-secondary">
+      <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-[var(--nyven-border)] text-xs text-nyven-text-secondary">
         <span className="truncate">{entry.name} · {formatBytes(entry.size)}</span>
         {entry.html_url && (
           <a href={entry.html_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 hover:text-nyven-text shrink-0">

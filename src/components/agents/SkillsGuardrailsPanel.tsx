@@ -93,7 +93,7 @@ export function SkillsGuardrailsPanel({ agentId }: Props) {
           {skills.map((s, i) => (
             <li
               key={s.id}
-              className="flex items-start gap-3 p-3 rounded-xl border border-white/[0.06] bg-nyven-surface"
+              className="flex items-start gap-3 p-3 rounded-xl border border-[var(--nyven-border)] bg-nyven-surface"
             >
               <button
                 type="button"
@@ -139,7 +139,7 @@ export function SkillsGuardrailsPanel({ agentId }: Props) {
           <label key={key} className="block">
             <span className="text-xs text-nyven-text-secondary mb-1 block">{label}</span>
             <textarea
-              className="w-full px-3.5 py-2.5 rounded-xl bg-nyven-bg border border-white/[0.08] text-sm outline-none focus:border-nyven-cyan/40 resize-y"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-nyven-bg border border-[var(--nyven-border)] text-sm outline-none focus:border-nyven-cyan/40 resize-y"
               rows={2}
               value={guardrails[key]}
               onChange={(e) => setGuardrails({ ...guardrails, [key]: e.target.value })}

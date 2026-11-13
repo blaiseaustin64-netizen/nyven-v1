@@ -198,7 +198,7 @@ export function KnowledgePanel({ agentId, onKnowledgeChange }: Props) {
           <button
             type="button"
             onClick={resetForm}
-            className="p-2 rounded-lg text-nyven-text-secondary hover:bg-white/[0.04]"
+            className="p-2 rounded-lg text-nyven-text-secondary hover:bg-[var(--nyven-input-bg)]"
           >
             <X size={18} />
           </button>
@@ -250,7 +250,7 @@ export function KnowledgePanel({ agentId, onKnowledgeChange }: Props) {
           <button
             type="button"
             onClick={resetForm}
-            className="p-2 rounded-lg text-nyven-text-secondary hover:bg-white/[0.04]"
+            className="p-2 rounded-lg text-nyven-text-secondary hover:bg-[var(--nyven-input-bg)]"
           >
             <X size={18} />
           </button>
@@ -297,7 +297,7 @@ export function KnowledgePanel({ agentId, onKnowledgeChange }: Props) {
       {error && <Err text={error} />}
 
       {items.length === 0 && (
-        <div className="flex flex-col items-center py-12 px-6 rounded-2xl border border-dashed border-white/[0.08] text-center">
+        <div className="flex flex-col items-center py-12 px-6 rounded-2xl border border-dashed border-[var(--nyven-border)] text-center">
           <BookOpen className="text-nyven-cyan mb-3 opacity-80" size={28} />
           <p className="text-sm text-nyven-text-secondary max-w-sm">
             Your agent doesn&apos;t know anything yet. Add FAQs or business information to
@@ -328,7 +328,7 @@ export function KnowledgePanel({ agentId, onKnowledgeChange }: Props) {
               <li
                 key={f.id}
                 className={clsx(
-                  'p-4 rounded-xl border border-white/[0.06] bg-nyven-surface',
+                  'p-4 rounded-xl border border-[var(--nyven-border)] bg-nyven-surface',
                   f.status === 'disabled' && 'opacity-50'
                 )}
               >
@@ -339,7 +339,7 @@ export function KnowledgePanel({ agentId, onKnowledgeChange }: Props) {
                       {f.answer}
                     </div>
                     {f.category && (
-                      <span className="inline-block mt-2 text-[10px] uppercase tracking-wider text-nyven-text-secondary/70 bg-white/[0.04] px-1.5 py-0.5 rounded">
+                      <span className="inline-block mt-2 text-[10px] uppercase tracking-wider text-nyven-text-secondary/70 bg-[var(--nyven-input-bg)] px-1.5 py-0.5 rounded">
                         {f.category}
                       </span>
                     )}
@@ -348,7 +348,7 @@ export function KnowledgePanel({ agentId, onKnowledgeChange }: Props) {
                     <button
                       type="button"
                       onClick={() => toggleStatus(f)}
-                      className="p-1.5 rounded-lg text-nyven-text-secondary hover:bg-white/[0.04]"
+                      className="p-1.5 rounded-lg text-nyven-text-secondary hover:bg-[var(--nyven-input-bg)]"
                       title={f.status === 'active' ? 'Disable' : 'Enable'}
                     >
                       {f.status === 'active' ? (
@@ -360,7 +360,7 @@ export function KnowledgePanel({ agentId, onKnowledgeChange }: Props) {
                     <button
                       type="button"
                       onClick={() => startFaq(f)}
-                      className="p-1.5 rounded-lg text-nyven-text-secondary hover:bg-white/[0.04]"
+                      className="p-1.5 rounded-lg text-nyven-text-secondary hover:bg-[var(--nyven-input-bg)]"
                     >
                       <Pencil size={14} />
                     </button>
@@ -403,7 +403,7 @@ export function KnowledgePanel({ agentId, onKnowledgeChange }: Props) {
               <li
                 key={t.id}
                 className={clsx(
-                  'p-4 rounded-xl border border-white/[0.06] bg-nyven-surface',
+                  'p-4 rounded-xl border border-[var(--nyven-border)] bg-nyven-surface',
                   t.status === 'disabled' && 'opacity-50'
                 )}
               >
@@ -418,7 +418,7 @@ export function KnowledgePanel({ agentId, onKnowledgeChange }: Props) {
                     <button
                       type="button"
                       onClick={() => toggleStatus(t)}
-                      className="p-1.5 rounded-lg text-nyven-text-secondary hover:bg-white/[0.04]"
+                      className="p-1.5 rounded-lg text-nyven-text-secondary hover:bg-[var(--nyven-input-bg)]"
                     >
                       {t.status === 'active' ? (
                         <ToggleRight size={16} className="text-emerald-400" />
@@ -429,7 +429,7 @@ export function KnowledgePanel({ agentId, onKnowledgeChange }: Props) {
                     <button
                       type="button"
                       onClick={() => startText(t)}
-                      className="p-1.5 rounded-lg text-nyven-text-secondary hover:bg-white/[0.04]"
+                      className="p-1.5 rounded-lg text-nyven-text-secondary hover:bg-[var(--nyven-input-bg)]"
                     >
                       <Pencil size={14} />
                     </button>
@@ -478,7 +478,7 @@ export function KnowledgePanel({ agentId, onKnowledgeChange }: Props) {
                       resolveKnowledgeGap(g.id)
                       refresh()
                     }}
-                    className="text-[11px] text-nyven-cyan px-2 py-1 rounded-lg hover:bg-white/[0.04]"
+                    className="text-[11px] text-nyven-cyan px-2 py-1 rounded-lg hover:bg-[var(--nyven-input-bg)]"
                   >
                     Resolve
                   </button>
@@ -503,7 +503,7 @@ export function KnowledgePanel({ agentId, onKnowledgeChange }: Props) {
 }
 
 const inputClass =
-  'w-full px-3.5 py-2.5 rounded-xl bg-nyven-bg border border-white/[0.08] text-sm text-nyven-text placeholder:text-nyven-text-secondary/50 focus:border-nyven-cyan/40 outline-none transition-colors resize-y'
+  'w-full px-3.5 py-2.5 rounded-xl bg-nyven-bg border border-[var(--nyven-border)] text-sm text-nyven-text placeholder:text-nyven-text-secondary/50 focus:border-nyven-cyan/40 outline-none transition-colors resize-y'
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (

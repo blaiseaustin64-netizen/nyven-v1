@@ -41,7 +41,7 @@ export function AttachmentCard({
       type="button"
       onClick={onClick}
       className={clsx(
-        'relative w-[132px] h-[132px] rounded-2xl border border-white/[0.1] bg-white/[0.04] overflow-hidden text-left shrink-0',
+        'relative w-[132px] h-[132px] rounded-2xl border border-[var(--nyven-border)] bg-[var(--nyven-input-bg)] overflow-hidden text-left shrink-0',
         align === 'right' && 'ml-auto',
         className
       )}

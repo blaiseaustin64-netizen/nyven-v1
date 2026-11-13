@@ -110,7 +110,7 @@ export function VoiceChatScreen({
             'p-2.5 rounded-full transition-colors',
             muted
               ? 'text-amber-200/90 bg-white/10'
-              : 'text-[#7d869c] hover:text-[#e8ecf5] hover:bg-white/[0.08]'
+              : 'text-[var(--nyven-text-secondary)] hover:text-[var(--nyven-text)] hover:bg-[var(--nyven-surface)]'
           )}
           aria-label={muted ? 'Unmute' : 'Mute'}
         >
@@ -119,7 +119,7 @@ export function VoiceChatScreen({
         <button
           type="button"
           onClick={onClose}
-          className="p-2.5 rounded-full text-[#7d869c] hover:text-[#e8ecf5] hover:bg-white/[0.08] transition-colors"
+          className="p-2.5 rounded-full text-[var(--nyven-text-secondary)] hover:text-[var(--nyven-text)] hover:bg-[var(--nyven-surface)] transition-colors"
           aria-label="Close voice chat"
         >
           <X size={18} />
@@ -152,8 +152,8 @@ export function VoiceChatScreen({
           className={clsx(
             'h-14 w-14 rounded-full flex items-center justify-center transition-all duration-200',
             voicePhase === 'listening'
-              ? 'bg-white/20 text-[#e8ecf5]'
-              : 'bg-white/[0.08] text-[#7d869c] hover:text-[#e8ecf5] hover:bg-white/[0.12]',
+              ? 'bg-[var(--nyven-surface)] text-[var(--nyven-text)]'
+              : 'bg-[var(--nyven-input-bg)] text-[var(--nyven-text-secondary)] hover:text-[var(--nyven-text)] hover:bg-[var(--nyven-surface)]',
             (muted || isProcessing || isSpeaking) && 'opacity-40 cursor-not-allowed'
           )}
           aria-label={voicePhase === 'listening' ? 'Stop listening' : 'Start listening'}

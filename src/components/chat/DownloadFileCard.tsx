@@ -68,7 +68,7 @@ export function DownloadFileCard({
       <button
         type="button"
         onClick={onOpen}
-        className="w-full flex items-center gap-3 px-3 py-3 text-left hover:bg-white/[0.03]"
+        className="w-full flex items-center gap-3 px-3 py-3 text-left hover:bg-[var(--nyven-input-bg)]"
       >
         <div className="w-10 h-10 rounded-xl bg-[var(--nyven-bg-secondary)] grid place-items-center shrink-0">
           <Icon size={18} className="text-[var(--nyven-cyan)]" />
@@ -85,7 +85,7 @@ export function DownloadFileCard({
               e.stopPropagation()
               void share()
             }}
-            className="w-9 h-9 rounded-full grid place-items-center text-[var(--nyven-text-secondary)] hover:bg-white/[0.06]"
+            className="w-9 h-9 rounded-full grid place-items-center text-[var(--nyven-text-secondary)] hover:bg-[var(--nyven-surface)]"
             aria-label="Share"
           >
             <Link2 size={16} />
@@ -97,7 +97,7 @@ export function DownloadFileCard({
               e.stopPropagation()
               void download()
             }}
-            className="w-9 h-9 rounded-full grid place-items-center text-[var(--nyven-text-secondary)] hover:bg-white/[0.06]"
+            className="w-9 h-9 rounded-full grid place-items-center text-[var(--nyven-text-secondary)] hover:bg-[var(--nyven-surface)]"
             aria-label="Download"
           >
             {busy ? (

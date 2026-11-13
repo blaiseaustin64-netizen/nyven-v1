@@ -93,7 +93,7 @@ export function ChatHistoryPanel({
   return (
     <div
       className={clsx(
-        'flex flex-col h-full bg-[#0a0b10]/98 backdrop-blur-xl border-white/[0.06]',
+        'flex flex-col h-full bg-[#0a0b10]/98 backdrop-blur-xl border-[var(--nyven-border)]',
         variant === 'desktop'
           ? 'border-r w-[260px] lg:w-[280px] shrink-0'
           : 'w-[min(100vw,320px)] border-r shadow-2xl'
@@ -111,7 +111,7 @@ export function ChatHistoryPanel({
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-lg text-nyven-text-secondary hover:text-nyven-text hover:bg-white/[0.05] min-h-[40px] min-w-[40px] flex items-center justify-center"
+            className="p-2 rounded-lg text-nyven-text-secondary hover:text-nyven-text hover:bg-[var(--nyven-surface)] min-h-[40px] min-w-[40px] flex items-center justify-center"
             aria-label="Close history"
           >
             <X size={18} />
@@ -127,7 +127,7 @@ export function ChatHistoryPanel({
             onNew()
             onClose?.()
           }}
-          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-nyven-surface border border-white/[0.08] text-sm font-medium text-nyven-text hover:border-nyven-cyan/25 hover:bg-white/[0.04] transition-colors min-h-[44px]"
+          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-nyven-surface border border-[var(--nyven-border)] text-sm font-medium text-nyven-text hover:border-nyven-cyan/25 hover:bg-[var(--nyven-input-bg)] transition-colors min-h-[44px]"
         >
           <Plus size={16} className="text-nyven-cyan" />
           New chat
@@ -146,7 +146,7 @@ export function ChatHistoryPanel({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search chats"
-            className="w-full pl-9 pr-3 py-2 rounded-xl bg-white/[0.04] border border-white/[0.06] text-sm text-nyven-text placeholder:text-nyven-text-secondary/70 outline-none focus:border-nyven-cyan/30"
+            className="w-full pl-9 pr-3 py-2 rounded-xl bg-[var(--nyven-input-bg)] border border-[var(--nyven-border)] text-sm text-nyven-text placeholder:text-nyven-text-secondary/70 outline-none focus:border-nyven-cyan/30"
             aria-label="Search conversations"
           />
         </div>
@@ -179,8 +179,8 @@ export function ChatHistoryPanel({
                   className={clsx(
                     'group relative flex items-center gap-0.5 rounded-xl',
                     c.id === activeId
-                      ? 'bg-white/[0.08] text-nyven-text'
-                      : 'text-nyven-text-secondary hover:bg-white/[0.04] hover:text-nyven-text'
+                      ? 'bg-[var(--nyven-input-bg)] text-nyven-text'
+                      : 'text-nyven-text-secondary hover:bg-[var(--nyven-input-bg)] hover:text-nyven-text'
                   )}
                 >
                   {editingId === c.id ? (
@@ -218,7 +218,7 @@ export function ChatHistoryPanel({
                           e.stopPropagation()
                           startEdit(c)
                         }}
-                        className="p-2 rounded-lg hover:bg-white/[0.06] text-nyven-text-secondary min-h-[36px] min-w-[36px] flex items-center justify-center"
+                        className="p-2 rounded-lg hover:bg-[var(--nyven-surface)] text-nyven-text-secondary min-h-[36px] min-w-[36px] flex items-center justify-center"
                       >
                         <Pencil size={14} />
                       </button>
@@ -229,7 +229,7 @@ export function ChatHistoryPanel({
                           e.stopPropagation()
                           onDelete(c.id)
                         }}
-                        className="p-2 rounded-lg hover:bg-white/[0.06] text-nyven-text-secondary hover:text-red-400 min-h-[36px] min-w-[36px] flex items-center justify-center"
+                        className="p-2 rounded-lg hover:bg-[var(--nyven-surface)] text-nyven-text-secondary hover:text-red-400 min-h-[36px] min-w-[36px] flex items-center justify-center"
                       >
                         <Trash2 size={14} />
                       </button>

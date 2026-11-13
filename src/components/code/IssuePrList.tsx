@@ -32,7 +32,7 @@ export function IssuePrList(p: Props) {
   const noun = p.kind === 'issues' ? 'issues' : 'pull requests'
   return (
     <Panel className="overflow-hidden">
-      <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-white/[0.06]">
+      <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-[var(--nyven-border)]">
         <div className="flex gap-1" role="group" aria-label={`Filter ${noun} by state`}>
           {(['open', 'closed', 'all'] as ListState[]).map((s) => (
             <button
@@ -80,7 +80,7 @@ export function IssuePrList(p: Props) {
       )}
 
       {p.hasMore && p.items !== null && (
-        <div className="p-3 border-t border-white/[0.06]">
+        <div className="p-3 border-t border-[var(--nyven-border)]">
           <SecondaryButton onClick={p.onLoadMore} disabled={p.loading}>{p.loading ? 'Loading…' : `Load more ${noun}`}</SecondaryButton>
         </div>
       )}
@@ -125,7 +125,7 @@ function Row(r: RowProps) {
         {r.labels && r.labels.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-2">
             {r.labels.map((l) => (
-              <span key={l.name} className="text-[10px] px-1.5 py-0.5 rounded border border-white/[0.08] text-nyven-text-secondary">{l.name}</span>
+              <span key={l.name} className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--nyven-border)] text-nyven-text-secondary">{l.name}</span>
             ))}
           </div>
         )}

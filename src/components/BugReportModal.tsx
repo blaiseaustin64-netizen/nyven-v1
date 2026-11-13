@@ -90,7 +90,7 @@ export function BugReportModal({ open, onClose, conversationId, messageId }: Pro
         aria-label="Close"
         onClick={close}
       />
-      <div className="relative w-full sm:max-w-md bg-nyven-surface border border-white/[0.08] rounded-t-2xl sm:rounded-2xl shadow-2xl p-5 max-h-[90vh] overflow-y-auto">
+      <div className="relative w-full sm:max-w-md bg-nyven-surface border border-[var(--nyven-border)] rounded-t-2xl sm:rounded-2xl shadow-2xl p-5 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Bug size={18} className="text-nyven-cyan" />
@@ -99,7 +99,7 @@ export function BugReportModal({ open, onClose, conversationId, messageId }: Pro
           <button
             type="button"
             onClick={close}
-            className="p-2 rounded-xl text-nyven-text-secondary hover:text-nyven-text hover:bg-white/[0.04]"
+            className="p-2 rounded-xl text-nyven-text-secondary hover:text-nyven-text hover:bg-[var(--nyven-input-bg)]"
             aria-label="Close"
           >
             <X size={18} />
@@ -132,7 +132,7 @@ export function BugReportModal({ open, onClose, conversationId, messageId }: Pro
                 required
                 value={summary}
                 onChange={(e) => setSummary(e.target.value)}
-                className="w-full bg-nyven-bg border border-white/[0.08] rounded-xl px-3 py-2.5 text-sm outline-none focus:border-nyven-cyan/40"
+                className="w-full bg-nyven-bg border border-[var(--nyven-border)] rounded-xl px-3 py-2.5 text-sm outline-none focus:border-nyven-cyan/40"
                 placeholder="Brief summary"
               />
             </div>
@@ -141,7 +141,7 @@ export function BugReportModal({ open, onClose, conversationId, messageId }: Pro
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="w-full bg-nyven-bg border border-white/[0.08] rounded-xl px-3 py-2.5 text-sm outline-none"
+                className="w-full bg-nyven-bg border border-[var(--nyven-border)] rounded-xl px-3 py-2.5 text-sm outline-none"
               >
                 {CATEGORIES.map((c) => (
                   <option key={c.value} value={c.value}>
@@ -158,7 +158,7 @@ export function BugReportModal({ open, onClose, conversationId, messageId }: Pro
                 value={details}
                 onChange={(e) => setDetails(e.target.value)}
                 rows={4}
-                className="w-full bg-nyven-bg border border-white/[0.08] rounded-xl px-3 py-2.5 text-sm outline-none focus:border-nyven-cyan/40 resize-none"
+                className="w-full bg-nyven-bg border border-[var(--nyven-border)] rounded-xl px-3 py-2.5 text-sm outline-none focus:border-nyven-cyan/40 resize-none"
                 placeholder="Steps to reproduce, what you expected…"
               />
             </div>

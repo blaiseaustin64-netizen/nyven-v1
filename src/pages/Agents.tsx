@@ -36,7 +36,7 @@ function statusColor(status: AgentStatus): string {
     case 'paused':
       return 'text-amber-400 bg-amber-400/10 border-amber-400/20'
     default:
-      return 'text-nyven-text-secondary bg-white/[0.04] border-white/[0.08]'
+      return 'text-nyven-text-secondary bg-[var(--nyven-input-bg)] border-[var(--nyven-border)]'
   }
 }
 
@@ -113,7 +113,7 @@ export function Agents() {
               {[1, 2].map((i) => (
                 <div
                   key={i}
-                  className="h-36 rounded-2xl bg-nyven-surface/50 border border-white/[0.04] animate-pulse"
+                  className="h-36 rounded-2xl bg-nyven-surface/50 border border-[var(--nyven-border)] animate-pulse"
                 />
               ))}
             </div>
@@ -121,9 +121,9 @@ export function Agents() {
             <motion.div
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              className="flex flex-col items-center justify-center py-16 sm:py-20 px-6 rounded-2xl border border-dashed border-white/[0.08] bg-nyven-surface/30 text-center"
+              className="flex flex-col items-center justify-center py-16 sm:py-20 px-6 rounded-2xl border border-dashed border-[var(--nyven-border)] bg-nyven-surface/30 text-center"
             >
-              <div className="w-14 h-14 rounded-2xl bg-nyven-surface border border-white/[0.06] flex items-center justify-center mb-5">
+              <div className="w-14 h-14 rounded-2xl bg-nyven-surface border border-[var(--nyven-border)] flex items-center justify-center mb-5">
                 <Bot size={26} className="text-nyven-cyan opacity-80" />
               </div>
               <h3 className="font-display text-lg font-medium mb-2">
@@ -151,12 +151,12 @@ export function Agents() {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: i * 0.04, duration: 0.3 }}
-                    className="group relative bg-nyven-surface border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.12] transition-colors cursor-pointer"
+                    className="group relative bg-nyven-surface border border-[var(--nyven-border)] rounded-2xl p-5 hover:border-[var(--nyven-border)] transition-colors cursor-pointer"
                     onClick={() => navigate(`/agents/${agent.id}`)}
                   >
                     <div className="flex items-start gap-4">
                       <div
-                        className="w-12 h-12 rounded-xl flex items-center justify-center text-lg font-semibold shrink-0 border border-white/[0.08]"
+                        className="w-12 h-12 rounded-xl flex items-center justify-center text-lg font-semibold shrink-0 border border-[var(--nyven-border)]"
                         style={{
                           backgroundColor: `${agent.color}18`,
                           color: agent.color,
@@ -219,11 +219,11 @@ export function Agents() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.05 + i * 0.04 }}
-                className="bg-nyven-surface border border-white/[0.06] rounded-2xl p-5 hover:border-nyven-cyan/25 transition-colors"
+                className="bg-nyven-surface border border-[var(--nyven-border)] rounded-2xl p-5 hover:border-nyven-cyan/25 transition-colors"
               >
                 <div className="flex items-start gap-4">
                   <div
-                    className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 border border-white/[0.08]"
+                    className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 border border-[var(--nyven-border)]"
                     style={{
                       backgroundColor: `${type.defaultColor}18`,
                       color: type.defaultColor,
@@ -248,7 +248,7 @@ export function Agents() {
                       {type.capabilities.slice(0, 3).map((cap) => (
                         <span
                           key={cap}
-                          className="text-[11px] text-nyven-text-secondary bg-white/[0.04] border border-white/[0.06] px-2 py-0.5 rounded-md"
+                          className="text-[11px] text-nyven-text-secondary bg-[var(--nyven-input-bg)] border border-[var(--nyven-border)] px-2 py-0.5 rounded-md"
                         >
                           {cap}
                         </span>
@@ -274,11 +274,11 @@ export function Agents() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 + i * 0.04 }}
-                className="relative bg-nyven-surface/60 border border-white/[0.04] rounded-2xl p-5 opacity-75"
+                className="relative bg-nyven-surface/60 border border-[var(--nyven-border)] rounded-2xl p-5 opacity-75"
               >
                 <div className="flex items-start gap-4">
                   <div
-                    className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 border border-white/[0.06] bg-white/[0.03]"
+                    className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 border border-[var(--nyven-border)] bg-[var(--nyven-input-bg)]"
                     style={{ color: type.defaultColor }}
                   >
                     <Lock size={18} className="opacity-60" />
@@ -288,7 +288,7 @@ export function Agents() {
                       <h3 className="font-medium text-[15px] text-nyven-text-secondary">
                         {type.name}
                       </h3>
-                      <span className="text-[10px] uppercase tracking-wider font-medium text-nyven-text-secondary/80 bg-white/[0.04] px-1.5 py-0.5 rounded">
+                      <span className="text-[10px] uppercase tracking-wider font-medium text-nyven-text-secondary/80 bg-[var(--nyven-input-bg)] px-1.5 py-0.5 rounded">
                         Coming soon
                       </span>
                     </div>

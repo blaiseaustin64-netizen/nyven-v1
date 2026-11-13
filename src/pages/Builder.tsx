@@ -165,11 +165,11 @@ export function Builder() {
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      <header className="flex items-center justify-between gap-3 px-3 sm:px-4 h-14 border-b border-white/[0.05] bg-nyven-bg/90 backdrop-blur-md shrink-0">
+      <header className="flex items-center justify-between gap-3 px-3 sm:px-4 h-14 border-b border-[var(--nyven-border)] bg-nyven-bg/90 backdrop-blur-md shrink-0">
         <div className="flex items-center gap-2 min-w-0">
           <button
             onClick={() => navigate('/build')}
-            className="p-2 rounded-lg text-nyven-text-secondary hover:text-nyven-text hover:bg-white/[0.05]"
+            className="p-2 rounded-lg text-nyven-text-secondary hover:text-nyven-text hover:bg-[var(--nyven-surface)]"
             aria-label="Back"
           >
             <ArrowLeft size={18} />
@@ -186,12 +186,12 @@ export function Builder() {
         </div>
 
         <div className="flex items-center gap-1.5">
-          <div className="flex lg:hidden bg-nyven-surface rounded-lg p-0.5 border border-white/[0.06]">
+          <div className="flex lg:hidden bg-nyven-surface rounded-lg p-0.5 border border-[var(--nyven-border)]">
             <button
               onClick={() => setViewMode('chat')}
               className={clsx(
                 'px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
-                viewMode === 'chat' ? 'bg-white/[0.08] text-nyven-text' : 'text-nyven-text-secondary'
+                viewMode === 'chat' ? 'bg-[var(--nyven-input-bg)] text-nyven-text' : 'text-nyven-text-secondary'
               )}
             >
               <MessageSquare size={14} className="inline mr-1" />
@@ -201,7 +201,7 @@ export function Builder() {
               onClick={() => setViewMode('preview')}
               className={clsx(
                 'px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
-                viewMode === 'preview' ? 'bg-white/[0.08] text-nyven-text' : 'text-nyven-text-secondary'
+                viewMode === 'preview' ? 'bg-[var(--nyven-input-bg)] text-nyven-text' : 'text-nyven-text-secondary'
               )}
             >
               <Eye size={14} className="inline mr-1" />
@@ -209,7 +209,7 @@ export function Builder() {
             </button>
           </div>
 
-          <div className="hidden sm:flex items-center gap-0.5 bg-nyven-surface rounded-lg p-0.5 border border-white/[0.06]">
+          <div className="hidden sm:flex items-center gap-0.5 bg-nyven-surface rounded-lg p-0.5 border border-[var(--nyven-border)]">
             {[
               { id: 'desktop' as Device, icon: Monitor },
               { id: 'tablet' as Device, icon: Tablet },
@@ -230,7 +230,7 @@ export function Builder() {
           </div>
 
           <button
-            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-nyven-text-secondary hover:text-nyven-text hover:bg-white/[0.05]"
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-nyven-text-secondary hover:text-nyven-text hover:bg-[var(--nyven-surface)]"
             title="Save (coming soon)"
           >
             <Save size={14} />
@@ -259,7 +259,7 @@ export function Builder() {
       <div className="flex-1 flex min-h-0">
         <div
           className={clsx(
-            'flex flex-col border-r border-white/[0.05] bg-nyven-bg-secondary/20',
+            'flex flex-col border-r border-[var(--nyven-border)] bg-nyven-bg-secondary/20',
             viewMode === 'chat' ? 'flex w-full lg:w-[380px] xl:w-[420px]' : 'hidden lg:flex lg:w-[380px] xl:w-[420px]'
           )}
         >
@@ -277,7 +277,7 @@ export function Builder() {
                   className={clsx(
                     'max-w-[85%] text-[14px] leading-relaxed',
                     msg.role === 'user'
-                      ? 'bg-nyven-surface border border-white/[0.06] rounded-2xl rounded-br-md px-3.5 py-2.5'
+                      ? 'bg-nyven-surface border border-[var(--nyven-border)] rounded-2xl rounded-br-md px-3.5 py-2.5'
                       : 'text-nyven-text'
                   )}
                 >
@@ -337,7 +337,7 @@ export function Builder() {
               <motion.div
                 key="preview"
                 className={clsx(
-                  'bg-nyven-surface border border-white/[0.08] rounded-xl overflow-hidden shadow-nyven transition-all duration-300',
+                  'bg-nyven-surface border border-[var(--nyven-border)] rounded-xl overflow-hidden shadow-nyven transition-all duration-300',
                   device === 'desktop' && 'w-full max-w-4xl h-[70vh]',
                   device === 'tablet' && 'w-[768px] max-w-full h-[65vh]',
                   device === 'mobile' && 'w-[375px] max-w-full h-[70vh]'

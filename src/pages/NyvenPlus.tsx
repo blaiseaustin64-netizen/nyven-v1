@@ -44,7 +44,7 @@ export function NyvenPlus() {
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="bg-nyven-surface border border-white/[0.06] rounded-2xl p-6 sm:p-7"
+            className="bg-nyven-surface border border-[var(--nyven-border)] rounded-2xl p-6 sm:p-7"
           >
             <h2 className="font-display text-xl font-medium mb-1">Free</h2>
             <p className="text-nyven-text-secondary text-sm mb-6">
@@ -58,7 +58,7 @@ export function NyvenPlus() {
                 </li>
               ))}
             </ul>
-            <button className="w-full py-3 rounded-xl border border-white/[0.1] text-sm font-medium text-nyven-text-secondary cursor-default">
+            <button className="w-full py-3 rounded-xl border border-[var(--nyven-border)] text-sm font-medium text-nyven-text-secondary cursor-default">
               Current plan
             </button>
           </motion.div>

@@ -236,7 +236,7 @@ export function Settings() {
           className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium text-left transition-colors min-h-[44px] ${
             active === id
               ? 'bg-nyven-surface text-nyven-cyan'
-              : 'text-nyven-text-secondary hover:text-nyven-text hover:bg-white/[0.03]'
+              : 'text-nyven-text-secondary hover:text-nyven-text hover:bg-[var(--nyven-input-bg)]'
           }`}
         >
           <Icon size={16} strokeWidth={1.75} />
@@ -258,7 +258,7 @@ export function Settings() {
         <div className="flex items-center gap-3 mb-6 lg:mb-8">
           <Link
             to={routeParams.section || params.get('section') ? '/settings' : '/chat'}
-            className="lg:hidden p-2 rounded-xl hover:bg-white/[0.04] text-nyven-text-secondary min-h-[44px] min-w-[44px] flex items-center justify-center"
+            className="lg:hidden p-2 rounded-xl hover:bg-[var(--nyven-input-bg)] text-nyven-text-secondary min-h-[44px] min-w-[44px] flex items-center justify-center"
             aria-label="Back"
           >
             <ChevronLeft size={18} />
@@ -275,7 +275,7 @@ export function Settings() {
 
         {/* Mobile: vertical settings list */}
         <div className={`lg:hidden space-y-5 ${showMobileList ? 'block' : 'hidden'}`}>
-          <div className="flex items-center gap-3 p-4 rounded-2xl border border-white/[0.08] bg-nyven-surface/80">
+          <div className="flex items-center gap-3 p-4 rounded-2xl border border-[var(--nyven-border)] bg-nyven-surface/80">
             <div className="w-12 h-12 rounded-full bg-nyven-cyan/15 text-nyven-cyan flex items-center justify-center text-lg font-semibold shrink-0">
               {initial}
             </div>
@@ -287,7 +287,7 @@ export function Settings() {
                 {user?.email || 'Not signed in'}
               </p>
             </div>
-            <span className="text-[11px] px-2 py-1 rounded-full border border-white/10 text-nyven-text-secondary shrink-0">
+            <span className="text-[11px] px-2 py-1 rounded-full border border-[var(--nyven-border)] text-nyven-text-secondary shrink-0">
               Free
             </span>
           </div>
@@ -297,7 +297,7 @@ export function Settings() {
               <p className="text-xs uppercase tracking-wide text-nyven-text-secondary/80 px-1 mb-2">
                 {g.title}
               </p>
-              <div className="rounded-2xl border border-white/[0.08] bg-nyven-surface/60 overflow-hidden divide-y divide-white/[0.05]">
+              <div className="rounded-2xl border border-[var(--nyven-border)] bg-nyven-surface/60 overflow-hidden divide-y divide-white/[0.05]">
                 {g.ids.map((id) => {
                   const Icon = sections.find((s) => s.id === id)!.icon
                   return (
@@ -307,7 +307,7 @@ export function Settings() {
                       onClick={() => setActive(id)}
                       className="w-full flex items-center gap-3 px-3 py-3 min-h-[56px] text-left active:bg-nyven-cyan/10"
                     >
-                      <span className="w-10 h-10 rounded-xl bg-white/[0.06] flex items-center justify-center text-nyven-text-secondary shrink-0">
+                      <span className="w-10 h-10 rounded-xl bg-[var(--nyven-surface)] flex items-center justify-center text-nyven-text-secondary shrink-0">
                         <Icon size={18} strokeWidth={1.75} />
                       </span>
                       <span className="flex-1 min-w-0">
@@ -391,13 +391,13 @@ export function Settings() {
                         <input
                           value={displayName}
                           onChange={(e) => setDisplayName(e.target.value)}
-                          className="w-full bg-nyven-bg border border-white/[0.08] rounded-xl px-3 py-2 text-sm outline-none focus:border-nyven-cyan/40"
+                          className="w-full bg-nyven-bg border border-[var(--nyven-border)] rounded-xl px-3 py-2 text-sm outline-none focus:border-nyven-cyan/40"
                         />
                       </Field>
                       <button
                         type="button"
                         onClick={() => void saveProfile()}
-                        className="mt-2 px-4 py-2 rounded-xl bg-nyven-surface border border-white/[0.08] text-sm hover:bg-white/[0.04]"
+                        className="mt-2 px-4 py-2 rounded-xl bg-nyven-surface border border-[var(--nyven-border)] text-sm hover:bg-[var(--nyven-input-bg)]"
                       >
                         Save profile
                       </button>
@@ -409,7 +409,7 @@ export function Settings() {
                           type="password"
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
-                          className="w-full bg-nyven-bg border border-white/[0.08] rounded-xl px-3 py-2 text-sm outline-none focus:border-nyven-cyan/40"
+                          className="w-full bg-nyven-bg border border-[var(--nyven-border)] rounded-xl px-3 py-2 text-sm outline-none focus:border-nyven-cyan/40"
                         />
                       </Field>
                       <Field label="Confirm">
@@ -417,13 +417,13 @@ export function Settings() {
                           type="password"
                           value={password2}
                           onChange={(e) => setPassword2(e.target.value)}
-                          className="w-full bg-nyven-bg border border-white/[0.08] rounded-xl px-3 py-2 text-sm outline-none focus:border-nyven-cyan/40"
+                          className="w-full bg-nyven-bg border border-[var(--nyven-border)] rounded-xl px-3 py-2 text-sm outline-none focus:border-nyven-cyan/40"
                         />
                       </Field>
                       <button
                         type="button"
                         onClick={() => void changePassword()}
-                        className="mt-2 px-4 py-2 rounded-xl text-sm border border-white/[0.08] hover:bg-white/[0.04]"
+                        className="mt-2 px-4 py-2 rounded-xl text-sm border border-[var(--nyven-border)] hover:bg-[var(--nyven-input-bg)]"
                       >
                         Update password
                       </button>
@@ -436,12 +436,12 @@ export function Settings() {
                       </p>
                       <Field label="Current password">
                         <input type="password" value={deletePassword} onChange={(e) => setDeletePassword(e.target.value)}
-                          className="w-full bg-nyven-bg border border-white/[0.08] rounded-xl px-3 py-2 text-sm outline-none focus:border-red-400/40"
+                          className="w-full bg-nyven-bg border border-[var(--nyven-border)] rounded-xl px-3 py-2 text-sm outline-none focus:border-red-400/40"
                           autoComplete="current-password" />
                       </Field>
                       <input value={deleteConfirm} onChange={(e) => setDeleteConfirm(e.target.value)}
                         placeholder="Type DELETE"
-                        className="w-full bg-nyven-bg border border-white/[0.08] rounded-xl px-3 py-2 text-sm mb-2 mt-2 outline-none" />
+                        className="w-full bg-nyven-bg border border-[var(--nyven-border)] rounded-xl px-3 py-2 text-sm mb-2 mt-2 outline-none" />
                       <button type="button" disabled={deletingAccount} onClick={() => void requestAccountDelete()}
                         className="text-sm text-red-400/90 hover:text-red-400 disabled:opacity-50">
                         {deletingAccount ? 'Deleting…' : 'Delete my account'}
@@ -610,7 +610,7 @@ export function Settings() {
                     memories.map((m) => (
                       <div
                         key={m.id}
-                        className="flex items-start gap-2 py-2 border-b border-white/[0.04] last:border-0"
+                        className="flex items-start gap-2 py-2 border-b border-[var(--nyven-border)] last:border-0"
                       >
                         <div className="flex-1 min-w-0">
                           <p className="text-sm truncate">{m.content}</p>
@@ -763,7 +763,7 @@ export function Settings() {
                       <button
                         type="button"
                         onClick={() => void signOut()}
-                        className="mt-2 px-4 py-2 rounded-xl text-sm border border-white/[0.08] hover:bg-white/[0.04]"
+                        className="mt-2 px-4 py-2 rounded-xl text-sm border border-[var(--nyven-border)] hover:bg-[var(--nyven-input-bg)]"
                       >
                         Sign out this device
                       </button>
@@ -807,7 +807,7 @@ function SectionTitle({ title, desc }: { title: string; desc: string }) {
 
 function Card({ children }: { children: React.ReactNode }) {
   return (
-    <div className="bg-nyven-surface border border-white/[0.06] rounded-2xl p-4 space-y-3">
+    <div className="bg-nyven-surface border border-[var(--nyven-border)] rounded-2xl p-4 space-y-3">
       {children}
     </div>
   )
@@ -839,7 +839,7 @@ function Toggle({
     >
       <span
         className={`relative w-10 h-6 rounded-full transition-colors ${
-          on ? 'bg-nyven-cyan/40' : 'bg-white/[0.08]'
+          on ? 'bg-nyven-cyan/40' : 'bg-[var(--nyven-input-bg)]'
         }`}
       >
         <span
@@ -866,7 +866,7 @@ function Select({
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full bg-nyven-bg border border-white/[0.08] rounded-xl px-3 py-2 text-sm outline-none focus:border-nyven-cyan/40"
+      className="w-full bg-nyven-bg border border-[var(--nyven-border)] rounded-xl px-3 py-2 text-sm outline-none focus:border-nyven-cyan/40"
     >
       {options.map((o) => (
         <option key={o.value} value={o.value}>
@@ -879,7 +879,7 @@ function Select({
 
 function UsageRow({ label, value }: { label: string; value: number | string }) {
   return (
-    <div className="flex justify-between text-sm py-1.5 border-b border-white/[0.04] last:border-0">
+    <div className="flex justify-between text-sm py-1.5 border-b border-[var(--nyven-border)] last:border-0">
       <span className="text-nyven-text-secondary">{label}</span>
       <span className="font-medium tabular-nums">{value}</span>
     </div>
@@ -960,7 +960,7 @@ function BugReportCard() {
           <input
             value={summary}
             onChange={(e) => setSummary(e.target.value)}
-            className="w-full px-3 py-2.5 rounded-xl bg-nyven-bg border border-white/[0.08] text-sm outline-none focus:border-nyven-cyan/30 min-h-[44px]"
+            className="w-full px-3 py-2.5 rounded-xl bg-nyven-bg border border-[var(--nyven-border)] text-sm outline-none focus:border-nyven-cyan/30 min-h-[44px]"
             placeholder="Brief summary"
             maxLength={500}
           />
@@ -969,7 +969,7 @@ function BugReportCard() {
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            className="w-full px-3 py-2.5 rounded-xl bg-nyven-bg border border-white/[0.08] text-sm outline-none min-h-[44px]"
+            className="w-full px-3 py-2.5 rounded-xl bg-nyven-bg border border-[var(--nyven-border)] text-sm outline-none min-h-[44px]"
           >
             <option value="general">General</option>
             <option value="chat">Chat</option>
@@ -984,7 +984,7 @@ function BugReportCard() {
             value={details}
             onChange={(e) => setDetails(e.target.value)}
             rows={4}
-            className="w-full px-3 py-2.5 rounded-xl bg-nyven-bg border border-white/[0.08] text-sm outline-none focus:border-nyven-cyan/30 resize-y min-h-[96px]"
+            className="w-full px-3 py-2.5 rounded-xl bg-nyven-bg border border-[var(--nyven-border)] text-sm outline-none focus:border-nyven-cyan/30 resize-y min-h-[96px]"
             placeholder="Steps to reproduce, device, etc."
             maxLength={4000}
           />

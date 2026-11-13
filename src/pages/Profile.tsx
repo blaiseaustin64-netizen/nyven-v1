@@ -36,7 +36,7 @@ export function Profile() {
     <div className="h-full overflow-y-auto">
       <div className="max-w-md mx-auto px-4 sm:px-6 py-12">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-nyven-surface border border-white/[0.08] mb-5">
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-nyven-surface border border-[var(--nyven-border)] mb-5">
             <NIdentity state="white" size={40} />
           </div>
           {loading && (
@@ -56,7 +56,7 @@ export function Profile() {
           )}
         </div>
 
-        <div className="bg-nyven-surface border border-white/[0.06] rounded-2xl p-5 text-left space-y-4 mb-6">
+        <div className="bg-nyven-surface border border-[var(--nyven-border)] rounded-2xl p-5 text-left space-y-4 mb-6">
           {user && (
             <>
               <div>
@@ -66,7 +66,7 @@ export function Profile() {
                 <input
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
-                  className="w-full bg-nyven-bg border border-white/[0.08] rounded-xl px-3 py-2 text-sm outline-none focus:border-nyven-cyan/40"
+                  className="w-full bg-nyven-bg border border-[var(--nyven-border)] rounded-xl px-3 py-2 text-sm outline-none focus:border-nyven-cyan/40"
                 />
               </div>
               <div className="flex justify-between text-sm">
@@ -115,13 +115,13 @@ export function Profile() {
           )}
           <Link
             to="/settings"
-            className="w-full py-2.5 rounded-xl bg-nyven-surface border border-white/[0.06] text-sm font-medium hover:bg-white/[0.05] transition-colors text-center"
+            className="w-full py-2.5 rounded-xl bg-nyven-surface border border-[var(--nyven-border)] text-sm font-medium hover:bg-[var(--nyven-surface)] transition-colors text-center"
           >
             Settings
           </Link>
           <Link
             to="/settings?section=usage"
-            className="w-full py-2.5 rounded-xl bg-nyven-surface border border-white/[0.06] text-sm font-medium hover:bg-white/[0.05] transition-colors text-center"
+            className="w-full py-2.5 rounded-xl bg-nyven-surface border border-[var(--nyven-border)] text-sm font-medium hover:bg-[var(--nyven-surface)] transition-colors text-center"
           >
             Usage
           </Link>

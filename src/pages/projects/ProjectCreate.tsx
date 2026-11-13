@@ -79,7 +79,7 @@ export function ProjectCreate() {
             value={name}
             onChange={(e) => setName(e.target.value.slice(0, 120))}
             placeholder="e.g. VEXDYN Website"
-            className="mt-1.5 w-full h-11 px-3 rounded-xl bg-white/[0.03] border border-white/[0.08] text-sm outline-none focus:border-nyven-cyan/35"
+            className="mt-1.5 w-full h-11 px-3 rounded-xl bg-[var(--nyven-input-bg)] border border-[var(--nyven-border)] text-sm outline-none focus:border-nyven-cyan/35"
             autoFocus
           />
         </label>
@@ -93,7 +93,7 @@ export function ProjectCreate() {
             onChange={(e) => setDescription(e.target.value.slice(0, 2000))}
             placeholder="What is this project about?"
             rows={3}
-            className="mt-1.5 w-full px-3 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.08] text-sm outline-none focus:border-nyven-cyan/35 resize-y min-h-[88px]"
+            className="mt-1.5 w-full px-3 py-2.5 rounded-xl bg-[var(--nyven-input-bg)] border border-[var(--nyven-border)] text-sm outline-none focus:border-nyven-cyan/35 resize-y min-h-[88px]"
           />
         </label>
 
@@ -106,7 +106,7 @@ export function ProjectCreate() {
             onChange={(e) => setInstructions(e.target.value.slice(0, 8000))}
             placeholder="How should NYVEN behave in this project? e.g. Act as a senior product manager. Do not change working features without approval."
             rows={5}
-            className="mt-1.5 w-full px-3 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.08] text-sm outline-none focus:border-nyven-cyan/35 resize-y min-h-[120px]"
+            className="mt-1.5 w-full px-3 py-2.5 rounded-xl bg-[var(--nyven-input-bg)] border border-[var(--nyven-border)] text-sm outline-none focus:border-nyven-cyan/35 resize-y min-h-[120px]"
           />
         </label>
 
@@ -116,7 +116,7 @@ export function ProjectCreate() {
           <button
             type="button"
             onClick={() => navigate('/projects')}
-            className="px-4 py-2.5 rounded-xl border border-white/[0.1] text-sm text-nyven-text-secondary min-h-[44px]"
+            className="px-4 py-2.5 rounded-xl border border-[var(--nyven-border)] text-sm text-nyven-text-secondary min-h-[44px]"
           >
             Cancel
           </button>

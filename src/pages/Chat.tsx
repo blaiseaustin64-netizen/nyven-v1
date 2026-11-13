@@ -826,7 +826,7 @@ export function Chat() {
                     <button
                       key={chip.label}
                       type="button"
-                      className="px-3.5 py-2 rounded-full border border-white/10 bg-white/[0.04] text-sm text-nyven-text-secondary hover:text-nyven-text hover:border-nyven-cyan/30 min-h-[40px]"
+                      className="px-3.5 py-2 rounded-full border border-[var(--nyven-border)] bg-[var(--nyven-input-bg)] text-sm text-nyven-text-secondary hover:text-nyven-text hover:border-nyven-cyan/30 min-h-[40px]"
                       onClick={() => {
                         if (chip.path) window.location.assign(chip.path)
                         else if (chip.text)

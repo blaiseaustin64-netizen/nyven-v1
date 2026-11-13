@@ -16,7 +16,7 @@ export function ConnectionBar({ view, busy, onConnect, onDisconnect, onRetry }: 
     <Panel className="p-4 sm:p-5">
       <div className="flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
         <div className="flex items-start gap-3 min-w-0">
-          <div className="p-2 rounded-xl bg-white/[0.04] border border-white/[0.06] shrink-0">
+          <div className="p-2 rounded-xl bg-[var(--nyven-input-bg)] border border-[var(--nyven-border)] shrink-0">
             <Github size={18} className="text-nyven-text" />
           </div>
           <div className="min-w-0">
@@ -47,7 +47,7 @@ export function ConnectionBar({ view, busy, onConnect, onDisconnect, onRetry }: 
               <SecondaryButton onClick={onDisconnect} disabled={busy}>
                 <Unplug size={13} /> {busy ? 'Disconnecting…' : 'Disconnect'}
               </SecondaryButton>
-              <Link to="/settings?section=connections" className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs border border-white/[0.1] text-nyven-text-secondary min-h-[36px]">
+              <Link to="/settings?section=connections" className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs border border-[var(--nyven-border)] text-nyven-text-secondary min-h-[36px]">
                 <Settings size={13} /> Manage
               </Link>
             </>

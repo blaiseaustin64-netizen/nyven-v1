@@ -215,7 +215,7 @@ export function VoiceSpeechSettings({
               className={`w-full text-left rounded-2xl border px-4 py-3 transition-colors min-h-[56px] ${
                 on
                   ? 'border-nyven-cyan/40 bg-nyven-cyan/10'
-                  : 'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04]'
+                  : 'border-[var(--nyven-border)] bg-white/[0.02] hover:bg-[var(--nyven-input-bg)]'
               }`}
             >
               <div className="flex items-start justify-between gap-3">
@@ -259,7 +259,7 @@ export function VoiceSpeechSettings({
               <button
                 type="button"
                 onClick={() => void playPreview(draftVoice, true)}
-                className="px-3 py-1.5 rounded-lg border border-white/[0.1] hover:bg-white/[0.05] text-nyven-text min-h-[36px]"
+                className="px-3 py-1.5 rounded-lg border border-[var(--nyven-border)] hover:bg-[var(--nyven-surface)] text-nyven-text min-h-[36px]"
               >
                 Play preview
               </button>
@@ -269,7 +269,7 @@ export function VoiceSpeechSettings({
             <button
               type="button"
               onClick={stopPreview}
-              className="px-3 py-1.5 rounded-lg border border-white/[0.1] hover:bg-white/[0.05] min-h-[36px]"
+              className="px-3 py-1.5 rounded-lg border border-[var(--nyven-border)] hover:bg-[var(--nyven-surface)] min-h-[36px]"
             >
               Stop
             </button>
@@ -291,7 +291,7 @@ export function VoiceSpeechSettings({
         )}
       </div>
 
-      <div className="space-y-3 pt-2 border-t border-white/[0.06]">
+      <div className="space-y-3 pt-2 border-t border-[var(--nyven-border)]">
         <div className="flex items-center justify-between gap-3">
           <span className="text-sm text-nyven-text">Voice features</span>
           <Toggle on={voiceEnabled} onChange={onToggleEnabled} />
