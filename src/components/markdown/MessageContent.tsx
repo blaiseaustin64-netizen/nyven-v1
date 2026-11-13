@@ -114,7 +114,7 @@ function CodeBlock({
   const [copied, setCopied] = useState(false)
   const [copyError, setCopyError] = useState(false)
   const [html, setHtml] = useState<string | null>(null)
-  const [wrap, setWrap] = useState(true)
+  const [wrap, setWrap] = useState(false)
   const label = (language || 'code').trim() || 'code'
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -186,7 +186,7 @@ function CodeBlock({
   }, [code, language, isStreaming])
 
   return (
-    <div className="my-3 rounded-xl border border-white/[0.08] bg-[#0a0c12] overflow-hidden min-w-0 max-w-full">
+    <div className="my-3 rounded-xl border border-white/[0.08] bg-black overflow-hidden min-w-0 max-w-full">
       <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-white/[0.06] bg-white/[0.03]">
         <span className="text-[11px] font-medium uppercase tracking-wide text-nyven-text-secondary truncate">
           {label}
@@ -213,7 +213,7 @@ function CodeBlock({
       </div>
       <pre
         className={clsx(
-          'p-3 m-0 text-[13px] leading-relaxed font-mono text-nyven-text/95 max-w-full nyven-code-pre max-h-[min(50vh,22rem)] overflow-y-auto',
+          'p-3 m-0 text-[13px] leading-relaxed font-mono text-[#e8eaed] max-w-full nyven-code-pre max-h-[min(50vh,22rem)] overflow-y-auto bg-black',
           wrap
             ? 'whitespace-pre-wrap break-words [overflow-wrap:anywhere] overflow-x-hidden'
             : 'overflow-x-auto whitespace-pre [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'

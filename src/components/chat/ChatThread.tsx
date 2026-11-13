@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { ChatMessage } from '../ChatMessage'
 import type { Message } from '../../lib/types'
 import { AttachmentCard } from '../attachments/AttachmentCard'
+import { DownloadFileCard } from './DownloadFileCard'
 
 type Props = {
   messages: Message[]
@@ -53,6 +54,13 @@ export function ChatThread({
         const isLast = idx === messages.length - 1
         return (
           <div key={msg.id} className="space-y-2">
+            {msg.role === 'nyven' && msg.files && msg.files.length > 0 && (
+              <div className="space-y-1 mb-2">
+                {msg.files.map((f) => (
+                  <DownloadFileCard key={f.id} file={f} />
+                ))}
+              </div>
+            )}
             {msg.role === 'user' && msg.attachments && msg.attachments.length > 0 && (
               <div className="flex flex-wrap gap-2 justify-end">
                 {msg.attachments.map((a) => (

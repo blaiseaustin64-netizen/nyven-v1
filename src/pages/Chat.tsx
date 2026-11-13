@@ -5,6 +5,8 @@ import { ChatThread } from '../components/chat/ChatThread'
 import { ChatFloatingChrome } from '../components/chat/ChatFloatingChrome'
 import { PrivateChatIcon } from '../components/PrivateChatIcon'
 import { recordChatTurnForInstall } from '../lib/pwa'
+import { extractNyvenFiles } from '../lib/parseNyvenFiles'
+import { hydrateMessageFiles } from '../lib/hydrateMessageFiles'
 import { useReadAloud } from '../hooks/useReadAloud'
 import { MessageComposer, type ComposerSendPayload } from '../components/MessageComposer'
 import { NIdentity } from '../components/NIdentity'
@@ -122,6 +124,8 @@ export function Chat() {
   const hideHeader = useHideOnScroll(24)
   const readAloud = useReadAloud()
   const [privateMode, setPrivateMode] = useState(false)
+  const privateModeRef = useRef(false)
+  useEffect(() => { privateModeRef.current = privateMode }, [privateMode])
 
 
   useEffect(() => {
@@ -205,7 +209,7 @@ export function Chat() {
       const fromList = conversations.find((c) => c.id === activeId)
       if (fromList?.messages?.length) {
         abortInFlight()
-        if (!cancelled) setMessages(fromList.messages)
+        if (!cancelled) setMessages(hydrateMessageFiles(fromList.messages))
         return
       }
       if (!fromList) {
@@ -215,7 +219,7 @@ export function Chat() {
       }
       abortInFlight()
       const msgs = await loadConversationMessages(userId, activeId)
-      if (!cancelled) setMessages(msgs)
+      if (!cancelled) setMessages(hydrateMessageFiles(msgs))
     })()
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -226,10 +230,10 @@ export function Chat() {
   const openConversation = async (c: Conversation) => {
     contextOpenConversation(c)
     if (c.messages?.length) {
-      setMessages(c.messages)
+      setMessages(hydrateMessageFiles(c.messages))
     } else {
       const msgs = await loadConversationMessages(userId, c.id)
-      setMessages(msgs)
+      setMessages(hydrateMessageFiles(msgs))
     }
     setTimeout(() => scrollToBottom(true, true), 50)
   }
@@ -237,6 +241,9 @@ export function Chat() {
 
   const persistMessages = useCallback(
     (updated: Message[], titleSource?: string) => {
+      // Private chats: never write history or durable messages
+      if (privateModeRef.current) return
+
       const titleBase =
         titleSource || updated.find((m) => m.role === 'user')?.content || 'Chat'
       const title =
@@ -251,17 +258,11 @@ export function Chat() {
       // Durable write (non-blocking). Streaming UI is already updated.
       void (async () => {
         try {
-          let convId = activeId || ''
-          if (!privateMode) {
-            convId = await ensureConversation(userId, activeId, title || 'Chat')
-          } else {
-            convId = activeId || `private_${Date.now()}`
-          }
+          const convId = await ensureConversation(userId, activeId, title || 'Chat')
           const last = updated[updated.length - 1]
           if (last && !last.isThinking && !last.isStreaming) {
             await persistMessage(userId, convId, last, title)
           }
-          // Also persist the prior user message if present
           const lastUser = [...updated].reverse().find((m) => m.role === 'user')
           if (lastUser) {
             await persistMessage(userId, convId, lastUser, title)
@@ -404,8 +405,10 @@ export function Chat() {
     isGeneratingRef.current = true
     scrollToBottom()
     void recordUsage(userId, 'message')
-    void ensureConversation(userId, convId, text.slice(0, 40) || 'Chat')
-    if (!privateMode) { void persistMessage(userId, convId, userMsg, text.slice(0, 40) })
+    if (!privateMode) {
+      void ensureConversation(userId, convId, text.slice(0, 40) || 'Chat')
+      void persistMessage(userId, convId, userMsg, text.slice(0, 40))
+    }
 
     const controller = new AbortController()
     abortControllerRef.current = controller
@@ -488,25 +491,44 @@ export function Chat() {
               flushTimerRef.current = null
             }
             flushTokens()
-            setMessages((prev) => {
-              const updated = prev.map((m) =>
-                m.id === streamId
-                  ? {
-                      ...m,
-                      isThinking: false,
-                      isStreaming: false,
-                      activityState: (m.activityState === 'error'
-                        ? 'error'
-                        : 'completed') as ActivityState,
-                      activityDetail: undefined,
-                      toolSummary: undefined,
-                      citations: citations && citations.length ? citations : m.citations,
-                    }
-                  : m
-              )
-              persistMessages(updated, text)
-              return updated
-            })
+            const rawFinal = streamContentRef.current || ''
+            void (async () => {
+              let finalContent = rawFinal
+              let files: import('../lib/types').Message['files'] = undefined
+              try {
+                const parsed = await extractNyvenFiles(rawFinal)
+                if (parsed.files.length) {
+                  finalContent = parsed.content || rawFinal
+                  files = parsed.files
+                  streamContentRef.current = finalContent
+                }
+              } catch {
+                /* keep raw */
+              }
+              setMessages((prev) => {
+                const updated = prev.map((m) =>
+                  m.id === streamId
+                    ? {
+                        ...m,
+                        content: finalContent || m.content,
+                        files: files?.length ? files : m.files,
+                        isThinking: false,
+                        isStreaming: false,
+                        activityState: (m.activityState === 'error'
+                          ? 'error'
+                          : 'completed') as ActivityState,
+                        activityDetail: undefined,
+                        toolSummary: undefined,
+                        citations: citations && citations.length ? citations : m.citations,
+                      }
+                    : m
+                )
+                persistMessages(updated, text)
+                return updated
+              })
+              setIsGenerating(false)
+            })()
+            // isGenerating cleared in async path; keep early false for responsiveness
             setIsGenerating(false)
             isGeneratingRef.current = false
             streamMsgIdRef.current = null
@@ -529,7 +551,7 @@ export function Chat() {
             fromVoiceRef.current = false
             voiceSubmitInFlightRef.current = false
             setFromVoice(false)
-            void extractMemoriesFromExchange(userId, text, streamContentRef.current, {
+            if (!privateModeRef.current) void extractMemoriesFromExchange(userId, text, streamContentRef.current, {
               conversationId: activeIdRef.current,
             })
           },
@@ -802,22 +824,21 @@ export function Chat() {
               </div>
             )}
 
-            {messages.length > 0 && (
-              
-        {messages.length === 0 && (
-          <div className="absolute top-[max(0.75rem,env(safe-area-inset-top))] right-3 z-30">
-            <PrivateChatIcon active={privateMode} onToggle={() => setPrivateMode((v) => !v)} />
-          </div>
-        )}
-        {privateMode && messages.length === 0 && (
-          <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 z-10 px-6 text-center pointer-events-none">
-            <p className="text-[15px] font-medium text-[var(--nyven-text)]">Private chat</p>
-            <p className="text-[13px] text-[var(--nyven-text-secondary)] mt-2 max-w-xs mx-auto leading-relaxed">
-              This chat won't be saved to your history or Nyven's memory.
-            </p>
-          </div>
-        )}
+            {messages.length === 0 && (
+              <div className="absolute top-[max(0.75rem,env(safe-area-inset-top))] right-3 z-30">
+                <PrivateChatIcon active={privateMode} onToggle={() => setPrivateMode((v) => !v)} />
+              </div>
+            )}
+            {privateMode && messages.length === 0 && (
+              <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 z-10 px-6 text-center pointer-events-none">
+                <p className="text-[15px] font-medium text-[var(--nyven-text)]">Private chat</p>
+                <p className="text-[13px] text-[var(--nyven-text-secondary)] mt-2 max-w-xs mx-auto leading-relaxed">
+                  This chat won't be saved to your history or Nyven's memory.
+                </p>
+              </div>
+            )}
 
+            {messages.length > 0 && (
               <ChatThread
                 messages={messages}
                 isGenerating={isGenerating}

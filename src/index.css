@@ -313,3 +313,24 @@ body {
 .text-nyven-text-secondary { color: var(--nyven-text-secondary) !important; }
 .text-nyven-cyan { color: var(--nyven-cyan) !important; }
 .border-nyven-cyan\/30 { border-color: color-mix(in srgb, var(--nyven-cyan) 30%, transparent) !important; }
+
+/* Syntax highlighting — Nyven (works on pure black code boxes) */
+.nyven-code-pre .hljs-keyword,
+.nyven-code-pre .hljs-selector-tag,
+.nyven-code-pre .hljs-literal { color: #c792ea; }
+.nyven-code-pre .hljs-string,
+.nyven-code-pre .hljs-attr { color: #c3e88d; }
+.nyven-code-pre .hljs-number,
+.nyven-code-pre .hljs-built_in { color: #f78c6c; }
+.nyven-code-pre .hljs-comment,
+.nyven-code-pre .hljs-quote { color: #6a737d; font-style: italic; }
+.nyven-code-pre .hljs-function .hljs-title,
+.nyven-code-pre .hljs-title.function_,
+.nyven-code-pre .hljs-title { color: #82aaff; }
+.nyven-code-pre .hljs-params { color: #eeffff; }
+.nyven-code-pre .hljs-type,
+.nyven-code-pre .hljs-class .hljs-title { color: #ffcb6b; }
+.nyven-code-pre .hljs-meta,
+.nyven-code-pre .hljs-variable { color: #f07178; }
+.nyven-code-pre .hljs-property { color: #89ddff; }
+html[data-theme="light"] .nyven-code-pre { color: #e8eaed; }

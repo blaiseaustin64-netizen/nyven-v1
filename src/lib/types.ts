@@ -37,7 +37,17 @@ export interface Message {
   }>
   citations?: Array<{ id: string; title: string; url: string; source?: string }>
   toolSummary?: string
+  /** Generated downloadable files (chat cards) */
+  files?: Array<{
+    id: string
+    name: string
+    mimeType: string
+    size: number
+    href?: string
+    base64?: string
+  }>
 }
+
 
 export interface Conversation {
   id: string

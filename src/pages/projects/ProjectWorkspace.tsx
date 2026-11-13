@@ -32,6 +32,7 @@ import { ChatThread } from '../../components/chat/ChatThread'
 import { ChatFloatingChrome } from '../../components/chat/ChatFloatingChrome'
 import { useReadAloud } from '../../hooks/useReadAloud'
 import { streamCoreChat } from '../../lib/core/streamClient'
+import { extractNyvenFiles } from '../../lib/parseNyvenFiles'
 import type { Message } from '../../lib/types'
 import type { ActivityState } from '../../lib/core/types'
 import { useKeyboardOpen } from '../../hooks/useKeyboardOpen'
@@ -369,24 +370,48 @@ export function ProjectWorkspace() {
               )
             },
             onDone: () => {
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === streamId
-                    ? { ...m, isStreaming: false, isThinking: false, activityState: undefined }
-                    : m
+              void (async () => {
+                let finalContent = full
+                let files: import('../../lib/types').Message['files']
+                try {
+                  const parsed = await extractNyvenFiles(full)
+                  if (parsed.files.length) {
+                    finalContent = parsed.content || full
+                    files = parsed.files
+                  }
+                } catch { /* */ }
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === streamId
+                      ? {
+                          ...m,
+                          content: finalContent,
+                          files: files?.length ? files : m.files,
+                          isStreaming: false,
+                          isThinking: false,
+                          activityState: undefined,
+                        }
+                      : m
+                  )
                 )
-              )
-              void fetch(`/api/conversations/${thread.id}/messages`, {
-                method: 'POST',
-                credentials: 'include',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  title,
-                  messages: [
-                    { id: streamId, role: 'assistant', content: full, createdAt: Date.now() },
-                  ],
-                }),
-              })
+                void fetch(`/api/conversations/${thread.id}/messages`, {
+                  method: 'POST',
+                  credentials: 'include',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    title,
+                    messages: [
+                      {
+                        id: streamId,
+                        role: 'assistant',
+                        content: finalContent,
+                        createdAt: Date.now(),
+                        metadata: files?.length ? { files } : undefined,
+                      },
+                    ],
+                  }),
+                })
+              })()
               if (opts?.fromVoice || voice.fromVoiceRef.current) {
                 void voice.speakReply(full)
               } else {

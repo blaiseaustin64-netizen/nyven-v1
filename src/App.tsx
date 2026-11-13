@@ -1,4 +1,5 @@
 import { InstallPrompt } from './components/InstallPrompt'
+import { UpdateBanner } from './components/UpdateBanner'
 import { useState, useEffect } from 'react'
 import { useKeyboardOpen } from './hooks/useKeyboardOpen'
 import { Routes, Route, Navigate, useLocation, useSearchParams } from 'react-router-dom'
@@ -190,6 +191,7 @@ export default function App() {
             <Route path="/preview/:slug" element={<Preview />} />
           </Routes>
       <InstallPrompt />
+      <UpdateBanner />
           </AppErrorBoundary>
         </main>
 
