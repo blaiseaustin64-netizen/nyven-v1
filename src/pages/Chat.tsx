@@ -667,6 +667,16 @@ export function Chat() {
 
   handleSendRef.current = handleSend
 
+  const handleEditUser = (messageId: string, newText: string) => {
+    // Drop the edited user message and everything after; resend
+    setMessages((prev) => {
+      const idx = prev.findIndex((m) => m.id === messageId)
+      if (idx < 0) return prev
+      return prev.slice(0, idx)
+    })
+    void handleSend({ text: newText, attachments: [] })
+  }
+
   const handleRegenerate = () => {
     const lastUser = [...messages].reverse().find((m) => m.role === 'user')
     if (!lastUser || isGenerating) return
@@ -775,14 +785,14 @@ export function Chat() {
       <div className="flex-1 flex flex-col min-w-0 min-h-0 max-w-full relative">
         {/* Mobile chat top bar — hamburger only, title when chat has messages */}
         <header
-          className={`lg:hidden flex items-center gap-2 px-2 h-12 shrink-0 bg-transparent transition-transform duration-200 ${
+          className={`lg:hidden relative flex items-center gap-2 px-2 h-12 shrink-0 bg-transparent transition-transform duration-200 ${
             hideHeader.hidden ? '-translate-y-full opacity-0 pointer-events-none' : ''
           }`}
         >
           <button
             type="button"
             onClick={() => window.dispatchEvent(new Event('nyven-open-menu'))}
-            className="p-2 rounded-lg text-nyven-text-secondary hover:text-nyven-text min-h-[44px] min-w-[44px] flex items-center justify-center"
+            className="relative p-2 rounded-lg text-nyven-text-secondary hover:text-nyven-text min-h-[44px] min-w-[44px] flex items-center justify-center"
             aria-label="Open menu"
           >
             <Menu size={22} />
@@ -792,10 +802,16 @@ export function Chat() {
               {messages.find((m) => m.role === 'user')?.content?.slice(0, 48) || 'Chat'}
             </h1>
           )}
+          {messages.length === 0 && (
+            <>
+              <div className="flex-1" />
+              <PrivateChatIcon active={privateMode} onToggle={() => setPrivateMode((v) => !v)} />
+            </>
+          )}
         </header>
         <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 sm:px-6 py-6 min-h-0 min-w-0" style={{ paddingBottom: composerPad }} onScroll={(e) => { onChatScroll(e); hideHeader.onScroll(e) }}>
           <div className="max-w-3xl mx-auto space-y-6">
-            {messages.length === 0 && (
+            {messages.length === 0 && !privateMode && (
               <div className="flex flex-col items-center justify-center min-h-[50vh] py-16 sm:py-24 text-center px-4">
                 <NIdentity state="white" size={56} className="mb-6 opacity-90 drop-shadow-[0_0_24px_rgba(98,230,255,0.25)]" />
                 <h2 className="font-display text-2xl sm:text-[1.75rem] font-medium text-nyven-text mb-3">
@@ -824,15 +840,13 @@ export function Chat() {
               </div>
             )}
 
-            {messages.length === 0 && (
-              <div className="absolute top-[max(0.75rem,env(safe-area-inset-top))] right-3 z-30">
-                <PrivateChatIcon active={privateMode} onToggle={() => setPrivateMode((v) => !v)} />
-              </div>
-            )}
-            {privateMode && messages.length === 0 && (
-              <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 z-10 px-6 text-center pointer-events-none">
-                <p className="text-[15px] font-medium text-[var(--nyven-text)]">Private chat</p>
-                <p className="text-[13px] text-[var(--nyven-text-secondary)] mt-2 max-w-xs mx-auto leading-relaxed">
+            {messages.length === 0 && privateMode && (
+              <div className="flex flex-col items-center justify-center min-h-[50vh] py-16 px-6 text-center">
+                <div className="mb-4 text-[var(--nyven-cyan)] pointer-events-none" aria-hidden>
+                  <PrivateChatIcon active size={56} onToggle={() => {}} className="pointer-events-none w-16 h-16" />
+                </div>
+                <p className="text-[1.125rem] font-medium text-[var(--nyven-text)]">Private chat</p>
+                <p className="text-[0.875rem] text-[var(--nyven-text-secondary)] mt-2 max-w-xs leading-relaxed">
                   This chat won't be saved to your history or Nyven's memory.
                 </p>
               </div>
@@ -851,6 +865,7 @@ export function Chat() {
                 readingMessageId={readAloud.state.messageId}
                 readAloudLoading={readAloud.state.loading}
                 onRegenerate={handleRegenerate}
+                onEditUser={handleEditUser}
                 listOnly
                 className="contents"
               />

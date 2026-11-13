@@ -1,3 +1,5 @@
+import { InstallPrompt } from './InstallPrompt'
+import { isStandalone } from '../lib/pwa'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { NavLink, useNavigate, useLocation } from 'react-router-dom'
@@ -132,6 +134,9 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const [pinned, setPinned] = useState<Set<string>>(() => loadPinned())
   const [archived, setArchived] = useState<Set<string>>(() => loadArchived())
   const [showArchived, setShowArchived] = useState(false)
+  const [installOpen, setInstallOpen] = useState(false)
+  const [archiveToast, setArchiveToast] = useState<{ text: string; undoId?: string } | null>(null)
+  const archiveToastTimer = useRef<number | null>(null)
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
   const holdRef = useRef<{ id: string; timer: number; moved: boolean } | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
@@ -229,12 +234,22 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
     setMenuId(null)
   }
 
-  const toggleArchive = (id: string) => {
+  const toggleArchive = (id: string, opts?: { silent?: boolean }) => {
     setArchived((prev) => {
       const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
+      const was = next.has(id)
+      if (was) next.delete(id)
       else next.add(id)
       saveArchived(next)
+      if (!opts?.silent) {
+        if (archiveToastTimer.current) window.clearTimeout(archiveToastTimer.current)
+        if (was) {
+          setArchiveToast({ text: 'Chat restored' })
+        } else {
+          setArchiveToast({ text: 'Chat archived', undoId: id })
+        }
+        archiveToastTimer.current = window.setTimeout(() => setArchiveToast(null), 3000)
+      }
       return next
     })
   }

@@ -736,7 +736,7 @@ export function MessageComposer({
           onPaste={handlePaste}
           placeholder={placeholder}
           rows={1}
-          className="w-full min-w-0 bg-transparent border-0 outline-none resize-none text-base leading-[1.65] text-nyven-text placeholder:text-nyven-text-secondary/70 max-h-[150px] overflow-y-auto overscroll-contain py-1 [scrollbar-width:thin] touch-pan-y"
+          className="nyven-composer-input w-full min-w-0 bg-transparent border-0 outline-none ring-0 focus:outline-none focus:ring-0 resize-none text-base leading-[1.65] text-nyven-text placeholder:text-nyven-text-secondary/70 max-h-[150px] overflow-y-auto overscroll-contain py-1 touch-pan-y"
           style={{ minHeight: '48px' }}
         />
 

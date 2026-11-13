@@ -273,8 +273,8 @@ input:focus-visible {
   }
 }
 
+
 /* ── Theme modes (Appearance) ── */
-html[data-theme="dark"],
 html[data-theme="default"] {
   --nyven-bg: #07090D;
   --nyven-bg-secondary: #0D1118;
@@ -285,18 +285,33 @@ html[data-theme="default"] {
   --nyven-border: rgba(255,255,255,0.08);
   --nyven-cyan: #62E6FF;
   --nyven-violet: #8B7CFF;
+  --nyven-input-bg: rgba(255,255,255,0.04);
+  color-scheme: dark;
+}
+html[data-theme="dark"] {
+  --nyven-bg: #000000;
+  --nyven-bg-secondary: #0a0a0a;
+  --nyven-surface: #121212;
+  --nyven-surface-2: #1a1a1a;
+  --nyven-text: #FFFFFF;
+  --nyven-text-secondary: #A0A0A0;
+  --nyven-border: rgba(255,255,255,0.1);
+  --nyven-cyan: #7DE8FF;
+  --nyven-violet: #A99BFF;
+  --nyven-input-bg: rgba(255,255,255,0.06);
   color-scheme: dark;
 }
 html[data-theme="light"] {
   --nyven-bg: #F6F4EF;
   --nyven-bg-secondary: #EFEBE3;
-  --nyven-surface: #FFFFFF;
-  --nyven-surface-2: #F3F0EA;
+  --nyven-surface: #FAF8F4;
+  --nyven-surface-2: #F0EDE6;
   --nyven-text: #1A1D24;
   --nyven-text-secondary: #5C6570;
   --nyven-border: rgba(0,0,0,0.08);
   --nyven-cyan: #0B8FA8;
   --nyven-violet: #6B5CE7;
+  --nyven-input-bg: rgba(0,0,0,0.04);
   color-scheme: light;
 }
 html {
@@ -305,14 +320,31 @@ html {
 body {
   background-color: var(--nyven-bg);
   color: var(--nyven-text);
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
-/* Map Tailwind-ish utilities used in components to CSS vars where possible */
 .bg-nyven-bg { background-color: var(--nyven-bg) !important; }
 .bg-nyven-surface { background-color: var(--nyven-surface) !important; }
 .text-nyven-text { color: var(--nyven-text) !important; }
 .text-nyven-text-secondary { color: var(--nyven-text-secondary) !important; }
 .text-nyven-cyan { color: var(--nyven-cyan) !important; }
 .border-nyven-cyan\/30 { border-color: color-mix(in srgb, var(--nyven-cyan) 30%, transparent) !important; }
+
+/* Hide composer textarea scrollbar chrome */
+.nyven-composer-input {
+  scrollbar-width: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+.nyven-composer-input:focus,
+.nyven-composer-input:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+.nyven-composer-input::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
 
 /* Syntax highlighting — Nyven (works on pure black code boxes) */
 .nyven-code-pre .hljs-keyword,

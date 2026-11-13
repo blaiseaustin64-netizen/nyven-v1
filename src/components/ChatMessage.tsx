@@ -22,7 +22,7 @@ import type { ActivityState } from '../lib/core/types'
 interface ChatMessageProps {
   message: Message
   onRegenerate?: () => void
-  onEdit?: () => void
+  onEdit?: (newText?: string) => void
   onDelete?: () => void
   isLast?: boolean
   conversationId?: string
@@ -84,6 +84,9 @@ export function ChatMessage({
   const [feedback, setFeedback] = useState<'positive' | 'negative' | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [userSheetOpen, setUserSheetOpen] = useState(false)
+  const [editingUser, setEditingUser] = useState(false)
+  const [editDraft, setEditDraft] = useState('')
+
   const userLongPress = useRef<number | null>(null)
   const longPressTimer = useRef<number | null>(null)
   const isUser = message.role === 'user'
@@ -141,6 +144,27 @@ export function ChatMessage({
           </div>
         </div>
       </div>
+      {editingUser && (
+        <div className="fixed inset-0 z-[91] flex items-end sm:items-center justify-center p-3" role="dialog" aria-modal="true">
+          <button type="button" className="absolute inset-0 bg-black/50" aria-label="Close" onClick={() => setEditingUser(false)} />
+          <div className="relative w-full max-w-md rounded-2xl border border-[var(--nyven-border)] bg-[var(--nyven-surface)] p-4 shadow-2xl">
+            <p className="text-sm text-[var(--nyven-text-secondary)] mb-2">Edit text</p>
+            <textarea
+              value={editDraft}
+              onChange={(e) => setEditDraft(e.target.value)}
+              className="w-full min-h-[120px] rounded-xl bg-[var(--nyven-bg)] border border-[var(--nyven-border)] text-[var(--nyven-text)] p-3 text-[0.9375rem] outline-none resize-y"
+              autoFocus
+            />
+            <div className="flex gap-2 mt-3">
+              <button type="button" className="flex-1 h-11 rounded-xl border border-[var(--nyven-border)] text-[var(--nyven-text-secondary)]" onClick={() => setEditingUser(false)}>Cancel</button>
+              <button type="button" className="flex-1 h-11 rounded-xl bg-[var(--nyven-cyan)] text-[#071018] font-semibold" onClick={() => {
+                setEditingUser(false)
+                onEdit?.(editDraft.trim())
+              }}>Send</button>
+            </div>
+          </div>
+        </div>
+      )}
       {userSheetOpen && (
         <div className="fixed inset-0 z-[90]" role="dialog" aria-modal="true">
           <button type="button" className="absolute inset-0 bg-black/50" aria-label="Close" onClick={() => setUserSheetOpen(false)} />
@@ -150,21 +174,12 @@ export function ChatMessage({
               <Copy size={18} /> Copy
             </button>
             <button type="button" className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-[15px] text-[var(--nyven-text)] hover:bg-white/[0.05]" onClick={() => {
-              try {
-                const sel = window.getSelection()
-                const range = document.createRange()
-                // best-effort select all in bubble via clipboard already
-                void navigator.clipboard.writeText(message.content)
-              } catch {}
+              setEditDraft(message.content)
+              setEditingUser(true)
               setUserSheetOpen(false)
             }}>
-              <span className="w-[18px] text-center text-sm">≡</span> Select text
+              <Pencil size={18} /> Edit text
             </button>
-            {onEdit && (
-              <button type="button" className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-[15px] text-[var(--nyven-text)] hover:bg-white/[0.05]" onClick={() => { setUserSheetOpen(false); onEdit() }}>
-                <Pencil size={18} /> Edit message
-              </button>
-            )}
             <button type="button" className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-[15px] text-[var(--nyven-text)] hover:bg-white/[0.05]" onClick={() => { void handleShare(); setUserSheetOpen(false) }}>
               <Share2 size={18} /> Share prompt
             </button>

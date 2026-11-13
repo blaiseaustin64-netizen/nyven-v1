@@ -1,22 +1,21 @@
-import { useEffect, useState } from 'react'
-
 /**
- * Nyven private-chat mark: headphone arc, eyes, speech-bubble mouth.
- * Eyes slide into the bubble when private is on.
+ * Nyven private-chat mark only (no circle background).
+ * Eyes slide into the speech bubble when active.
  */
 export function PrivateChatIcon({
   active,
   onToggle,
   className = '',
+  size = 22,
 }: {
   active: boolean
   onToggle: () => void
   className?: string
+  size?: number
 }) {
-  const [reduced, setReduced] = useState(false)
-  useEffect(() => {
-    setReduced(window.matchMedia('(prefers-reduced-motion: reduce)').matches)
-  }, [])
+  const reduced =
+    typeof window !== 'undefined' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
   return (
     <button
@@ -29,15 +28,14 @@ export function PrivateChatIcon({
         }
         onToggle()
       }}
-      className={`relative w-11 h-11 rounded-full grid place-items-center border border-[var(--nyven-border)] bg-[var(--nyven-surface)] transition-colors ${
+      className={`w-11 h-11 grid place-items-center bg-transparent border-0 shadow-none ring-0 outline-none ${
         active ? 'text-[var(--nyven-cyan)]' : 'text-[var(--nyven-text-secondary)]'
       } ${className}`}
       aria-label={active ? 'Private mode on' : 'Turn on private mode'}
       aria-pressed={active}
       title={active ? 'Private mode on' : 'Private chat'}
     >
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
-        {/* Headphone arc */}
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
         <path
           d="M6.5 11.5c0-3.2 2.6-5.8 5.5-5.8s5.5 2.6 5.5 5.8"
           stroke="currentColor"
@@ -56,13 +54,11 @@ export function PrivateChatIcon({
           strokeWidth="1.8"
           strokeLinecap="round"
         />
-        {/* Speech bubble mouth */}
         <path
           d="M9.2 16.2h5.6c.9 0 1.6.7 1.6 1.5 0 .3-.1.6-.3.8l-1.2 1.3c-.2.2-.5.1-.6-.1l-.5-1.1H9.2c-.9 0-1.6-.7-1.6-1.5s.7-1.5 1.6-1.5z"
           fill="currentColor"
           opacity="0.9"
         />
-        {/* Eyes */}
         <circle
           cx="10"
           cy="11.2"
@@ -88,21 +84,6 @@ export function PrivateChatIcon({
           }}
         />
       </svg>
-      {active && (
-        <span
-          className="absolute inset-0 rounded-full"
-          style={{
-            boxShadow: '0 0 0 0 color-mix(in srgb, var(--nyven-cyan) 40%, transparent)',
-            animation: reduced ? undefined : 'nyven-private-pulse 600ms ease-out',
-          }}
-        />
-      )}
-      <style>{`
-        @keyframes nyven-private-pulse {
-          0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--nyven-cyan) 45%, transparent); }
-          100% { box-shadow: 0 0 0 12px transparent; }
-        }
-      `}</style>
     </button>
   )
 }

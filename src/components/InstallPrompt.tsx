@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react'
 import {
   type BeforeInstallPromptEvent,
   dismissInstall,
+  getDeferredInstall,
   isStandalone,
+  onDeferredInstall,
   shouldOfferInstall,
 } from '../lib/pwa'
 
@@ -12,52 +14,61 @@ function isIOS() {
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
 }
 
-export function InstallPrompt() {
-  const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null)
+export function InstallPrompt({ forceOpen = false, onClose }: { forceOpen?: boolean; onClose?: () => void }) {
+  const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(() => getDeferredInstall())
   const [open, setOpen] = useState(false)
-  const [iosGuide, setIosGuide] = useState(false)
+  const [guide, setGuide] = useState(false)
 
   useEffect(() => {
     if (isStandalone()) return
-    const onBip = (e: Event) => {
-      e.preventDefault()
-      setDeferred(e as BeforeInstallPromptEvent)
-      if (shouldOfferInstall()) setOpen(true)
-    }
-    window.addEventListener('beforeinstallprompt', onBip)
-    // After some chat turns, maybe show iOS guide
-    const t = window.setInterval(() => {
+    const unsub = onDeferredInstall((e) => setDeferred(e))
+    const check = () => {
       if (isStandalone()) return
-      if (!shouldOfferInstall()) return
-      if (isIOS()) setIosGuide(true)
-      else if (deferred) setOpen(true)
-    }, 4000)
-    return () => {
-      window.removeEventListener('beforeinstallprompt', onBip)
-      window.clearInterval(t)
+      if (!shouldOfferInstall() && !forceOpen) return
+      if (getDeferredInstall() || deferred) setOpen(true)
+      else setGuide(true)
     }
-  }, [deferred])
+    window.addEventListener('nyven-install-check', check)
+    if (forceOpen) check()
+    else if (shouldOfferInstall()) check()
+    return () => {
+      unsub()
+      window.removeEventListener('nyven-install-check', check)
+    }
+  }, [deferred, forceOpen])
 
   if (isStandalone()) return null
-  if (!open && !iosGuide) return null
+  if (!open && !guide && !forceOpen) return null
+  if (!open && !guide && forceOpen) {
+    // show guide
+  }
 
   const close = () => {
     dismissInstall(7)
     setOpen(false)
-    setIosGuide(false)
+    setGuide(false)
+    onClose?.()
   }
 
   const install = async () => {
-    if (!deferred) return
-    await deferred.prompt()
+    const ev = deferred || getDeferredInstall()
+    if (!ev) {
+      setGuide(true)
+      setOpen(true)
+      return
+    }
+    await ev.prompt()
     try {
-      await deferred.userChoice
+      await ev.userChoice
     } catch {
       /* */
     }
+    window.__nyvenDeferredInstall = null
     setDeferred(null)
     close()
   }
+
+  const showGuide = guide || (!(deferred || getDeferredInstall()) && (open || forceOpen))
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-[80] p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pointer-events-none">
@@ -65,10 +76,12 @@ export function InstallPrompt() {
         <div className="flex items-start gap-3">
           <img src="/nyven-icon-192.png" alt="" className="w-11 h-11 rounded-xl" />
           <div className="min-w-0 flex-1">
-            <p className="text-[15px] font-semibold text-[var(--nyven-text)]">Install Nyven</p>
-            <p className="text-[13px] text-[var(--nyven-text-secondary)] mt-0.5 leading-snug">
-              {iosGuide
-                ? 'On iPhone: tap Share, then Add to Home Screen.'
+            <p className="text-[0.9375rem] font-semibold text-[var(--nyven-text)]">Install Nyven</p>
+            <p className="text-[0.8125rem] text-[var(--nyven-text-secondary)] mt-0.5 leading-snug">
+              {showGuide
+                ? isIOS()
+                  ? 'On iPhone: tap Share, then Add to Home Screen.'
+                  : 'Open your browser menu → Install app / Add to Home Screen.'
                 : 'Add Nyven to your home screen for a faster, app-like experience.'}
             </p>
           </div>
@@ -81,7 +94,7 @@ export function InstallPrompt() {
           >
             Not now
           </button>
-          {!iosGuide && deferred && (
+          {!showGuide && (
             <button
               type="button"
               onClick={() => void install()}
@@ -90,7 +103,7 @@ export function InstallPrompt() {
               Install
             </button>
           )}
-          {iosGuide && (
+          {showGuide && (
             <button
               type="button"
               onClick={close}

@@ -1,3 +1,41 @@
+export type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
+}
+
+declare global {
+  interface Window {
+    __nyvenDeferredInstall?: BeforeInstallPromptEvent | null
+    __nyvenInstallListeners?: Array<(e: BeforeInstallPromptEvent | null) => void>
+  }
+}
+
+/** Call as early as possible (main.tsx) so the event is not missed. */
+export function captureInstallPromptEarly() {
+  if (typeof window === 'undefined') return
+  window.__nyvenInstallListeners = window.__nyvenInstallListeners || []
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault()
+    const ev = e as BeforeInstallPromptEvent
+    window.__nyvenDeferredInstall = ev
+    window.__nyvenInstallListeners?.forEach((fn) => fn(ev))
+  })
+}
+
+export function getDeferredInstall(): BeforeInstallPromptEvent | null {
+  return (typeof window !== 'undefined' && window.__nyvenDeferredInstall) || null
+}
+
+export function onDeferredInstall(fn: (e: BeforeInstallPromptEvent | null) => void) {
+  if (typeof window === 'undefined') return () => {}
+  window.__nyvenInstallListeners = window.__nyvenInstallListeners || []
+  window.__nyvenInstallListeners.push(fn)
+  if (window.__nyvenDeferredInstall) fn(window.__nyvenDeferredInstall)
+  return () => {
+    window.__nyvenInstallListeners = (window.__nyvenInstallListeners || []).filter((f) => f !== fn)
+  }
+}
+
 export function registerServiceWorker() {
   if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return
   window.addEventListener('load', () => {
@@ -21,6 +59,7 @@ export function recordChatTurnForInstall() {
   try {
     const n = Number(localStorage.getItem(CHAT_COUNT_KEY) || '0') + 1
     localStorage.setItem(CHAT_COUNT_KEY, String(n))
+    window.dispatchEvent(new CustomEvent('nyven-install-check', { detail: { turns: n } }))
     return n
   } catch {
     return 0
@@ -45,9 +84,4 @@ export function dismissInstall(days = 7) {
   } catch {
     /* */
   }
-}
-
-export type BeforeInstallPromptEvent = Event & {
-  prompt: () => Promise<void>
-  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
 }

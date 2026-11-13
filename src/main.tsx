@@ -3,10 +3,11 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import './index.css'
-import { registerServiceWorker } from './lib/pwa'
+import { registerServiceWorker, captureInstallPromptEarly } from './lib/pwa'
 import { applyAppearance, loadAppearance } from './lib/appearance'
 
 try { applyAppearance(loadAppearance()) } catch {}
+captureInstallPromptEarly()
 registerServiceWorker()
 
 createRoot(document.getElementById('root')!).render(

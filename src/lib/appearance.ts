@@ -2,7 +2,7 @@ export type ThemeChoice = 'default' | 'system' | 'dark' | 'light'
 
 export type AppearancePrefs = {
   theme: ThemeChoice
-  textScale: number // 0.9 – 1.25
+  textScale: number
 }
 
 const KEY = 'nyven_appearance_v1'
@@ -27,19 +27,36 @@ export function saveAppearance(p: AppearancePrefs) {
   applyAppearance(p)
 }
 
-export function resolveTheme(choice: ThemeChoice): 'dark' | 'light' {
+/** Resolved theme attribute on <html> */
+export function resolveThemeAttr(choice: ThemeChoice): 'default' | 'dark' | 'light' {
   if (choice === 'light') return 'light'
-  if (choice === 'dark' || choice === 'default') return 'dark'
+  if (choice === 'dark') return 'dark'
+  if (choice === 'default') return 'default'
+  // system
   if (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: light)').matches) {
     return 'light'
   }
-  return 'dark'
+  return 'default'
 }
 
 export function applyAppearance(p: AppearancePrefs) {
-  const resolved = resolveTheme(p.theme)
-  document.documentElement.setAttribute('data-theme', resolved === 'light' ? 'light' : 'dark')
+  const attr = resolveThemeAttr(p.theme)
+  document.documentElement.setAttribute('data-theme', attr)
   document.documentElement.style.setProperty('--nyven-font-scale', `${(p.textScale || 1) * 16}px`)
   const meta = document.querySelector('meta[name="theme-color"]')
-  if (meta) meta.setAttribute('content', resolved === 'light' ? '#F6F4EF' : '#07090D')
+  const colors: Record<string, string> = {
+    default: '#07090D',
+    dark: '#000000',
+    light: '#F6F4EF',
+  }
+  if (meta) meta.setAttribute('content', colors[attr] || colors.default)
+  document.documentElement.style.colorScheme = attr === 'light' ? 'light' : 'dark'
+}
+
+export function subscribeSystemTheme(onChange: () => void) {
+  if (typeof window === 'undefined') return () => {}
+  const mq = window.matchMedia('(prefers-color-scheme: light)')
+  const fn = () => onChange()
+  mq.addEventListener?.('change', fn)
+  return () => mq.removeEventListener?.('change', fn)
 }

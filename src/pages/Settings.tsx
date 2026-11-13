@@ -1003,10 +1003,43 @@ function BugReportCard() {
 }
 
 
+
+function ThemeIcon({ kind }: { kind: 'default' | 'system' | 'dark' | 'light' }) {
+  const stroke = 'currentColor'
+  if (kind === 'default') {
+    return (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path d="M12 3.5l1.6 4.2L18 9.2l-3.5 2.8 1.1 4.5L12 14.2 8.4 16.5 9.5 12 6 9.2l4.4-1.5L12 3.5z" stroke={stroke} strokeWidth="1.6" strokeLinejoin="round" />
+      </svg>
+    )
+  }
+  if (kind === 'system') {
+    return (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <rect x="7" y="3.5" width="10" height="17" rx="2.2" stroke={stroke} strokeWidth="1.6" />
+        <path d="M10 18.5h4" stroke={stroke} strokeWidth="1.6" strokeLinecap="round" />
+      </svg>
+    )
+  }
+  if (kind === 'dark') {
+    return (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path d="M15.5 4.2a7.5 7.5 0 1 0 4.3 13.3A8 8 0 0 1 15.5 4.2z" stroke={stroke} strokeWidth="1.6" strokeLinejoin="round" />
+      </svg>
+    )
+  }
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="12" cy="12" r="3.2" stroke={stroke} strokeWidth="1.6" />
+      <path d="M12 3.5v2.2M12 18.3v2.2M3.5 12h2.2M18.3 12h2.2M6.1 6.1l1.6 1.6M16.3 16.3l1.6 1.6M17.9 6.1l-1.6 1.6M7.7 16.3l-1.6 1.6" stroke={stroke} strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 function AppearancePanel({ showToast }: { showToast: (m: string) => void }) {
   const [prefs, setPrefs] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem('nyven_appearance_v1') || '{}')
+      return { theme: 'default', textScale: 1, ...JSON.parse(localStorage.getItem('nyven_appearance_v1') || '{}') }
     } catch {
       return { theme: 'default', textScale: 1 }
     }
@@ -1015,48 +1048,79 @@ function AppearancePanel({ showToast }: { showToast: (m: string) => void }) {
   const scale = typeof prefs.textScale === 'number' ? prefs.textScale : 1
 
   const apply = (next: { theme?: string; textScale?: number }) => {
+    try { navigator.vibrate?.(10) } catch {}
     const merged = { theme, textScale: scale, ...next }
     setPrefs(merged)
     localStorage.setItem('nyven_appearance_v1', JSON.stringify(merged))
-    const choice = merged.theme || 'default'
-    let resolved = choice
-    if (choice === 'system') {
-      resolved = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
-    }
-    if (choice === 'default') resolved = 'dark'
-    document.documentElement.setAttribute('data-theme', resolved === 'light' ? 'light' : 'dark')
-    document.documentElement.style.setProperty('--nyven-font-scale', `${(merged.textScale || 1) * 16}px`)
-    const meta = document.querySelector('meta[name="theme-color"]')
-    if (meta) meta.setAttribute('content', resolved === 'light' ? '#F6F4EF' : '#07090D')
+    // Use shared apply
+    import('../lib/appearance').then(({ applyAppearance }) => {
+      applyAppearance(merged as any)
+    })
     showToast('Appearance updated')
   }
 
-  const options = [
-    { id: 'default', label: 'Default' },
-    { id: 'system', label: 'System' },
-    { id: 'dark', label: 'Dark' },
-    { id: 'light', label: 'Light' },
+  const options: Array<{ id: 'default' | 'system' | 'dark' | 'light'; label: string; hint: string }> = [
+    { id: 'default', label: 'Default', hint: 'Nyven navy & cyan' },
+    { id: 'system', label: 'System', hint: 'Match your phone' },
+    { id: 'dark', label: 'Dark', hint: 'True black' },
+    { id: 'light', label: 'Light', hint: 'Soft off-white' },
   ]
 
   return (
     <div className="space-y-6">
       <div>
         <p className="text-sm text-[var(--nyven-text-secondary)] mb-3">Theme</p>
-        <div className="flex flex-wrap gap-2">
-          {options.map((o) => (
-            <button
-              key={o.id}
-              type="button"
-              onClick={() => apply({ theme: o.id })}
-              className={`px-4 py-2.5 rounded-2xl text-sm font-medium border transition ${
-                theme === o.id
-                  ? 'border-[var(--nyven-cyan)] text-[var(--nyven-cyan)] bg-[var(--nyven-surface)]'
-                  : 'border-[var(--nyven-border)] text-[var(--nyven-text-secondary)]'
-              }`}
-            >
-              {o.label}
-            </button>
-          ))}
+        <div className="grid grid-cols-2 gap-3">
+          {options.map((o) => {
+            const selected = theme === o.id
+            return (
+              <button
+                key={o.id}
+                type="button"
+                onClick={() => apply({ theme: o.id })}
+                className={`relative text-left rounded-2xl border p-3 transition ${
+                  selected
+                    ? 'border-[var(--nyven-cyan)] bg-[var(--nyven-surface)]'
+                    : 'border-[var(--nyven-border)] bg-[var(--nyven-surface)]/60'
+                }`}
+              >
+                {selected && (
+                  <span className="absolute top-2 right-2 w-5 h-5 rounded-full bg-[var(--nyven-cyan)] text-[#071018] text-[11px] grid place-items-center font-bold">✓</span>
+                )}
+                <div className="flex items-center gap-2 text-[var(--nyven-text)] mb-2">
+                  <ThemeIcon kind={o.id} />
+                  <span className="text-[0.9375rem] font-medium">{o.label}</span>
+                </div>
+                <div className="h-8 rounded-lg overflow-hidden border border-[var(--nyven-border)] flex">
+                  {o.id === 'default' && (
+                    <>
+                      <span className="flex-1" style={{ background: '#07090D' }} />
+                      <span className="w-1/3" style={{ background: '#62E6FF' }} />
+                    </>
+                  )}
+                  {o.id === 'system' && (
+                    <>
+                      <span className="flex-1" style={{ background: '#F6F4EF' }} />
+                      <span className="flex-1" style={{ background: '#000' }} />
+                    </>
+                  )}
+                  {o.id === 'dark' && (
+                    <>
+                      <span className="flex-1" style={{ background: '#000' }} />
+                      <span className="w-1/4" style={{ background: '#fff' }} />
+                    </>
+                  )}
+                  {o.id === 'light' && (
+                    <>
+                      <span className="flex-1" style={{ background: '#F6F4EF' }} />
+                      <span className="w-1/3" style={{ background: '#1A1D24' }} />
+                    </>
+                  )}
+                </div>
+                <p className="text-[0.75rem] text-[var(--nyven-text-secondary)] mt-2">{o.hint}</p>
+              </button>
+            )
+          })}
         </div>
       </div>
       <div>
@@ -1072,11 +1136,11 @@ function AppearancePanel({ showToast }: { showToast: (m: string) => void }) {
             className="w-full accent-[var(--nyven-cyan)]"
           />
           <div className="mt-4 rounded-xl bg-[var(--nyven-bg-secondary)] p-3">
-            <p className="text-[13px] text-[var(--nyven-text-secondary)] mb-2">Preview</p>
-            <div className="rounded-2xl bg-[var(--nyven-surface)] px-3 py-2 text-[15px] text-[var(--nyven-text)] inline-block mb-2">
+            <p className="text-[0.8125rem] text-[var(--nyven-text-secondary)] mb-2">Preview</p>
+            <div className="rounded-2xl bg-[var(--nyven-surface)] px-3 py-2 text-[0.9375rem] text-[var(--nyven-text)] inline-block mb-2">
               What is the truth of the universe?
             </div>
-            <p className="text-[15px] text-[var(--nyven-text)] leading-relaxed">
+            <p className="text-[0.9375rem] text-[var(--nyven-text)] leading-relaxed">
               The universe is a vast system of laws and mysteries.
             </p>
           </div>

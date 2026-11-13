@@ -23,6 +23,7 @@ type Props = {
   readingMessageId?: string | null
   readAloudLoading?: boolean
   onRegenerate?: () => void
+  onEditUser?: (messageId: string, newText: string) => void
   onAttachmentClick?: (att: NonNullable<Message['attachments']>[number]) => void
   listOnly?: boolean
   className?: string
@@ -43,6 +44,7 @@ export function ChatThread({
   readingMessageId,
   readAloudLoading,
   onRegenerate,
+  onEditUser,
   onAttachmentClick,
   listOnly,
   className,
@@ -84,6 +86,13 @@ export function ChatThread({
               message={msg}
               isLast={isLast}
               conversationId={conversationId}
+              onEdit={
+                msg.role === 'user' && onEditUser
+                  ? (newText?: string) => {
+                      if (newText && newText.trim()) onEditUser(msg.id, newText.trim())
+                    }
+                  : undefined
+              }
               onRegenerate={
                 isLast && msg.role === 'nyven' && !msg.isStreaming && onRegenerate
                   ? onRegenerate
