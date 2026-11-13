@@ -86,7 +86,7 @@ export function BugReportModal({ open, onClose, conversationId, messageId }: Pro
     <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-0 sm:p-4">
       <button
         type="button"
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        className="absolute inset-0 bg-[var(--nyven-overlay)] backdrop-blur-sm"
         aria-label="Close"
         onClick={close}
       />

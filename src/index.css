@@ -287,6 +287,12 @@ html[data-theme="default"] {
   --nyven-violet: #8B7CFF;
   --nyven-input-bg: rgba(255,255,255,0.04);
   color-scheme: dark;
+
+  --nyven-hover: rgba(255,255,255,0.06);
+  --nyven-overlay: rgba(0,0,0,0.55);
+  --nyven-on-accent: #071018;
+  --nyven-icon-bg: rgba(98,230,255,0.12);
+  --nyven-shadow: 0 16px 48px rgba(0,0,0,0.45);
 }
 html[data-theme="dark"] {
   --nyven-bg: #000000;
@@ -300,6 +306,12 @@ html[data-theme="dark"] {
   --nyven-violet: #A99BFF;
   --nyven-input-bg: rgba(255,255,255,0.06);
   color-scheme: dark;
+
+  --nyven-hover: rgba(255,255,255,0.08);
+  --nyven-overlay: rgba(0,0,0,0.7);
+  --nyven-on-accent: #000000;
+  --nyven-icon-bg: rgba(255,255,255,0.08);
+  --nyven-shadow: 0 16px 48px rgba(0,0,0,0.7);
 }
 html[data-theme="light"] {
   --nyven-bg: #F6F4EF;
@@ -313,6 +325,12 @@ html[data-theme="light"] {
   --nyven-violet: #6B5CE7;
   --nyven-input-bg: rgba(0,0,0,0.04);
   color-scheme: light;
+
+  --nyven-hover: rgba(0,0,0,0.05);
+  --nyven-overlay: rgba(0,0,0,0.4);
+  --nyven-on-accent: #071018;
+  --nyven-icon-bg: rgba(11,143,168,0.12);
+  --nyven-shadow: 0 16px 40px rgba(0,0,0,0.12);
 }
 html {
   font-size: var(--nyven-font-scale, 16px);
@@ -366,3 +384,35 @@ body {
 .nyven-code-pre .hljs-variable { color: #f07178; }
 .nyven-code-pre .hljs-property { color: #89ddff; }
 html[data-theme="light"] .nyven-code-pre { color: #e8eaed; }
+
+/* Temporary theme switch animation */
+html.nyven-theme-animating,
+html.nyven-theme-animating * {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, fill 0.3s ease, stroke 0.3s ease, box-shadow 0.3s ease !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  html.nyven-theme-animating,
+  html.nyven-theme-animating * {
+    transition: none !important;
+  }
+}
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.25s;
+}
+
+/* Theme-aware logo (white assets) */
+html[data-theme="light"] .nyven-logo-adaptive {
+  filter: invert(1) brightness(0.15);
+}
+html[data-theme="default"] .nyven-logo-adaptive,
+html[data-theme="dark"] .nyven-logo-adaptive {
+  filter: none;
+}
+
+/* Code boxes stay pure black in all themes */
+.nyven-code-pre,
+.nyven-code-box {
+  background-color: #000 !important;
+  color: #e8eaed !important;
+}

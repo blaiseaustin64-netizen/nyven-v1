@@ -215,7 +215,7 @@ export function VoiceSpeechSettings({
               className={`w-full text-left rounded-2xl border px-4 py-3 transition-colors min-h-[56px] ${
                 on
                   ? 'border-nyven-cyan/40 bg-nyven-cyan/10'
-                  : 'border-[var(--nyven-border)] bg-white/[0.02] hover:bg-[var(--nyven-input-bg)]'
+                  : 'border-[var(--nyven-border)] bg-[var(--nyven-input-bg)] hover:bg-[var(--nyven-input-bg)]'
               }`}
             >
               <div className="flex items-start justify-between gap-3">
@@ -313,7 +313,7 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
       aria-checked={on}
       onClick={() => onChange(!on)}
       className={`relative w-11 h-6 rounded-full transition-colors ${
-        on ? 'bg-nyven-cyan' : 'bg-white/15'
+        on ? 'bg-nyven-cyan' : 'bg-[var(--nyven-hover)]'
       }`}
     >
       <span

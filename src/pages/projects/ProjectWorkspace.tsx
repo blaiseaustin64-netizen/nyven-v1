@@ -767,7 +767,7 @@ export function ProjectWorkspace() {
                       <button
                         type="button"
                         onClick={() => void deleteFile(f.id)}
-                        className="absolute top-1 right-1 w-7 h-7 rounded-full bg-black/50 grid place-items-center text-white/80"
+                        className="absolute top-1 right-1 w-7 h-7 rounded-full bg-[var(--nyven-overlay)] grid place-items-center text-[var(--nyven-text)]"
                         aria-label={`Delete ${f.name}`}
                       >
                         <Trash2 size={12} />
@@ -783,7 +783,7 @@ export function ProjectWorkspace() {
         {tab === 'details' && (
           <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4">
             <div className="max-w-3xl mx-auto space-y-4">
-              <section className="rounded-2xl border border-[var(--nyven-border)] bg-white/[0.02] p-4">
+              <section className="rounded-2xl border border-[var(--nyven-border)] bg-[var(--nyven-input-bg)] p-4">
                 <h3 className="text-xs uppercase tracking-wider text-nyven-text-secondary mb-2">Name</h3>
                 <input
                   value={nameDraft}
@@ -797,7 +797,7 @@ export function ProjectWorkspace() {
                 />
               </section>
 
-              <section className="rounded-2xl border border-[var(--nyven-border)] bg-white/[0.02] p-4">
+              <section className="rounded-2xl border border-[var(--nyven-border)] bg-[var(--nyven-input-bg)] p-4">
                 <h3 className="text-xs uppercase tracking-wider text-nyven-text-secondary mb-2">
                   Description
                 </h3>
@@ -810,7 +810,7 @@ export function ProjectWorkspace() {
                 />
               </section>
 
-              <section className="rounded-2xl border border-[var(--nyven-border)] bg-white/[0.02] p-4">
+              <section className="rounded-2xl border border-[var(--nyven-border)] bg-[var(--nyven-input-bg)] p-4">
                 <h3 className="text-xs uppercase tracking-wider text-nyven-text-secondary mb-2">
                   Instructions
                 </h3>
@@ -830,7 +830,7 @@ export function ProjectWorkspace() {
                 </button>
               </section>
 
-              <section className="rounded-2xl border border-[var(--nyven-border)] bg-white/[0.02] p-4">
+              <section className="rounded-2xl border border-[var(--nyven-border)] bg-[var(--nyven-input-bg)] p-4">
                 <h3 className="text-xs uppercase tracking-wider text-nyven-text-secondary mb-2">Tasks</h3>
                 <div className="flex gap-2 mb-2">
                   <input
@@ -865,7 +865,7 @@ export function ProjectWorkspace() {
                 </ul>
               </section>
 
-              <section className="rounded-2xl border border-[var(--nyven-border)] bg-white/[0.02] p-4">
+              <section className="rounded-2xl border border-[var(--nyven-border)] bg-[var(--nyven-input-bg)] p-4">
                 <button
                   type="button"
                   onClick={() => setActivityOpen((v) => !v)}
@@ -941,7 +941,7 @@ export function ProjectWorkspace() {
         <div className="fixed inset-0 z-50 flex flex-col justify-end">
           <button
             type="button"
-            className="absolute inset-0 bg-black/50"
+            className="absolute inset-0 bg-[var(--nyven-overlay)]"
             aria-label="Close"
             onClick={() => setFileSheetOpen(false)}
           />

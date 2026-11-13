@@ -539,14 +539,14 @@ export function MessageComposer({
                   )}
                   {(a.status === 'uploading' || a.status === 'processing') && (
                     <div className="absolute inset-0 bg-black/45 flex items-center justify-center">
-                      <Loader2 size={22} className="animate-spin text-white" />
+                      <Loader2 size={22} className="animate-spin text-[var(--nyven-text)]" />
                     </div>
                   )}
                   {a.status === 'error' && (
                     <button
                       type="button"
                       onClick={() => retryUpload(a)}
-                      className="absolute inset-0 bg-black/50 flex items-center justify-center text-[10px] text-red-200 font-medium"
+                      className="absolute inset-0 bg-[var(--nyven-overlay)] flex items-center justify-center text-[10px] text-red-200 font-medium"
                       aria-label={`Retry ${a.name}`}
                     >
                       Retry
@@ -555,7 +555,7 @@ export function MessageComposer({
                   <button
                     type="button"
                     onClick={() => removeAttachment(a.id)}
-                    className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-[var(--nyven-surface)] border border-white/20 text-nyven-text flex items-center justify-center shadow"
+                    className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-[var(--nyven-surface)] border border-[var(--nyven-border)] text-nyven-text flex items-center justify-center shadow"
                     aria-label={`Remove ${a.name}`}
                   >
                     <X size={12} />
@@ -597,7 +597,7 @@ export function MessageComposer({
           <div className="fixed inset-0 z-[80]" role="dialog" aria-modal="true" aria-label="Add to chat">
             <button
               type="button"
-              className="absolute inset-0 bg-black/55 backdrop-blur-[2px]"
+              className="absolute inset-0 bg-[var(--nyven-overlay)] backdrop-blur-[2px]"
               aria-label="Close"
               onClick={closeMenu}
             />

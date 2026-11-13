@@ -66,7 +66,7 @@ export function IntroSequence({ onComplete, isFirstVisit }: IntroSequenceProps) 
             key="wordmark"
             src={wordmark}
             alt="NYVEN"
-            className="relative z-10 h-8 sm:h-10 w-auto object-contain"
+            className="relative z-10 h-8 sm:h-10 w-auto object-contain nyven-logo-adaptive"
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}

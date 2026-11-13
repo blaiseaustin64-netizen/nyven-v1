@@ -59,7 +59,7 @@ export function IssuePrList(p: Props) {
       )}
 
       {p.items !== null && p.items.length > 0 && (
-        <ul className="divide-y divide-white/[0.04]" aria-label={noun}>
+        <ul className="divide-y divide-[var(--nyven-border)]" aria-label={noun}>
           {p.kind === 'issues'
             ? (p.items as IssueItem[]).map((i) => <Row key={i.number} number={i.number} title={i.title} state={i.state} author={i.author} updated={i.updated_at} url={i.html_url} icon="issue" labels={i.labels} comments={i.comments} />)
             : (p.items as PullItem[]).map((pr) => (

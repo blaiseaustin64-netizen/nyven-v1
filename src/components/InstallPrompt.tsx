@@ -74,7 +74,7 @@ export function InstallPrompt({ forceOpen = false, onClose }: { forceOpen?: bool
     <div className="fixed inset-x-0 bottom-0 z-[80] p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pointer-events-none">
       <div className="pointer-events-auto mx-auto max-w-md rounded-2xl border border-[var(--nyven-border)] bg-[var(--nyven-surface)]/95 backdrop-blur-xl shadow-[0_16px_48px_rgba(0,0,0,0.4)] p-4">
         <div className="flex items-start gap-3">
-          <img src="/nyven-icon-192.png" alt="" className="w-11 h-11 rounded-xl" />
+          <img src="/nyven-icon-192.png" alt="" className="w-11 h-11 rounded-xl nyven-logo-adaptive" />
           <div className="min-w-0 flex-1">
             <p className="text-[0.9375rem] font-semibold text-[var(--nyven-text)]">Install Nyven</p>
             <p className="text-[0.8125rem] text-[var(--nyven-text-secondary)] mt-0.5 leading-snug">
@@ -98,7 +98,7 @@ export function InstallPrompt({ forceOpen = false, onClose }: { forceOpen?: bool
             <button
               type="button"
               onClick={() => void install()}
-              className="flex-1 h-11 rounded-xl bg-[var(--nyven-cyan)] text-[#071018] text-sm font-semibold"
+              className="flex-1 h-11 rounded-xl bg-[var(--nyven-cyan)] text-[var(--nyven-on-accent)] text-sm font-semibold"
             >
               Install
             </button>
@@ -107,7 +107,7 @@ export function InstallPrompt({ forceOpen = false, onClose }: { forceOpen?: bool
             <button
               type="button"
               onClick={close}
-              className="flex-1 h-11 rounded-xl bg-[var(--nyven-cyan)] text-[#071018] text-sm font-semibold"
+              className="flex-1 h-11 rounded-xl bg-[var(--nyven-cyan)] text-[var(--nyven-on-accent)] text-sm font-semibold"
             >
               Got it
             </button>

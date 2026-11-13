@@ -220,23 +220,23 @@ export function AttachmentViewer({
           </button>
         </header>
         {showText && text ? (
-          <pre className="flex-1 overflow-auto p-4 text-sm whitespace-pre-wrap break-words text-white/90 font-mono">
+          <pre className="flex-1 overflow-auto p-4 text-sm whitespace-pre-wrap break-words text-[var(--nyven-text)] font-mono">
             {text}
           </pre>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center gap-3 px-6">
-            <div className="w-16 h-16 rounded-2xl bg-white/10 grid place-items-center text-sm tracking-wide">
+            <div className="w-16 h-16 rounded-2xl bg-[var(--nyven-hover)] grid place-items-center text-sm tracking-wide">
               {zip ? 'ZIP' : pdf ? 'PDF' : office ? 'DOC' : 'FILE'}
             </div>
-            <p className="text-sm text-white/50">Preview unavailable</p>
-            {missing && <p className="text-xs text-white/40">Original not available on this device</p>}
+            <p className="text-sm text-[var(--nyven-text-secondary)]">Preview unavailable</p>
+            {missing && <p className="text-xs text-[var(--nyven-text-secondary)]">Original not available on this device</p>}
             <div className="flex flex-col gap-2 w-full max-w-xs mt-2">
               {objectUrl && (
-                <button type="button" onClick={download} className="h-11 rounded-full border border-white/20 text-sm">
+                <button type="button" onClick={download} className="h-11 rounded-full border border-[var(--nyven-border)] text-sm">
                   Download
                 </button>
               )}
-              <button type="button" onClick={() => void share()} className="h-11 rounded-full border border-white/20 text-sm">
+              <button type="button" onClick={() => void share()} className="h-11 rounded-full border border-[var(--nyven-border)] text-sm">
                 Share
               </button>
               {(text || textPreview) && (
@@ -246,7 +246,7 @@ export function AttachmentViewer({
                     setText(text || textPreview || '')
                     setMode('text')
                   }}
-                  className="h-11 rounded-full border border-white/20 text-sm"
+                  className="h-11 rounded-full border border-[var(--nyven-border)] text-sm"
                 >
                   View extracted text
                 </button>
@@ -273,18 +273,18 @@ export function AttachmentViewer({
         </header>
         <div className="flex gap-2 justify-center px-4 pb-2">
           {objectUrl && (
-            <button type="button" onClick={download} className="px-3 h-8 rounded-full text-xs border border-white/20">
+            <button type="button" onClick={download} className="px-3 h-8 rounded-full text-xs border border-[var(--nyven-border)]">
               Download
             </button>
           )}
           {text && (
-            <button type="button" onClick={() => setMode('text')} className="px-3 h-8 rounded-full text-xs border border-white/20">
+            <button type="button" onClick={() => setMode('text')} className="px-3 h-8 rounded-full text-xs border border-[var(--nyven-border)]">
               View extracted text
             </button>
           )}
         </div>
         {mode === 'text' ? (
-          <pre className="flex-1 overflow-auto p-4 text-sm whitespace-pre-wrap font-mono text-white/90">{text}</pre>
+          <pre className="flex-1 overflow-auto p-4 text-sm whitespace-pre-wrap font-mono text-[var(--nyven-text)]">{text}</pre>
         ) : (
           <div ref={pdfContainerRef} className="flex-1 overflow-auto p-4" />
         )}
@@ -299,16 +299,16 @@ export function AttachmentViewer({
           <button
             type="button"
             onClick={() => setMode((m) => (m === 'edit' ? 'view' : 'edit'))}
-            className="w-11 h-11 rounded-full bg-white/10 grid place-items-center"
+            className="w-11 h-11 rounded-full bg-[var(--nyven-hover)] grid place-items-center"
             aria-label="Edit"
           >
             <Pencil size={18} />
           </button>
         )}
-        <button type="button" onClick={() => void share()} className="w-11 h-11 rounded-full bg-white/10 grid place-items-center" aria-label="Share">
+        <button type="button" onClick={() => void share()} className="w-11 h-11 rounded-full bg-[var(--nyven-hover)] grid place-items-center" aria-label="Share">
           <Share2 size={18} />
         </button>
-        <button type="button" onClick={onClose} className="w-11 h-11 rounded-full bg-white/10 grid place-items-center" aria-label="Close">
+        <button type="button" onClick={onClose} className="w-11 h-11 rounded-full bg-[var(--nyven-hover)] grid place-items-center" aria-label="Close">
           <X size={18} />
         </button>
       </header>
@@ -320,18 +320,18 @@ export function AttachmentViewer({
               key={a}
               type="button"
               onClick={() => setAspect(a)}
-              className={`px-3 h-8 rounded-full text-xs border ${aspect === a ? 'border-white/50' : 'border-white/15'}`}
+              className={`px-3 h-8 rounded-full text-xs border ${aspect === a ? 'border-[var(--nyven-border)]' : 'border-[var(--nyven-border)]'}`}
             >
               {a}
             </button>
           ))}
-          <button type="button" onClick={() => setRotation((r) => r + 90)} className="px-3 h-8 rounded-full text-xs border border-white/15 inline-flex items-center gap-1">
+          <button type="button" onClick={() => setRotation((r) => r + 90)} className="px-3 h-8 rounded-full text-xs border border-[var(--nyven-border)] inline-flex items-center gap-1">
             <RotateCw size={14} /> Rotate
           </button>
           <button type="button" onClick={applyImageEdit} className="px-3 h-8 rounded-full text-xs bg-white text-black">
             Use in chat
           </button>
-          <button type="button" onClick={download} className="px-3 h-8 rounded-full text-xs border border-white/15">
+          <button type="button" onClick={download} className="px-3 h-8 rounded-full text-xs border border-[var(--nyven-border)]">
             <Download size={14} className="inline" /> Download
           </button>
         </div>
@@ -354,7 +354,7 @@ export function AttachmentViewer({
 
       <div className="flex-1 min-h-0 overflow-auto flex items-center justify-center p-4">
         {missing && !objectUrl && !text ? (
-          <p className="text-sm text-white/50">Original not available on this device</p>
+          <p className="text-sm text-[var(--nyven-text-secondary)]">Original not available on this device</p>
         ) : image && objectUrl ? (
           <>
             <img
@@ -370,10 +370,10 @@ export function AttachmentViewer({
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
-            className="w-full max-w-3xl h-full min-h-[50vh] bg-transparent text-sm font-mono text-white/90 outline-none resize-none"
+            className="w-full max-w-3xl h-full min-h-[50vh] bg-transparent text-sm font-mono text-[var(--nyven-text)] outline-none resize-none"
           />
         ) : (
-          <pre className="w-full max-w-3xl text-sm whitespace-pre-wrap break-words text-white/90 font-mono">
+          <pre className="w-full max-w-3xl text-sm whitespace-pre-wrap break-words text-[var(--nyven-text)] font-mono">
             {text || 'No preview available.'}
           </pre>
         )}

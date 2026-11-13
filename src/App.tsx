@@ -1,4 +1,5 @@
 import { InstallPrompt } from './components/InstallPrompt'
+import { loadAppearance, applyAppearance, subscribeSystemTheme } from './lib/appearance'
 import { UpdateBanner } from './components/UpdateBanner'
 import { useState, useEffect } from 'react'
 import { useKeyboardOpen } from './hooks/useKeyboardOpen'
@@ -69,6 +70,13 @@ function CreateAgentRoute() {
 }
 
 export default function App() {
+  useEffect(() => {
+    return subscribeSystemTheme(() => {
+      const p = loadAppearance()
+      if (p.theme === 'system') applyAppearance(p)
+    })
+  }, [])
+
   const keyboardOpen = useKeyboardOpen()
   const [showIntro, setShowIntro] = useState(true)
   const [isFirstVisit, setIsFirstVisit] = useState(true)

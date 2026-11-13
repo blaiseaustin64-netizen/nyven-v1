@@ -475,7 +475,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
                   Add to project
                 </button>
               )}
-              <div className="h-px bg-white/10 my-1" />
+              <div className="h-px bg-[var(--nyven-hover)] my-1" />
               <button
                 type="button"
                 role="menuitem"
@@ -510,7 +510,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         <button
           type="button"
           onClick={handleNewChat}
-          className="grid place-items-center w-9 h-9 rounded-[10px] text-[var(--nyven-text)] hover:bg-[var(--nyven-surface)] hover:text-white min-h-[40px] min-w-[40px]"
+          className="grid place-items-center w-9 h-9 rounded-[10px] text-[var(--nyven-text)] hover:bg-[var(--nyven-surface)] hover:text-[var(--nyven-text)] min-h-[40px] min-w-[40px]"
           aria-label="New chat"
           title="New chat"
         >
@@ -518,7 +518,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         </button>
         <button
           type="button"
-          className="hidden lg:grid place-items-center w-9 h-9 rounded-[10px] text-[var(--nyven-text-secondary)] hover:bg-white/[0.07] hover:text-[var(--nyven-text)]"
+          className="hidden lg:grid place-items-center w-9 h-9 rounded-[10px] text-[var(--nyven-text-secondary)] hover:bg-[var(--nyven-hover)] hover:text-[var(--nyven-text)]"
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           onClick={() => setCollapsed((c) => !c)}
         >
@@ -527,7 +527,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         {onMobileClose && (
           <button
             type="button"
-            className="lg:hidden grid place-items-center w-9 h-9 rounded-[10px] text-[var(--nyven-text-secondary)] hover:bg-white/[0.07]"
+            className="lg:hidden grid place-items-center w-9 h-9 rounded-[10px] text-[var(--nyven-text-secondary)] hover:bg-[var(--nyven-hover)]"
             aria-label="Close menu"
             onClick={onMobileClose}
           >
@@ -542,7 +542,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
           type="button"
           onClick={handleNewChat}
           className={clsx(
-            'w-full flex items-center gap-2.5 h-11 rounded-xl font-semibold text-[#071018] bg-gradient-to-br from-[#3de0ff] to-[#4f6bff] hover:brightness-110 active:scale-[0.98] transition-all min-h-[44px]',
+            'w-full flex items-center gap-2.5 h-11 rounded-xl font-semibold text-[var(--nyven-on-accent)] bg-gradient-to-br from-[var(--nyven-cyan)] to-[var(--nyven-violet)] hover:brightness-110 active:scale-[0.98] transition-all min-h-[44px]',
             collapsed ? 'lg:justify-center' : 'px-3.5'
           )}
         >
@@ -721,9 +721,9 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         typeof document !== 'undefined' &&
         createPortal(
           <div className="sm:hidden fixed inset-0 z-[70] flex items-end justify-center">
-            <button type="button" className="absolute inset-0 bg-black/55" aria-label="Close actions" onClick={() => setMenuId(null)} />
+            <button type="button" className="absolute inset-0 bg-[var(--nyven-overlay)]" aria-label="Close actions" onClick={() => setMenuId(null)} />
             <div role="dialog" aria-modal="true" aria-label="Chat actions" className="relative w-full max-w-lg rounded-t-2xl border border-[var(--nyven-border)] bg-[var(--nyven-surface)] p-3 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl">
-              <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-white/15" />
+              <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-[var(--nyven-hover)]" />
               <p className="px-2 pb-2 text-xs text-[var(--nyven-text-secondary)] truncate">{conversations.find((c) => c.id === menuId)?.title || 'Chat'}</p>
               <div className="space-y-1">
                 <button type="button" className="w-full flex items-center gap-3 px-3 min-h-[52px] rounded-xl text-left text-[var(--nyven-text)] hover:bg-[var(--nyven-surface)]" onClick={() => { const c = conversations.find((x) => x.id === menuId); setRenameValue((c?.title || '').slice(0, 80)); setRenameError(null); setRenameId(menuId); setMenuId(null) }}>
@@ -755,7 +755,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           <button
             type="button"
-            className="absolute inset-0 bg-black/55"
+            className="absolute inset-0 bg-[var(--nyven-overlay)]"
             aria-label="Cancel rename"
             onClick={() => setRenameId(null)}
           />
@@ -790,7 +790,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
               <button
                 type="button"
                 onClick={commitRename}
-                className="px-4 min-h-[44px] rounded-xl text-sm font-medium bg-[var(--nyven-cyan)] text-[#071018]"
+                className="px-4 min-h-[44px] rounded-xl text-sm font-medium bg-[var(--nyven-cyan)] text-[var(--nyven-on-accent)]"
               >
                 Save
               </button>
@@ -804,7 +804,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           <button
             type="button"
-            className="absolute inset-0 bg-black/55"
+            className="absolute inset-0 bg-[var(--nyven-overlay)]"
             aria-label="Cancel delete"
             onClick={() => setDeleteId(null)}
           />
@@ -841,7 +841,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
           <button
             type="button"
-            className="absolute inset-0 bg-black/55"
+            className="absolute inset-0 bg-[var(--nyven-overlay)]"
             aria-label="Close"
             onClick={() => setProjectSheetId(null)}
           />
@@ -892,7 +892,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         <div className="fixed inset-0 z-40 lg:hidden">
           <button
             type="button"
-            className="absolute inset-0 bg-black/55 backdrop-blur-sm"
+            className="absolute inset-0 bg-[var(--nyven-overlay)] backdrop-blur-sm"
             aria-label="Close menu"
             onClick={onMobileClose}
           />

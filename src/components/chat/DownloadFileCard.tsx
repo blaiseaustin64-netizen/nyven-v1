@@ -101,7 +101,7 @@ export function DownloadFileCard({
             aria-label="Download"
           >
             {busy ? (
-              <span className="w-3.5 h-3.5 rounded-full border-2 border-white/20 border-t-[var(--nyven-cyan)] animate-spin" />
+              <span className="w-3.5 h-3.5 rounded-full border-2 border-[var(--nyven-border)] border-t-[var(--nyven-cyan)] animate-spin" />
             ) : (
               <Download size={16} />
             )}

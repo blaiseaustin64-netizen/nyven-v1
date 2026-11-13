@@ -97,7 +97,7 @@ function StrengthMeter({ password }: { password: string }) {
     <div className="space-y-1" aria-live="polite">
       <div className="flex gap-1">
         {[1, 2, 3, 4].map((i) => (
-          <span key={i} className={clsx('h-1 flex-1 rounded-full', i <= score ? colors[score] : 'bg-white/10')} />
+          <span key={i} className={clsx('h-1 flex-1 rounded-full', i <= score ? colors[score] : 'bg-[var(--nyven-hover)]')} />
         ))}
       </div>
       <p className="text-xs text-nyven-text-secondary/80">Strength: {label}</p>
@@ -241,9 +241,9 @@ export function Auth() {
 
       {/* Brand panel: desktop only */}
       <aside className="relative hidden lg:flex lg:w-[46%] xl:w-1/2 flex-col justify-between p-12 border-r border-[var(--nyven-border)]">
-        <img src={wordmark} alt="NYVEN" className="h-5 w-auto self-start opacity-90" />
+        <img src={wordmark} alt="NYVEN" className="h-5 w-auto self-start opacity-90 nyven-logo-adaptive" />
         <div className="space-y-6 max-w-md">
-          <img src={nMark} alt="" aria-hidden className="h-24 w-auto opacity-90" />
+          <img src={nMark} alt="" aria-hidden className="h-24 w-auto opacity-90 nyven-logo-adaptive" />
           <h2 className="font-display text-4xl font-medium leading-tight tracking-tight">
             Your AI workspace,
             <br />
@@ -304,7 +304,7 @@ export function Auth() {
               onClick={() => switchMode(m)}
               className={clsx(
                 'h-10 rounded-lg text-sm font-medium transition-colors',
-                mode === m ? 'bg-white/[0.09] text-nyven-text shadow-sm' : 'text-nyven-text-secondary hover:text-nyven-text'
+                mode === m ? 'bg-[var(--nyven-hover)] text-nyven-text shadow-sm' : 'text-nyven-text-secondary hover:text-nyven-text'
               )}
             >
               {m === 'signin' ? 'Sign in' : 'Create account'}
@@ -398,7 +398,7 @@ export function Auth() {
         <button
           type="submit"
           disabled={busy}
-          className="w-full h-12 rounded-xl bg-nyven-cyan text-[#071018] font-semibold text-base transition active:scale-[0.99] hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full h-12 rounded-xl bg-nyven-cyan text-[var(--nyven-on-accent)] font-semibold text-base transition active:scale-[0.99] hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {busy ? 'Please wait…' : submitLabel}
         </button>

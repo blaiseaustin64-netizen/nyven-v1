@@ -265,7 +265,7 @@ export function Projects() {
                     e.stopPropagation()
                     openMenu(p)
                   }}
-                  className="absolute top-2 right-2 w-8 h-8 rounded-full grid place-items-center bg-black/30 text-white/70"
+                  className="absolute top-2 right-2 w-8 h-8 rounded-full grid place-items-center bg-black/30 text-[var(--nyven-text-secondary)]"
                   aria-label="Project menu"
                 >
                   <MoreHorizontal size={16} />
@@ -279,8 +279,8 @@ export function Projects() {
       {/* Long-press / menu sheet */}
       {menuProject && (
         <div className="fixed inset-0 z-50 flex flex-col justify-end">
-          <button type="button" className="absolute inset-0 bg-black/50" onClick={() => setMenuProject(null)} />
-          <div className="relative rounded-t-2xl bg-[#12151c] border-t border-[var(--nyven-border)] pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <button type="button" className="absolute inset-0 bg-[var(--nyven-overlay)]" onClick={() => setMenuProject(null)} />
+          <div className="relative rounded-t-2xl bg-[var(--nyven-surface)] border-t border-[var(--nyven-border)] pb-[max(1rem,env(safe-area-inset-bottom))]">
             <div className="flex justify-center py-2">
               <span className="w-10 h-1 rounded-full bg-[var(--nyven-surface)]" />
             </div>
@@ -326,8 +326,8 @@ export function Projects() {
 
       {editProject && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <button type="button" className="absolute inset-0 bg-black/50" onClick={() => setEditProject(null)} />
-          <div className="relative w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl bg-[#12151c] border border-[var(--nyven-border)] p-4">
+          <button type="button" className="absolute inset-0 bg-[var(--nyven-overlay)]" onClick={() => setEditProject(null)} />
+          <div className="relative w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl bg-[var(--nyven-surface)] border border-[var(--nyven-border)] p-4">
             <h3 className="font-medium mb-3">Edit project</h3>
             <input
               value={editName}
@@ -360,8 +360,8 @@ export function Projects() {
 
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <button type="button" className="absolute inset-0 bg-black/50" onClick={() => setDeleteTarget(null)} />
-          <div className="relative w-full max-w-sm rounded-2xl bg-[#12151c] border border-[var(--nyven-border)] p-4">
+          <button type="button" className="absolute inset-0 bg-[var(--nyven-overlay)]" onClick={() => setDeleteTarget(null)} />
+          <div className="relative w-full max-w-sm rounded-2xl bg-[var(--nyven-surface)] border border-[var(--nyven-border)] p-4">
             <p className="text-sm mb-4">
               Delete <strong>{deleteTarget.name || deleteTarget.title}</strong>? This cannot be undone.
             </p>
@@ -372,7 +372,7 @@ export function Projects() {
               <button
                 type="button"
                 onClick={() => void confirmDelete()}
-                className="px-4 h-10 rounded-xl bg-red-500/90 text-white text-sm font-medium"
+                className="px-4 h-10 rounded-xl bg-red-500/90 text-[var(--nyven-text)] text-sm font-medium"
               >
                 Delete
               </button>

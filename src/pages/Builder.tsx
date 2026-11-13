@@ -220,7 +220,7 @@ export function Builder() {
                 onClick={() => setDevice(id)}
                 className={clsx(
                   'p-1.5 rounded-md transition-colors',
-                  device === id ? 'bg-white/[0.1] text-nyven-cyan' : 'text-nyven-text-secondary hover:text-nyven-text'
+                  device === id ? 'bg-[var(--nyven-hover)] text-nyven-cyan' : 'text-nyven-text-secondary hover:text-nyven-text'
                 )}
                 aria-label={id}
               >

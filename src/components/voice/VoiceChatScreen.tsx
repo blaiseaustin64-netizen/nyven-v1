@@ -109,7 +109,7 @@ export function VoiceChatScreen({
           className={clsx(
             'p-2.5 rounded-full transition-colors',
             muted
-              ? 'text-amber-200/90 bg-white/10'
+              ? 'text-amber-200/90 bg-[var(--nyven-hover)]'
               : 'text-[var(--nyven-text-secondary)] hover:text-[var(--nyven-text)] hover:bg-[var(--nyven-surface)]'
           )}
           aria-label={muted ? 'Unmute' : 'Mute'}

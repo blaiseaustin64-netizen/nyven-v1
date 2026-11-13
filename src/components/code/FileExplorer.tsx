@@ -37,7 +37,7 @@ export function FileExplorer(p: Props) {
         p.data.entries.length === 0 ? (
           <EmptyNotice title="This directory is empty" />
         ) : (
-          <ul className="divide-y divide-white/[0.04]" aria-label="Directory contents">
+          <ul className="divide-y divide-[var(--nyven-border)]" aria-label="Directory contents">
             {p.path && (
               <li>
                 <button type="button" onClick={() => p.onNavigateCrumb(parentPathOf(p.path))} className="w-full text-left px-4 py-2.5 text-sm text-nyven-text-secondary hover:bg-[var(--nyven-input-bg)] min-h-[44px]">

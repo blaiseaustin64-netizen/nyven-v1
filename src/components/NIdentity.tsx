@@ -99,7 +99,7 @@ export function NIdentity({
       alt={alt}
       style={sizeStyle}
       className={clsx(
-        'select-none object-contain',
+        'nyven-logo-adaptive select-none object-contain',
         animated && state === 'thinking' && 'n-thinking-glow',
         animated && state === 'generating' && 'n-generating-glow',
         animated && (state === 'idle' || state === 'white') && 'n-idle-glow',

@@ -72,7 +72,7 @@ export function RepoBrowser(p: Props) {
           <EmptyNotice title={`No loaded repositories match “${p.query.trim()}”`} body={p.hasMore ? 'Load more repositories, then search again.' : undefined} />
         )}
 
-        <ul className="divide-y divide-white/[0.04]" aria-label="Repositories">
+        <ul className="divide-y divide-[var(--nyven-border)]" aria-label="Repositories">
           {p.filtered.map((r) => {
             const active = r.full_name === p.selectedFullName
             return (

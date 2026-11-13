@@ -86,7 +86,7 @@ export function ReadAloudPlayer({
         >
           <div
             className="relative w-full max-w-[22rem] flex items-center gap-0.5 rounded-full pl-2.5 pr-1 py-1
-              bg-[#11151d]/90 border border-[var(--nyven-border)]
+              bg-[var(--nyven-surface)]/90 border border-[var(--nyven-border)]
               backdrop-blur-xl
               shadow-[0_12px_40px_rgba(0,0,0,0.45),0_0_24px_rgba(34,211,238,0.06)]"
           >
@@ -114,20 +114,20 @@ export function ReadAloudPlayer({
                 className={
                   state.playing || state.loading
                     ? 'text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.35)]'
-                    : 'text-white/50'
+                    : 'text-[var(--nyven-text-secondary)]'
                 }
               />
               <Waveform active={state.playing && !state.loading} />
             </div>
 
-            <span className="text-[11px] text-white/45 tabular-nums w-7 shrink-0 text-center">
+            <span className="text-[11px] text-[var(--nyven-text-secondary)] tabular-nums w-7 shrink-0 text-center">
               {fmt(state.elapsed)}
             </span>
 
             <button
               type="button"
               onClick={() => onSeek(-15)}
-              className="relative w-8 h-8 shrink-0 rounded-full grid place-items-center text-white/75 hover:bg-[var(--nyven-surface)] active:scale-95"
+              className="relative w-8 h-8 shrink-0 rounded-full grid place-items-center text-[var(--nyven-text)] hover:bg-[var(--nyven-surface)] active:scale-95"
               aria-label="Back 15 seconds"
             >
               <RotateCcw size={15} strokeWidth={2} />
@@ -139,7 +139,7 @@ export function ReadAloudPlayer({
             <button
               type="button"
               onClick={onTogglePause}
-              className="w-8 h-8 shrink-0 rounded-full grid place-items-center text-white hover:bg-white/[0.1] active:scale-95"
+              className="w-8 h-8 shrink-0 rounded-full grid place-items-center text-[var(--nyven-text)] hover:bg-[var(--nyven-hover)] active:scale-95"
               aria-label={state.playing ? 'Pause' : 'Play'}
             >
               {state.loading ? (
@@ -154,7 +154,7 @@ export function ReadAloudPlayer({
             <button
               type="button"
               onClick={() => onSeek(15)}
-              className="relative w-8 h-8 shrink-0 rounded-full grid place-items-center text-white/75 hover:bg-[var(--nyven-surface)] active:scale-95"
+              className="relative w-8 h-8 shrink-0 rounded-full grid place-items-center text-[var(--nyven-text)] hover:bg-[var(--nyven-surface)] active:scale-95"
               aria-label="Forward 15 seconds"
             >
               <RotateCw size={15} strokeWidth={2} />
@@ -166,7 +166,7 @@ export function ReadAloudPlayer({
             <button
               type="button"
               onClick={onCycleRate}
-              className="h-7 min-w-[1.9rem] shrink-0 px-1 rounded-full text-[11px] font-medium text-white/80 hover:bg-[var(--nyven-surface)]"
+              className="h-7 min-w-[1.9rem] shrink-0 px-1 rounded-full text-[11px] font-medium text-[var(--nyven-text)] hover:bg-[var(--nyven-surface)]"
               aria-label="Playback speed"
             >
               {state.rate}x
@@ -175,7 +175,7 @@ export function ReadAloudPlayer({
             <button
               type="button"
               onClick={onClose}
-              className="w-8 h-8 shrink-0 rounded-full grid place-items-center text-white/55 hover:text-white/90 hover:bg-[var(--nyven-surface)]"
+              className="w-8 h-8 shrink-0 rounded-full grid place-items-center text-[var(--nyven-text-secondary)] hover:text-[var(--nyven-text)] hover:bg-[var(--nyven-surface)]"
               aria-label="Close"
             >
               <X size={15} />

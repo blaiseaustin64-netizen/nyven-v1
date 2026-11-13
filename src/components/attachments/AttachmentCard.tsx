@@ -50,10 +50,10 @@ export function AttachmentCard({
         <img src={item.previewUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
       ) : (
         <>
-          <span className="absolute top-2 left-2 px-1.5 py-0.5 rounded-md bg-black/50 text-[10px] font-medium tracking-wide">
+          <span className="absolute top-2 left-2 px-1.5 py-0.5 rounded-md bg-[var(--nyven-overlay)] text-[10px] font-medium tracking-wide">
             {badge}
           </span>
-          <span className="absolute inset-0 grid place-items-center text-white/25">
+          <span className="absolute inset-0 grid place-items-center text-[var(--nyven-text-secondary)]">
             {isImage ? <ImageIcon size={28} /> : <File size={28} />}
           </span>
         </>

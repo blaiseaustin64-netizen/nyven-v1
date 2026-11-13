@@ -93,7 +93,7 @@ export function SecondaryButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-medium border border-[var(--nyven-border)] text-nyven-text-secondary hover:text-nyven-text hover:border-white/[0.2] disabled:opacity-50 transition-colors min-h-[36px]"
+      className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-medium border border-[var(--nyven-border)] text-nyven-text-secondary hover:text-nyven-text hover:border-[var(--nyven-border)] disabled:opacity-50 transition-colors min-h-[36px]"
     >
       {children}
     </button>

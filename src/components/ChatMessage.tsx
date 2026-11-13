@@ -146,7 +146,7 @@ export function ChatMessage({
       </div>
       {editingUser && (
         <div className="fixed inset-0 z-[91] flex items-end sm:items-center justify-center p-3" role="dialog" aria-modal="true">
-          <button type="button" className="absolute inset-0 bg-black/50" aria-label="Close" onClick={() => setEditingUser(false)} />
+          <button type="button" className="absolute inset-0 bg-[var(--nyven-overlay)]" aria-label="Close" onClick={() => setEditingUser(false)} />
           <div className="relative w-full max-w-md rounded-2xl border border-[var(--nyven-border)] bg-[var(--nyven-surface)] p-4 shadow-2xl">
             <p className="text-sm text-[var(--nyven-text-secondary)] mb-2">Edit text</p>
             <textarea
@@ -157,7 +157,7 @@ export function ChatMessage({
             />
             <div className="flex gap-2 mt-3">
               <button type="button" className="flex-1 h-11 rounded-xl border border-[var(--nyven-border)] text-[var(--nyven-text-secondary)]" onClick={() => setEditingUser(false)}>Cancel</button>
-              <button type="button" className="flex-1 h-11 rounded-xl bg-[var(--nyven-cyan)] text-[#071018] font-semibold" onClick={() => {
+              <button type="button" className="flex-1 h-11 rounded-xl bg-[var(--nyven-cyan)] text-[var(--nyven-on-accent)] font-semibold" onClick={() => {
                 setEditingUser(false)
                 onEdit?.(editDraft.trim())
               }}>Send</button>
@@ -167,7 +167,7 @@ export function ChatMessage({
       )}
       {userSheetOpen && (
         <div className="fixed inset-0 z-[90]" role="dialog" aria-modal="true">
-          <button type="button" className="absolute inset-0 bg-black/50" aria-label="Close" onClick={() => setUserSheetOpen(false)} />
+          <button type="button" className="absolute inset-0 bg-[var(--nyven-overlay)]" aria-label="Close" onClick={() => setUserSheetOpen(false)} />
           <div className="absolute left-3 right-3 bottom-[max(1rem,env(safe-area-inset-bottom))] rounded-2xl border border-[var(--nyven-border)] bg-[var(--nyven-surface)]/95 backdrop-blur-xl shadow-2xl p-2">
             <p className="text-[12px] text-[var(--nyven-text-secondary)] px-3 py-2">{timeLabel}</p>
             <button type="button" className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-[15px] text-[var(--nyven-text)] hover:bg-[var(--nyven-surface)]" onClick={() => { void navigator.clipboard.writeText(message.content); setUserSheetOpen(false) }}>
@@ -348,7 +348,7 @@ export function ChatMessage({
 
       {sheetOpen && (
         <div className="fixed inset-0 z-[90] lg:hidden" role="dialog" aria-modal="true">
-          <button type="button" className="absolute inset-0 bg-black/50" aria-label="Close" onClick={() => setSheetOpen(false)} />
+          <button type="button" className="absolute inset-0 bg-[var(--nyven-overlay)]" aria-label="Close" onClick={() => setSheetOpen(false)} />
           <div className="absolute left-0 right-0 bottom-0 rounded-t-[24px] border-t border-[var(--nyven-border)] bg-[var(--nyven-surface)]/95 backdrop-blur-xl p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
             <div className="w-10 h-1 rounded-full bg-[var(--nyven-surface)] mx-auto mb-4" />
             <p className="text-sm text-nyven-text-secondary mb-3 text-center">Message actions</p>

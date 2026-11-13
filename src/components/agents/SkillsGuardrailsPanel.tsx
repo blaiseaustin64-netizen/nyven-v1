@@ -104,7 +104,7 @@ export function SkillsGuardrailsPanel({ agentId }: Props) {
                 }}
                 className={clsx(
                   'mt-0.5 w-9 h-5 rounded-full relative transition-colors shrink-0',
-                  s.enabled ? 'bg-nyven-cyan/80' : 'bg-white/10'
+                  s.enabled ? 'bg-nyven-cyan/80' : 'bg-[var(--nyven-hover)]'
                 )}
                 aria-pressed={s.enabled}
               >

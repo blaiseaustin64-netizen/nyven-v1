@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import {
   User,
   Sparkles,
+  Palette,
   Mic,
   Shield,
   BarChart3,
@@ -42,7 +43,7 @@ type Section =
 
 const sections: { id: Section; label: string; icon: typeof User }[] = [
   { id: 'account', label: 'Account', icon: User },
-  { id: 'appearance', label: 'Appearance', icon: Sparkles },
+  { id: 'appearance', label: 'Appearance', icon: Palette },
   { id: 'ai', label: 'AI', icon: Sparkles },
   { id: 'voice', label: 'Voice', icon: Mic },
   { id: 'privacy', label: 'Privacy & Security', icon: Shield },
@@ -221,7 +222,7 @@ export function Settings() {
 
   const mobileGroups: { title: string; ids: Section[] }[] = [
     { title: 'You', ids: ['account'] },
-    { title: 'Experience', ids: ['ai', 'voice'] },
+    { title: 'Experience', ids: ['appearance', 'ai', 'voice'] },
     { title: 'Data', ids: ['privacy', 'usage', 'sessions'] },
     { title: 'Help', ids: ['support'] },
   ]
@@ -297,7 +298,7 @@ export function Settings() {
               <p className="text-xs uppercase tracking-wide text-nyven-text-secondary/80 px-1 mb-2">
                 {g.title}
               </p>
-              <div className="rounded-2xl border border-[var(--nyven-border)] bg-nyven-surface/60 overflow-hidden divide-y divide-white/[0.05]">
+              <div className="rounded-2xl border border-[var(--nyven-border)] bg-nyven-surface/60 overflow-hidden divide-y divide-[var(--nyven-border)]">
                 {g.ids.map((id) => {
                   const Icon = sections.find((s) => s.id === id)!.icon
                   return (
@@ -1085,7 +1086,7 @@ function AppearancePanel({ showToast }: { showToast: (m: string) => void }) {
                 }`}
               >
                 {selected && (
-                  <span className="absolute top-2 right-2 w-5 h-5 rounded-full bg-[var(--nyven-cyan)] text-[#071018] text-[11px] grid place-items-center font-bold">✓</span>
+                  <span className="absolute top-2 right-2 w-5 h-5 rounded-full bg-[var(--nyven-cyan)] text-[var(--nyven-on-accent)] text-[11px] grid place-items-center font-bold">✓</span>
                 )}
                 <div className="flex items-center gap-2 text-[var(--nyven-text)] mb-2">
                   <ThemeIcon kind={o.id} />

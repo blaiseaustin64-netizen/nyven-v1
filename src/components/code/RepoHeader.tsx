@@ -73,7 +73,7 @@ export function RepoHeader(p: Props) {
         </span>
       </div>
 
-      <div className="rounded-xl border border-[var(--nyven-border)] bg-white/[0.02] px-3 py-2 text-[11px] text-nyven-text-secondary leading-relaxed">
+      <div className="rounded-xl border border-[var(--nyven-border)] bg-[var(--nyven-input-bg)] px-3 py-2 text-[11px] text-nyven-text-secondary leading-relaxed">
         <span className="text-nyven-text">VEXDYN Forge:</span> not connected. {FORGE_STATUS.reason}
       </div>
     </Panel>

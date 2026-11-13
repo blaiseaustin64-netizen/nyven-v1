@@ -246,7 +246,7 @@ export function ConnectionsPanel({ agentId, agentType }: Props) {
           return (
             <li
               key={def.type}
-              className="rounded-2xl border border-[var(--nyven-border)] bg-white/[0.02] p-4"
+              className="rounded-2xl border border-[var(--nyven-border)] bg-[var(--nyven-input-bg)] p-4"
             >
               <div className="flex items-start gap-3">
                 <div className="p-2 rounded-xl bg-[var(--nyven-input-bg)] border border-[var(--nyven-border)]">
