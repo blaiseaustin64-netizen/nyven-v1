@@ -16,10 +16,15 @@ import {
   Search,
   Trash2,
   RotateCcw,
+  Smartphone,
+  Moon,
+  Sun,
+  Check,
 } from 'lucide-react'
 import { useAuth } from '../lib/auth/AuthContext'
 import { InstallPrompt } from '../components/InstallPrompt'
 import { isStandalone } from '../lib/pwa'
+import { loadAppearance, saveAppearance, type ThemeChoice } from '../lib/appearance'
 import { useConversationHistory } from '../lib/chat/ConversationHistoryContext'
 import {
   DEFAULT_PREFERENCES,
@@ -220,7 +225,7 @@ export function Settings() {
   }
 
   const sectionMeta: Record<Section, { label: string; hint: string }> = {
-    appearance: { label: 'Appearance', hint: 'Theme and text size' },
+    appearance: { label: 'Appearance', hint: 'Theme' },
     conversations: { label: 'Conversations', hint: 'Archived chats' },
     account: { label: 'Account', hint: 'Profile and sign-in' },
     ai: { label: 'AI', hint: 'Response style and memory' },
@@ -886,7 +891,7 @@ function Toggle({
         }`}
       >
         <span
-          className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform ${
+          className={`absolute top-0.5 w-5 h-5 rounded-full bg-nyven-knob transition-transform ${
             on ? 'left-4' : 'left-0.5'
           }`}
         />
@@ -1046,109 +1051,52 @@ function BugReportCard() {
 }
 
 function AppearanceSettingsPanel({ showToast }: { showToast: (m: string) => void }) {
-  const [prefs, setPrefs] = useState(() => {
-    try {
-      const raw = JSON.parse(localStorage.getItem('nyven_appearance_v1') || '{}')
-      const theme = raw.theme === 'default' ? 'nyven' : (raw.theme || 'nyven')
-      return { theme, textScale: typeof raw.textScale === 'number' ? raw.textScale : 1 }
-    } catch {
-      return { theme: 'nyven', textScale: 1 }
-    }
-  })
+  const [theme, setTheme] = useState<ThemeChoice>(() => loadAppearance().theme)
 
-  const apply = (next: { theme?: string; textScale?: number }) => {
+  const choose = (next: ThemeChoice) => {
+    if (next === theme) return
     try { navigator.vibrate?.(10) } catch { /* */ }
-    const merged = { theme: prefs.theme, textScale: prefs.textScale, ...next }
-    setPrefs(merged)
-    localStorage.setItem('nyven_appearance_v1', JSON.stringify(merged))
-    void import('../lib/appearance').then(({ applyAppearance }) => {
-      applyAppearance(merged as { theme: 'nyven' | 'system' | 'dark' | 'light'; textScale: number })
-    })
+    setTheme(next)
+    saveAppearance({ theme: next })
     showToast('Appearance updated')
   }
 
-  const options = [
-    { id: 'nyven', label: 'NYVEN', hint: 'Signature navy and cyan' },
-    { id: 'system', label: 'System', hint: 'Match your device' },
-    { id: 'dark', label: 'Dark', hint: 'True black, immersive' },
-    { id: 'light', label: 'Light', hint: 'Warm ivory' },
-  ] as const
+  const options: { id: ThemeChoice; label: string; Icon: typeof Sparkles }[] = [
+    { id: 'nyven', label: 'Default', Icon: Sparkles },
+    { id: 'system', label: 'System', Icon: Smartphone },
+    { id: 'dark', label: 'Dark', Icon: Moon },
+    { id: 'light', label: 'Light', Icon: Sun },
+  ]
 
   return (
     <>
       <SectionTitle title="Appearance" desc="Theme for the whole NYVEN interface." />
       <Card>
-        <div className="grid grid-cols-2 gap-3">
-          {options.map((o) => {
-            const selected = prefs.theme === o.id
+        <div className="grid grid-cols-2 gap-3" role="radiogroup" aria-label="Theme">
+          {options.map(({ id, label, Icon }) => {
+            const selected = theme === id
             return (
               <button
-                key={o.id}
+                key={id}
                 type="button"
-                onClick={() => apply({ theme: o.id })}
-                className={`relative text-left rounded-2xl border p-3 transition ${
+                role="radio"
+                aria-checked={selected}
+                onClick={() => choose(id)}
+                className={`relative flex items-center gap-3 rounded-2xl border px-4 py-4 text-left transition ${
                   selected
-                    ? 'border-[var(--nyven-cyan)] bg-[var(--nyven-bg-secondary)]'
-                    : 'border-[var(--nyven-border)] bg-[var(--nyven-bg)]'
+                    ? 'border-nyven-cyan bg-nyven-bg-secondary'
+                    : 'border-nyven-border bg-nyven-bg'
                 }`}
               >
+                <Icon size={20} className={selected ? 'text-nyven-cyan' : 'text-nyven-text-secondary'} />
+                <span className="text-sm font-medium text-nyven-text">{label}</span>
                 {selected && (
-                  <span className="absolute top-2 right-2 text-[var(--nyven-cyan)] text-xs font-bold">✓</span>
+                  <Check size={16} className="absolute top-2.5 right-2.5 text-nyven-cyan" aria-hidden="true" />
                 )}
-                <p className="text-sm font-medium text-[var(--nyven-text)]">{o.label}</p>
-                <div className="mt-2 h-8 rounded-lg overflow-hidden border border-[var(--nyven-border)] flex">
-                  {o.id === 'nyven' && (
-                    <>
-                      <span className="flex-1" style={{ background: '#07090D' }} />
-                      <span className="w-1/3" style={{ background: '#62E6FF' }} />
-                    </>
-                  )}
-                  {o.id === 'system' && (
-                    <>
-                      <span className="flex-1" style={{ background: '#F6F4EF' }} />
-                      <span className="flex-1" style={{ background: '#000' }} />
-                    </>
-                  )}
-                  {o.id === 'dark' && (
-                    <>
-                      <span className="flex-1" style={{ background: '#000' }} />
-                      <span className="w-1/4" style={{ background: '#fff' }} />
-                    </>
-                  )}
-                  {o.id === 'light' && (
-                    <>
-                      <span className="flex-1" style={{ background: '#F6F4EF' }} />
-                      <span className="w-1/3" style={{ background: '#1A1D24' }} />
-                    </>
-                  )}
-                </div>
-                <p className="text-[0.75rem] text-[var(--nyven-text-secondary)] mt-2">{o.hint}</p>
               </button>
             )
           })}
         </div>
-        <div className="mt-4 rounded-xl border border-[var(--nyven-border)] bg-[var(--nyven-bg)] p-3">
-          <p className="text-[0.75rem] text-[var(--nyven-text-secondary)] mb-2">Live preview</p>
-          <div className="rounded-2xl bg-[var(--nyven-surface)] border border-[var(--nyven-border)] px-3 py-2 text-[0.9375rem] text-[var(--nyven-text)] inline-block mb-2">
-            What can you help me with?
-          </div>
-          <p className="text-[0.9375rem] text-[var(--nyven-text)] leading-relaxed">
-            I can help you think, write, and build — ask anything.
-          </p>
-        </div>
-      </Card>
-      <Card>
-        <Field label="Text size">
-          <input
-            type="range"
-            min={0.9}
-            max={1.25}
-            step={0.05}
-            value={prefs.textScale}
-            onChange={(e) => apply({ textScale: Number(e.target.value) })}
-            className="w-full accent-[var(--nyven-cyan)]"
-          />
-        </Field>
       </Card>
     </>
   )

@@ -37,7 +37,7 @@ export function ChatFloatingChrome({
             <button
               type="button"
               onClick={onJump}
-              className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-nyven-surface/90 backdrop-blur-md border border-[var(--nyven-border)] text-nyven-text shadow-lg shadow-black/30 hover:border-nyven-cyan/40 hover:text-nyven-cyan transition-colors"
+              className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-nyven-surface/90 backdrop-blur-md border border-[var(--nyven-border)] text-nyven-text shadow-lg shadow-nyven-shade/70 hover:border-nyven-cyan/40 hover:text-nyven-cyan transition-colors"
               aria-label="Jump to latest"
               title="Jump to latest"
             >

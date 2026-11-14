@@ -87,7 +87,7 @@ export function VoiceChatScreen({
   return (
     <div
       className="fixed inset-0 z-[80] flex flex-col"
-      style={{ background: '#07080d', color: '#e8ecf5' }}
+      style={{ background: 'var(--nyven-bg)', color: 'var(--nyven-text)' }}
       role="dialog"
       aria-modal="true"
       aria-label="Voice chat"
@@ -130,13 +130,13 @@ export function VoiceChatScreen({
       <div className="relative z-10 flex-1 flex flex-col items-center justify-end pb-4 px-6 pointer-events-none">
         <p
           className="text-[15px] tracking-wide mb-2"
-          style={{ color: focused ? '#e8ecf5' : '#7d869c' }}
+          style={{ color: focused ? 'var(--nyven-text)' : 'var(--nyven-text-secondary)' }}
           aria-live="polite"
         >
           {status}
         </p>
         {statusHint && (
-          <p className="text-xs text-center max-w-sm mb-2" style={{ color: '#7d869c' }}>
+          <p className="text-xs text-center max-w-sm mb-2" style={{ color: 'var(--nyven-text-secondary)' }}>
             {statusHint}
           </p>
         )}
@@ -160,7 +160,7 @@ export function VoiceChatScreen({
         >
           <Mic size={22} />
         </button>
-        <p className="mt-3 text-[12px]" style={{ color: '#7d869c' }}>
+        <p className="mt-3 text-[12px]" style={{ color: 'var(--nyven-text-secondary)' }}>
           {voicePhase === 'listening' ? 'Tap to finish' : 'Tap to speak'}
         </p>
       </div>

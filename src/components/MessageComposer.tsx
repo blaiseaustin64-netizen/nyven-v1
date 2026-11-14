@@ -538,7 +538,7 @@ export function MessageComposer({
                     </div>
                   )}
                   {(a.status === 'uploading' || a.status === 'processing') && (
-                    <div className="absolute inset-0 bg-black/45 flex items-center justify-center">
+                    <div className="absolute inset-0 bg-[var(--nyven-overlay)] flex items-center justify-center">
                       <Loader2 size={22} className="animate-spin text-[var(--nyven-text)]" />
                     </div>
                   )}
@@ -603,7 +603,7 @@ export function MessageComposer({
             />
             <div
               ref={menuRef}
-              className="absolute left-0 right-0 bottom-0 max-h-[min(88vh,640px)] flex flex-col rounded-t-[28px] border-t border-[var(--nyven-border)] bg-[var(--nyven-surface)]/95 backdrop-blur-xl shadow-[0_-12px_40px_rgba(0,0,0,0.45)] pb-[max(1rem,env(safe-area-inset-bottom))]"
+              className="absolute left-0 right-0 bottom-0 max-h-[min(88vh,640px)] flex flex-col rounded-t-[28px] border-t border-[var(--nyven-border)] bg-nyven-surface/95 backdrop-blur-xl shadow-[0_-12px_40px_rgb(var(--nyven-shadow-rgb)/var(--nyven-shadow-a))] pb-[max(1rem,env(safe-area-inset-bottom))]"
               style={{
                 transform: `translateY(${sheetDragY}px)`,
                 transition:
@@ -613,7 +613,7 @@ export function MessageComposer({
                     ? 'transform 240ms cubic-bezier(0.22, 1, 0.36, 1)'
                     : undefined,
                 backgroundImage:
-                  'linear-gradient(180deg, rgba(98,230,255,0.08) 0%, rgba(139,124,255,0.04) 28px, transparent 72px)',
+                  'linear-gradient(180deg, rgb(var(--nyven-cyan-rgb) / 0.08) 0%, rgb(var(--nyven-violet-rgb) / 0.04) 28px, transparent 72px)',
               }}
               onTouchStart={(e) => {
                 sheetDragStartY.current = e.touches[0].clientY
@@ -700,7 +700,7 @@ export function MessageComposer({
         {menuOpen && !isNarrow && (
           <div
             ref={menuRef}
-            className="absolute left-3 bottom-full mb-2 z-30 w-56 origin-bottom-left rounded-xl border border-[var(--nyven-border)] bg-[var(--nyven-surface)]/95 backdrop-blur-md shadow-xl shadow-black/40 p-1.5"
+            className="absolute left-3 bottom-full mb-2 z-30 w-56 origin-bottom-left rounded-xl border border-[var(--nyven-border)] bg-nyven-surface/95 backdrop-blur-md shadow-xl shadow-nyven-shade/90 p-1.5"
             role="menu"
             aria-label="Add to chat"
           >

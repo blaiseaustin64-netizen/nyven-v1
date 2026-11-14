@@ -58,7 +58,7 @@ export function AttachmentCard({
           </span>
         </>
       )}
-      <span className="absolute bottom-0 inset-x-0 px-2 py-1.5 bg-gradient-to-t from-black/80 to-transparent">
+      <span className="absolute bottom-0 inset-x-0 px-2 py-1.5 bg-gradient-to-t from-nyven-surface/90 to-transparent">
         <span className="block text-[11px] leading-snug line-clamp-2 break-all">{name}</span>
       </span>
     </button>

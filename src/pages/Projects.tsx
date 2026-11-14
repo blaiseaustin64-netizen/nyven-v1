@@ -265,7 +265,7 @@ export function Projects() {
                     e.stopPropagation()
                     openMenu(p)
                   }}
-                  className="absolute top-2 right-2 w-8 h-8 rounded-full grid place-items-center bg-black/30 text-[var(--nyven-text-secondary)]"
+                  className="absolute top-2 right-2 w-8 h-8 rounded-full grid place-items-center bg-nyven-hover text-[var(--nyven-text-secondary)]"
                   aria-label="Project menu"
                 >
                   <MoreHorizontal size={16} />

@@ -86,9 +86,9 @@ export function ReadAloudPlayer({
         >
           <div
             className="relative w-full max-w-[22rem] flex items-center gap-0.5 rounded-full pl-2.5 pr-1 py-1
-              bg-[var(--nyven-surface)]/90 border border-[var(--nyven-border)]
+              bg-nyven-surface/90 border border-[var(--nyven-border)]
               backdrop-blur-xl
-              shadow-[0_12px_40px_rgba(0,0,0,0.45),0_0_24px_rgba(34,211,238,0.06)]"
+              shadow-[0_12px_40px_rgb(var(--nyven-shadow-rgb)/var(--nyven-shadow-a)),0_0_24px_var(--nyven-glow)]"
           >
             {/* Smooth progress — driven by rAF via transform scaleX, no React per-frame */}
             <button
@@ -113,7 +113,7 @@ export function ReadAloudPlayer({
                 size={14}
                 className={
                   state.playing || state.loading
-                    ? 'text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.35)]'
+                    ? 'text-nyven-cyan drop-shadow-[0_0_8px_var(--nyven-glow-strong)]'
                     : 'text-[var(--nyven-text-secondary)]'
                 }
               />

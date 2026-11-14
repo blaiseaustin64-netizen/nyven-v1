@@ -5,6 +5,7 @@
     <link rel="icon" type="image/png" href="/nyven-icon-192.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
     <meta name="theme-color" content="#07090D" />
+    <meta name="color-scheme" content="dark" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="NYVEN" />
@@ -17,20 +18,25 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <title>NYVEN</title>
     <script>
+      /* Apply the saved theme before first paint (no flash). Keep in sync with src/lib/appearance.ts */
       (function () {
         try {
-          var k = 'nyven_appearance_v1';
-          var raw = localStorage.getItem(k);
-          var pref = raw ? JSON.parse(raw) : { theme: 'default', textScale: 1 };
-          var theme = pref.theme || 'default';
+          var raw = localStorage.getItem('nyven_appearance_v1');
+          var pref = raw ? JSON.parse(raw) : {};
+          var theme = pref.theme === 'default' || !pref.theme ? 'nyven' : pref.theme;
           if (theme === 'system') {
-            theme = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'default';
+            theme = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'nyven';
           }
-          if (theme !== 'light' && theme !== 'dark' && theme !== 'default') theme = 'nyven';
-          document.documentElement.setAttribute('data-theme', theme);
-          document.documentElement.style.setProperty('--nyven-font-scale', (pref.textScale || 1) * 16 + 'px');
+          if (theme !== 'light' && theme !== 'dark' && theme !== 'nyven') theme = 'nyven';
+          var root = document.documentElement;
+          var scheme = theme === 'light' ? 'light' : 'dark';
+          root.setAttribute('data-theme', theme);
+          root.style.colorScheme = scheme;
+          var colors = { nyven: '#07090D', dark: '#000000', light: '#F6F4EF' };
           var meta = document.querySelector('meta[name="theme-color"]');
-          if (meta) meta.setAttribute('content', theme === 'light' ? '#F6F4EF' : '#07090D');
+          if (meta) meta.setAttribute('content', colors[theme]);
+          var cs = document.querySelector('meta[name="color-scheme"]');
+          if (cs) cs.setAttribute('content', scheme);
         } catch (e) {}
       })();
     </script>

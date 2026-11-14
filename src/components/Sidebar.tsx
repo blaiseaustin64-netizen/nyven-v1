@@ -52,7 +52,7 @@ function highlightMatch(title: string, q: string) {
   return (
     <>
       {title.slice(0, i)}
-      <mark className="bg-[var(--nyven-cyan)]/25 text-[var(--nyven-text)] rounded px-0.5">{title.slice(i, i + q.trim().length)}</mark>
+      <mark className="bg-nyven-cyan/25 text-[var(--nyven-text)] rounded px-0.5">{title.slice(i, i + q.trim().length)}</mark>
       {title.slice(i + q.trim().length)}
     </>
   )
@@ -437,7 +437,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
             />
             <div
               className={clsx(
-                'hidden sm:block absolute right-2 z-50 w-[220px] rounded-[20px] border border-[var(--nyven-border)] bg-[var(--nyven-surface)]/95 backdrop-blur-xl shadow-xl shadow-black/40 py-1.5 origin-top-right animate-in fade-in zoom-in-95 duration-150',
+                'hidden sm:block absolute right-2 z-50 w-[220px] rounded-[20px] border border-[var(--nyven-border)] bg-nyven-surface/95 backdrop-blur-xl shadow-xl shadow-nyven-shade/90 py-1.5 origin-top-right animate-in fade-in zoom-in-95 duration-150',
                 menuPos === 'above' ? 'bottom-full mb-1' : 'top-full mt-1'
               )}
               role="menu"
@@ -509,7 +509,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         <div className="flex items-center gap-2.5 flex-1 min-w-0">
           <NIdentity state="white" size={28} />
           {!collapsed && (
-            <span className="font-display font-semibold text-[15px] tracking-[0.18em] bg-gradient-to-r from-white via-[#9fdcff] to-[#8fa4ff] bg-clip-text text-transparent truncate">
+            <span className="font-display font-semibold text-[15px] tracking-[0.18em] bg-gradient-to-r from-nyven-text via-nyven-cyan to-nyven-violet bg-clip-text text-transparent truncate">
               NYVEN
             </span>
           )}
@@ -578,7 +578,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
       <div className="flex-1 min-h-0 flex flex-col border-t border-[var(--nyven-border)] mt-1">
         {!collapsed && (
           <div className="shrink-0 px-3 pt-3 pb-2 space-y-2">
-            <p className="px-1 text-[11px] font-medium uppercase tracking-wider text-[var(--nyven-text-secondary)]/90">
+            <p className="px-1 text-[11px] font-medium uppercase tracking-wider text-nyven-text-secondary/90">
               Recents
             </p>
             <div className="relative">
@@ -597,7 +597,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
                 placeholder="Search chats"
                 onFocus={() => setSearchFocused(true)}
                 onBlur={() => setSearchFocused(false)}
-                className="w-full h-11 pl-9 pr-10 rounded-xl bg-[var(--nyven-input-bg)] border border-[var(--nyven-border)] text-sm text-[var(--nyven-text)] placeholder:text-[var(--nyven-text-secondary)] outline-none focus:border-[var(--nyven-cyan)]/35"
+                className="w-full h-11 pl-9 pr-10 rounded-xl bg-[var(--nyven-input-bg)] border border-[var(--nyven-border)] text-sm text-[var(--nyven-text)] placeholder:text-[var(--nyven-text-secondary)] outline-none focus:border-nyven-cyan/35"
                 aria-label="Search chats"
               />
               {query && (
@@ -637,7 +637,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
           {!collapsed &&
             groups.map(({ label, items }) => (
               <div key={label} className="mb-2">
-                <p className="px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-[var(--nyven-text-secondary)]/80 flex items-center gap-1.5">
+                <p className="px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-nyven-text-secondary/80 flex items-center gap-1.5">
                   {label === 'Pinned' && <Pin size={11} />}
                   {label}
                 </p>
@@ -648,7 +648,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
       </div>
 
       {archiveToast && (
-        <div className="fixed bottom-[max(5rem,env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-[80] flex items-center gap-3 px-4 py-3 rounded-2xl border border-[var(--nyven-border)] bg-[var(--nyven-surface)]/95 backdrop-blur-xl shadow-xl max-w-[min(92vw,24rem)]">
+        <div className="fixed bottom-[max(5rem,env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-[80] flex items-center gap-3 px-4 py-3 rounded-2xl border border-[var(--nyven-border)] bg-nyven-surface/95 backdrop-blur-xl shadow-xl max-w-[min(92vw,24rem)]">
           <span className="text-[0.875rem] text-[var(--nyven-text)]">{archiveToast.text}</span>
           {archiveToast.undoId && (
             <button
@@ -675,7 +675,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
             onMobileClose?.()
             navigate('/settings')
           }}
-          className="w-10 h-10 rounded-full bg-[var(--nyven-cyan)]/15 text-[var(--nyven-cyan)] flex items-center justify-center text-sm font-semibold shrink-0 min-h-[44px] min-w-[44px]"
+          className="w-10 h-10 rounded-full bg-nyven-cyan/15 text-[var(--nyven-cyan)] flex items-center justify-center text-sm font-semibold shrink-0 min-h-[44px] min-w-[44px]"
           aria-label="Open settings"
         >
           {initial}
@@ -695,7 +695,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
             <button
               type="button"
               onClick={handleNewChat}
-              className="shrink-0 inline-flex items-center gap-1.5 px-3 h-10 rounded-full bg-transparent border border-[var(--nyven-border)] text-xs font-medium text-[var(--nyven-text-secondary)] hover:text-[var(--nyven-text)] hover:border-[var(--nyven-cyan)]/35 hover:bg-[var(--nyven-input-bg)] active:scale-[0.98] transition-all min-h-[44px]"
+              className="shrink-0 inline-flex items-center gap-1.5 px-3 h-10 rounded-full bg-transparent border border-[var(--nyven-border)] text-xs font-medium text-[var(--nyven-text-secondary)] hover:text-[var(--nyven-text)] hover:border-nyven-cyan/35 hover:bg-[var(--nyven-input-bg)] active:scale-[0.98] transition-all min-h-[44px]"
               aria-label="New chat"
             >
               <SquarePen size={14} strokeWidth={1.85} />
@@ -764,7 +764,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
               onKeyDown={(e) => {
                 if (e.key === 'Enter') commitRename()
               }}
-              className="w-full h-11 px-3 rounded-xl bg-[var(--nyven-input-bg)] border border-[var(--nyven-border)] text-sm text-[var(--nyven-text)] outline-none focus:border-[var(--nyven-cyan)]/40"
+              className="w-full h-11 px-3 rounded-xl bg-[var(--nyven-input-bg)] border border-[var(--nyven-border)] text-sm text-[var(--nyven-text)] outline-none focus:border-nyven-cyan/40"
             />
             {renameError && (
               <p className="text-xs text-red-300 mt-2">{renameError}</p>

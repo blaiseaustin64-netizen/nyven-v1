@@ -6,15 +6,27 @@ export default {
   ],
   theme: {
     extend: {
+      // Every NYVEN color comes from the active theme (see src/index.css).
+      // <alpha-value> keeps opacity classes working: bg-nyven-cyan/90, border-nyven-border/50 ...
       colors: {
         nyven: {
-          bg: '#07090D',
-          'bg-secondary': '#0D1118',
-          surface: '#111722',
-          text: '#F5F7FA',
-          'text-secondary': '#8993A4',
-          cyan: '#62E6FF',
-          violet: '#8B7CFF',
+          bg: 'rgb(var(--nyven-bg-rgb) / <alpha-value>)',
+          'bg-secondary': 'rgb(var(--nyven-bg-secondary-rgb) / <alpha-value>)',
+          surface: 'rgb(var(--nyven-surface-rgb) / <alpha-value>)',
+          'surface-2': 'rgb(var(--nyven-surface-2-rgb) / <alpha-value>)',
+          text: 'rgb(var(--nyven-text-rgb) / <alpha-value>)',
+          'text-secondary': 'rgb(var(--nyven-text-secondary-rgb) / <alpha-value>)',
+          // border / hover / input carry their own base alpha in the theme
+          border: 'rgb(var(--nyven-border-rgb) / calc(var(--nyven-border-a) * <alpha-value>))',
+          hover: 'rgb(var(--nyven-hover-rgb) / calc(var(--nyven-hover-a) * <alpha-value>))',
+          input: 'rgb(var(--nyven-input-bg-rgb) / calc(var(--nyven-input-bg-a) * <alpha-value>))',
+          overlay: 'rgb(var(--nyven-overlay-rgb) / calc(var(--nyven-overlay-a) * <alpha-value>))',
+          cyan: 'rgb(var(--nyven-cyan-rgb) / <alpha-value>)',
+          violet: 'rgb(var(--nyven-violet-rgb) / <alpha-value>)',
+          'on-accent': 'rgb(var(--nyven-on-accent-rgb) / <alpha-value>)',
+          // shadow tint: strength follows the theme (strong in Dark, soft in Light)
+          shade: 'rgb(var(--nyven-shadow-rgb) / calc(var(--nyven-shadow-a) * <alpha-value>))',
+          knob: 'rgb(var(--nyven-knob-rgb) / <alpha-value>)',
         }
       },
       fontFamily: {
@@ -42,8 +54,10 @@ export default {
         },
       },
       boxShadow: {
-        'nyven': '0 0 40px -10px rgba(98, 230, 255, 0.15)',
-        'nyven-violet': '0 0 40px -10px rgba(139, 124, 255, 0.12)',
+        // glow strength comes from the theme (soft in Light, off in Dark)
+        'nyven': '0 0 40px -10px var(--nyven-glow)',
+        'nyven-violet': '0 0 40px -10px var(--nyven-glow-violet)',
+        'nyven-pop': 'var(--nyven-shadow)',
       }
     },
   },

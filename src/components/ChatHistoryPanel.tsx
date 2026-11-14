@@ -93,7 +93,7 @@ export function ChatHistoryPanel({
   return (
     <div
       className={clsx(
-        'flex flex-col h-full bg-[#0a0b10]/98 backdrop-blur-xl border-[var(--nyven-border)]',
+        'flex flex-col h-full bg-nyven-bg-secondary/95 backdrop-blur-xl border-[var(--nyven-border)]',
         variant === 'desktop'
           ? 'border-r w-[260px] lg:w-[280px] shrink-0'
           : 'w-[min(100vw,320px)] border-r shadow-2xl'

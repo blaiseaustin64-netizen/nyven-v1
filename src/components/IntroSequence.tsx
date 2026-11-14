@@ -42,7 +42,7 @@ export function IntroSequence({ onComplete, isFirstVisit }: IntroSequenceProps) 
 
   if (!isFirstVisit) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#07090D]" onClick={onComplete} role="button" tabIndex={0}>
+      <div className="fixed inset-0 z-50 flex items-center justify-center nyven-intro-bg" onClick={onComplete} role="button" tabIndex={0}>
         <AnimatePresence>
           {stage < 2 && (
             <motion.div
@@ -61,7 +61,7 @@ export function IntroSequence({ onComplete, isFirstVisit }: IntroSequenceProps) 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#07090D] overflow-hidden" onClick={onComplete} role="button" tabIndex={0}>
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center nyven-intro-bg overflow-hidden" onClick={onComplete} role="button" tabIndex={0}>
       <div className="absolute inset-0 nyven-bg" />
 
       <AnimatePresence mode="wait">

@@ -784,7 +784,7 @@ export function AgentEditor() {
                           className={clsx(
                             'w-9 h-9 rounded-full border-2 transition-transform',
                             form.color === c
-                              ? 'border-white scale-110'
+                              ? 'border-nyven-text scale-110'
                               : 'border-transparent hover:scale-105'
                           )}
                           style={{ backgroundColor: c }}
@@ -1339,7 +1339,7 @@ function WidgetPreview({ form, typeName }: { form: FormState; typeName?: string 
             </div>
           </div>
         </div>
-        <div className="px-3 py-2.5 border-t border-[var(--nyven-border)] flex gap-2 bg-black/20">
+        <div className="px-3 py-2.5 border-t border-[var(--nyven-border)] flex gap-2 bg-nyven-bg/40">
           <div className="flex-1 h-9 rounded-xl bg-nyven-bg border border-[var(--nyven-border)]" />
           <div className="w-9 h-9 rounded-xl" style={{ backgroundColor: form.color }} />
         </div>

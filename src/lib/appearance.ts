@@ -1,15 +1,21 @@
 export type ThemeChoice = 'nyven' | 'system' | 'dark' | 'light'
+export type ResolvedTheme = 'nyven' | 'dark' | 'light'
 
 export type AppearancePrefs = {
   theme: ThemeChoice
-  textScale: number
 }
 
 const KEY = 'nyven_appearance_v1'
 
 export const DEFAULT_APPEARANCE: AppearancePrefs = {
   theme: 'nyven',
-  textScale: 1,
+}
+
+/** Browser chrome color (<meta name="theme-color">) per resolved theme. Matches --nyven-bg. */
+const THEME_COLOR: Record<ResolvedTheme, string> = {
+  nyven: '#07090D',
+  dark: '#000000',
+  light: '#F6F4EF',
 }
 
 function migrateTheme(raw: string | undefined): ThemeChoice {
@@ -22,23 +28,25 @@ export function loadAppearance(): AppearancePrefs {
   try {
     const raw = localStorage.getItem(KEY)
     if (!raw) return { ...DEFAULT_APPEARANCE }
-    const parsed = JSON.parse(raw) as Partial<AppearancePrefs>
-    return {
-      theme: migrateTheme(parsed.theme as string | undefined),
-      textScale: typeof parsed.textScale === 'number' ? parsed.textScale : 1,
-    }
+    const parsed = JSON.parse(raw) as { theme?: string }
+    // Old saved values may still contain textScale; it is simply ignored.
+    return { theme: migrateTheme(parsed.theme) }
   } catch {
     return { ...DEFAULT_APPEARANCE }
   }
 }
 
 export function saveAppearance(p: AppearancePrefs) {
-  localStorage.setItem(KEY, JSON.stringify(p))
+  try {
+    localStorage.setItem(KEY, JSON.stringify({ theme: p.theme }))
+  } catch {
+    /* storage unavailable: still apply for this session */
+  }
   applyAppearance(p)
 }
 
-/** Resolved theme attribute on <html data-theme="..."> */
-export function resolveThemeAttr(choice: ThemeChoice): 'nyven' | 'dark' | 'light' {
+/** Resolved theme attribute on <html data-theme="...">. "system" follows the phone live. */
+export function resolveThemeAttr(choice: ThemeChoice): ResolvedTheme {
   if (choice === 'light') return 'light'
   if (choice === 'dark') return 'dark'
   if (choice === 'nyven') return 'nyven'
@@ -48,50 +56,63 @@ export function resolveThemeAttr(choice: ThemeChoice): 'nyven' | 'dark' | 'light
   return 'nyven'
 }
 
-function applyThemeAttrs(p: AppearancePrefs) {
-  const attr = resolveThemeAttr(p.theme)
-  document.documentElement.setAttribute('data-theme', attr)
-  document.documentElement.style.setProperty('--nyven-font-scale', `${(p.textScale || 1) * 16}px`)
-  const meta = document.querySelector('meta[name="theme-color"]')
-  const colors: Record<string, string> = {
-    nyven: '#07090D',
-    dark: '#000000',
-    light: '#F6F4EF',
-  }
-  if (meta) meta.setAttribute('content', colors[attr] || colors.nyven)
-  document.documentElement.style.colorScheme = attr === 'light' ? 'light' : 'dark'
+function setMeta(name: string, content: string) {
+  const meta = document.querySelector(`meta[name="${name}"]`)
+  if (meta) meta.setAttribute('content', content)
 }
 
+function applyThemeAttrs(p: AppearancePrefs) {
+  const attr = resolveThemeAttr(p.theme)
+  const root = document.documentElement
+  root.setAttribute('data-theme', attr)
+  const scheme = attr === 'light' ? 'light' : 'dark'
+  root.style.colorScheme = scheme
+  setMeta('theme-color', THEME_COLOR[attr])
+  setMeta('color-scheme', scheme)
+}
+
+type ViewTransitionDoc = Document & {
+  startViewTransition?: (cb: () => void) => unknown
+}
+
+const SWITCH_CLASS = 'nyven-theme-animating'
+let switchTimer: number | undefined
+
+/**
+ * Apply a theme with a crossfade of the whole UI at once.
+ * 1) document.startViewTransition (about 250ms, see ::view-transition rules in index.css)
+ * 2) fallback: a temporary class on <html> for 300ms, then removed
+ * Reduced motion: switch instantly.
+ */
 export function applyAppearance(p: AppearancePrefs) {
   const run = () => applyThemeAttrs(p)
   const reduced =
     typeof window !== 'undefined' &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
-  if (reduced) {
+  if (typeof document === 'undefined' || reduced) {
     run()
     return
   }
 
-  // @ts-expect-error startViewTransition
-  if (typeof document !== 'undefined' && document.startViewTransition) {
+  const doc = document as ViewTransitionDoc
+  if (typeof doc.startViewTransition === 'function') {
     try {
-      // @ts-expect-error startViewTransition
-      document.startViewTransition(() => {
-        run()
-      })
+      doc.startViewTransition(run)
       return
     } catch {
-      /* fall through */
+      /* fall through to the class based crossfade */
     }
   }
 
   const html = document.documentElement
-  html.classList.add('nyven-theme-animating')
+  html.classList.add(SWITCH_CLASS)
   run()
-  window.setTimeout(() => {
-    html.classList.remove('nyven-theme-animating')
-  }, 320)
+  if (switchTimer) window.clearTimeout(switchTimer)
+  switchTimer = window.setTimeout(() => {
+    html.classList.remove(SWITCH_CLASS)
+    switchTimer = undefined
+  }, 300)
 }
 
 export function subscribeSystemTheme(onChange: () => void) {

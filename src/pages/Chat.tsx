@@ -813,7 +813,7 @@ export function Chat() {
           <div className="max-w-3xl mx-auto space-y-6">
             {messages.length === 0 && !privateMode && (
               <div className="flex flex-col items-center justify-center min-h-[50vh] py-16 sm:py-24 text-center px-4">
-                <NIdentity state="white" size={56} className="mb-6 opacity-90 drop-shadow-[0_0_24px_rgba(98,230,255,0.25)]" />
+                <NIdentity state="white" size={56} className="mb-6 opacity-90 drop-shadow-[0_0_24px_var(--nyven-glow-strong)]" />
                 <h2 className="font-display text-2xl sm:text-[1.75rem] font-medium text-nyven-text mb-3">
                   {timeGreeting(firstName)}
                 </h2>

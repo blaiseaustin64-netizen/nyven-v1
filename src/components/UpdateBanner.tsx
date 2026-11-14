@@ -50,9 +50,9 @@ export function UpdateBanner() {
         setTimeout(() => window.location.reload(), 400)
       }}
       className="fixed top-[max(0.5rem,env(safe-area-inset-top))] left-1/2 -translate-x-1/2 z-[90] px-4 py-2.5 rounded-full
-        bg-[var(--nyven-surface)]/95 border border-[var(--nyven-border)] backdrop-blur-xl
+        bg-nyven-surface/95 border border-[var(--nyven-border)] backdrop-blur-xl
         text-[13px] font-medium text-[var(--nyven-text)] shadow-lg
-        hover:border-[var(--nyven-cyan)]/40"
+        hover:border-nyven-cyan/40"
     >
       Update available — tap to refresh
     </button>

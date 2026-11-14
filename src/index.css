@@ -2,14 +2,148 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --nyven-bg: #07090D;
-  --nyven-bg-secondary: #0D1118;
-  --nyven-surface: #111722;
-  --nyven-text: #F5F7FA;
-  --nyven-text-secondary: #8993A4;
-  --nyven-cyan: #62E6FF;
-  --nyven-violet: #8B7CFF;
+/* ══════════════════════════════════════════════════════════════════════
+   NYVEN THEME SYSTEM (single source of truth)
+   Every color is stored as RGB channels (--nyven-xxx-rgb) so Tailwind can
+   build bg-nyven-xxx/50 style opacity classes from them. Full-color
+   variables (--nyven-xxx) are derived below for var(--nyven-xxx) usage.
+   Themes: nyven (Default) · dark · light. "System" resolves to one of them.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Default (NYVEN navy + cyan). Also the fallback before data-theme is set.
+   .nyven-intro-bg / .nyven-scope-dark force this palette inside any theme. */
+:root,
+html[data-theme="nyven"],
+html[data-theme="default"],
+.nyven-scope-dark,
+.nyven-intro-bg {
+  --nyven-bg-rgb: 7 9 13;
+  --nyven-bg-secondary-rgb: 13 17 24;
+  --nyven-surface-rgb: 17 23 34;
+  --nyven-surface-2-rgb: 22 29 42;
+  --nyven-text-rgb: 245 247 250;
+  --nyven-text-secondary-rgb: 137 147 164;
+  --nyven-border-rgb: 255 255 255;
+  --nyven-border-a: 0.08;
+  --nyven-cyan-rgb: 98 230 255;
+  --nyven-violet-rgb: 139 124 255;
+  --nyven-hover-rgb: 255 255 255;
+  --nyven-hover-a: 0.06;
+  --nyven-input-bg-rgb: 255 255 255;
+  --nyven-input-bg-a: 0.04;
+  --nyven-overlay-rgb: 0 0 0;
+  --nyven-overlay-a: 0.55;
+  --nyven-on-accent-rgb: 7 16 24;
+  --nyven-knob-rgb: 255 255 255;
+  --nyven-icon-bg-rgb: 98 230 255;
+  --nyven-icon-bg-a: 0.12;
+  --nyven-shadow-rgb: 0 0 0;
+  --nyven-shadow-a: 0.45;
+  /* glows: cyan / violet ambience */
+  --nyven-glow-a: 0.15;
+  --nyven-glow-violet-a: 0.12;
+  --nyven-glow-strong-a: 0.35;
+  /* ambient background aura + particles */
+  --nyven-aura-a1: 0.06;
+  --nyven-aura-a2: 0.04;
+  --nyven-aura-a3: 0.03;
+  --nyven-particle-opacity: 0.7;
+  color-scheme: dark;
+}
+
+/* Dark: true black, white text, no colored glows */
+html[data-theme="dark"] {
+  --nyven-bg-rgb: 0 0 0;
+  --nyven-bg-secondary-rgb: 10 10 10;
+  --nyven-surface-rgb: 18 18 18;
+  --nyven-surface-2-rgb: 26 26 26;
+  --nyven-text-rgb: 255 255 255;
+  --nyven-text-secondary-rgb: 160 160 160;
+  --nyven-border-rgb: 255 255 255;
+  --nyven-border-a: 0.1;
+  --nyven-cyan-rgb: 125 232 255;
+  --nyven-violet-rgb: 169 155 255;
+  --nyven-hover-rgb: 255 255 255;
+  --nyven-hover-a: 0.08;
+  --nyven-input-bg-rgb: 255 255 255;
+  --nyven-input-bg-a: 0.06;
+  --nyven-overlay-rgb: 0 0 0;
+  --nyven-overlay-a: 0.7;
+  --nyven-on-accent-rgb: 0 0 0;
+  --nyven-knob-rgb: 255 255 255;
+  --nyven-icon-bg-rgb: 255 255 255;
+  --nyven-icon-bg-a: 0.08;
+  --nyven-shadow-rgb: 0 0 0;
+  --nyven-shadow-a: 0.7;
+  --nyven-glow-a: 0;
+  --nyven-glow-violet-a: 0;
+  --nyven-glow-strong-a: 0;
+  --nyven-aura-a1: 0;
+  --nyven-aura-a2: 0;
+  --nyven-aura-a3: 0;
+  --nyven-particle-opacity: 0;
+  color-scheme: dark;
+}
+
+/* Light: off-white, dark text, very faint tint */
+html[data-theme="light"] {
+  --nyven-bg-rgb: 246 244 239;
+  --nyven-bg-secondary-rgb: 239 235 227;
+  --nyven-surface-rgb: 250 248 244;
+  --nyven-surface-2-rgb: 240 237 230;
+  --nyven-text-rgb: 26 29 36;
+  --nyven-text-secondary-rgb: 92 101 112;
+  --nyven-border-rgb: 0 0 0;
+  --nyven-border-a: 0.08;
+  --nyven-cyan-rgb: 11 143 168;
+  --nyven-violet-rgb: 107 92 231;
+  --nyven-hover-rgb: 0 0 0;
+  --nyven-hover-a: 0.05;
+  --nyven-input-bg-rgb: 0 0 0;
+  --nyven-input-bg-a: 0.04;
+  --nyven-overlay-rgb: 0 0 0;
+  --nyven-overlay-a: 0.4;
+  --nyven-on-accent-rgb: 246 244 239;
+  --nyven-knob-rgb: 255 255 255;
+  --nyven-icon-bg-rgb: 11 143 168;
+  --nyven-icon-bg-a: 0.12;
+  --nyven-shadow-rgb: 0 0 0;
+  --nyven-shadow-a: 0.12;
+  --nyven-glow-a: 0.06;
+  --nyven-glow-violet-a: 0.04;
+  --nyven-glow-strong-a: 0.12;
+  --nyven-aura-a1: 0.05;
+  --nyven-aura-a2: 0.03;
+  --nyven-aura-a3: 0.02;
+  --nyven-particle-opacity: 0.25;
+  color-scheme: light;
+}
+
+/* Derived full-color variables. Declared on the same elements that can
+   carry a palette (html + the dark scopes) so they always resolve against
+   the palette that is active right there. */
+:root,
+.nyven-scope-dark,
+.nyven-intro-bg {
+  --nyven-bg: rgb(var(--nyven-bg-rgb));
+  --nyven-bg-secondary: rgb(var(--nyven-bg-secondary-rgb));
+  --nyven-surface: rgb(var(--nyven-surface-rgb));
+  --nyven-surface-2: rgb(var(--nyven-surface-2-rgb));
+  --nyven-text: rgb(var(--nyven-text-rgb));
+  --nyven-text-secondary: rgb(var(--nyven-text-secondary-rgb));
+  --nyven-border: rgb(var(--nyven-border-rgb) / var(--nyven-border-a));
+  --nyven-cyan: rgb(var(--nyven-cyan-rgb));
+  --nyven-violet: rgb(var(--nyven-violet-rgb));
+  --nyven-hover: rgb(var(--nyven-hover-rgb) / var(--nyven-hover-a));
+  --nyven-input-bg: rgb(var(--nyven-input-bg-rgb) / var(--nyven-input-bg-a));
+  --nyven-overlay: rgb(var(--nyven-overlay-rgb) / var(--nyven-overlay-a));
+  --nyven-on-accent: rgb(var(--nyven-on-accent-rgb));
+  --nyven-knob: rgb(var(--nyven-knob-rgb));
+  --nyven-icon-bg: rgb(var(--nyven-icon-bg-rgb) / var(--nyven-icon-bg-a));
+  --nyven-shadow: 0 16px 48px rgb(var(--nyven-shadow-rgb) / var(--nyven-shadow-a));
+  --nyven-glow: rgb(var(--nyven-cyan-rgb) / var(--nyven-glow-a));
+  --nyven-glow-violet: rgb(var(--nyven-violet-rgb) / var(--nyven-glow-violet-a));
+  --nyven-glow-strong: rgb(var(--nyven-cyan-rgb) / var(--nyven-glow-strong-a));
 }
 
 * {
@@ -53,7 +187,7 @@ body {
     scrollbar-color: transparent transparent;
   }
   *:hover {
-    scrollbar-color: rgba(137, 147, 164, 0.35) transparent;
+    scrollbar-color: rgb(var(--nyven-text-secondary-rgb) / 0.35) transparent;
   }
   *::-webkit-scrollbar {
     width: 6px;
@@ -67,10 +201,10 @@ body {
     border-radius: 3px;
   }
   *:hover::-webkit-scrollbar-thumb {
-    background: rgba(137, 147, 164, 0.35);
+    background: rgb(var(--nyven-text-secondary-rgb) / 0.35);
   }
   *::-webkit-scrollbar-thumb:hover {
-    background: rgba(137, 147, 164, 0.5);
+    background: rgb(var(--nyven-text-secondary-rgb) / 0.5);
   }
 }
 
@@ -96,14 +230,24 @@ input:focus-visible {
   }
 }
 
-/* Background ambient */
+/* Background ambient (theme-aware; Dark = flat true black, Light = faint tint) */
 .nyven-bg {
-  background-color: #07090D;
+  background-color: var(--nyven-bg);
   background-image:
-    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(98, 230, 255, 0.06), transparent),
-    radial-gradient(ellipse 60% 40% at 80% 100%, rgba(139, 124, 255, 0.04), transparent),
-    radial-gradient(ellipse 50% 30% at 20% 80%, rgba(98, 230, 255, 0.03), transparent);
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgb(var(--nyven-cyan-rgb) / var(--nyven-aura-a1)), transparent),
+    radial-gradient(ellipse 60% 40% at 80% 100%, rgb(var(--nyven-violet-rgb) / var(--nyven-aura-a2)), transparent),
+    radial-gradient(ellipse 50% 30% at 20% 80%, rgb(var(--nyven-cyan-rgb) / var(--nyven-aura-a3)), transparent);
   background-attachment: fixed;
+}
+
+/* Intro sequence background: always the dark NYVEN look, in every theme */
+.nyven-intro-bg {
+  background-color: rgb(7 9 13);
+  color: rgb(245 247 250);
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgb(98 230 255 / 0.06), transparent),
+    radial-gradient(ellipse 60% 40% at 80% 100%, rgb(139 124 255 / 0.04), transparent);
+  color-scheme: dark;
 }
 
 /* Subtle particle-like dots via CSS */
@@ -111,15 +255,15 @@ input:focus-visible {
   content: '';
   position: absolute;
   inset: 0;
-  background-image: radial-gradient(1px 1px at 20% 30%, rgba(98, 230, 255, 0.15), transparent),
-    radial-gradient(1px 1px at 40% 70%, rgba(139, 124, 255, 0.12), transparent),
-    radial-gradient(1px 1px at 60% 20%, rgba(98, 230, 255, 0.1), transparent),
-    radial-gradient(1px 1px at 80% 50%, rgba(139, 124, 255, 0.08), transparent),
-    radial-gradient(1.5px 1.5px at 10% 80%, rgba(98, 230, 255, 0.12), transparent),
-    radial-gradient(1px 1px at 90% 10%, rgba(139, 124, 255, 0.1), transparent);
+  background-image: radial-gradient(1px 1px at 20% 30%, rgb(var(--nyven-cyan-rgb) / 0.15), transparent),
+    radial-gradient(1px 1px at 40% 70%, rgb(var(--nyven-violet-rgb) / 0.12), transparent),
+    radial-gradient(1px 1px at 60% 20%, rgb(var(--nyven-cyan-rgb) / 0.1), transparent),
+    radial-gradient(1px 1px at 80% 50%, rgb(var(--nyven-violet-rgb) / 0.08), transparent),
+    radial-gradient(1.5px 1.5px at 10% 80%, rgb(var(--nyven-cyan-rgb) / 0.12), transparent),
+    radial-gradient(1px 1px at 90% 10%, rgb(var(--nyven-violet-rgb) / 0.1), transparent);
   background-size: 100% 100%;
   pointer-events: none;
-  opacity: 0.7;
+  opacity: var(--nyven-particle-opacity);
   animation: particleDrift 60s linear infinite;
 }
 
@@ -145,18 +289,18 @@ input:focus-visible {
 }
 
 .n-thinking-glow {
-  filter: drop-shadow(0 0 12px rgba(98, 230, 255, 0.4)) drop-shadow(0 0 24px rgba(139, 124, 255, 0.25));
+  filter: drop-shadow(0 0 12px var(--nyven-glow-strong)) drop-shadow(0 0 24px var(--nyven-glow-violet));
   animation: breathe 2.2s ease-in-out infinite;
 }
 
 /* Generating: slightly stronger cyan pulse while tokens stream */
 .n-generating-glow {
-  filter: drop-shadow(0 0 14px rgba(98, 230, 255, 0.55)) drop-shadow(0 0 28px rgba(98, 230, 255, 0.2));
+  filter: drop-shadow(0 0 14px var(--nyven-glow-strong)) drop-shadow(0 0 28px var(--nyven-glow));
   animation: breathe 1.6s ease-in-out infinite;
 }
 
 .n-idle-glow {
-  filter: drop-shadow(0 0 8px rgba(98, 230, 255, 0.15));
+  filter: drop-shadow(0 0 8px var(--nyven-glow));
 }
 
 /* Message reveal */
@@ -177,10 +321,10 @@ input:focus-visible {
 
 /* Glass effect subtle */
 .glass {
-  background: rgba(17, 23, 34, 0.7);
+  background: rgb(var(--nyven-surface-rgb) / 0.7);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  border: 1px solid rgb(var(--nyven-border-rgb) / calc(var(--nyven-border-a) * 0.5));
 }
 
 /* Safe area for mobile */
@@ -274,78 +418,10 @@ input:focus-visible {
 }
 
 
-/* ── Theme modes (Appearance) ── */
-html[data-theme="nyven"] {
-  --nyven-bg: #07090D;
-  --nyven-bg-secondary: #0D1118;
-  --nyven-surface: #111722;
-  --nyven-surface-2: #161d2a;
-  --nyven-text: #F5F7FA;
-  --nyven-text-secondary: #8993A4;
-  --nyven-border: rgba(255,255,255,0.08);
-  --nyven-cyan: #62E6FF;
-  --nyven-violet: #8B7CFF;
-  --nyven-input-bg: rgba(255,255,255,0.04);
-  color-scheme: dark;
-
-  --nyven-hover: rgba(255,255,255,0.06);
-  --nyven-overlay: rgba(0,0,0,0.55);
-  --nyven-on-accent: #071018;
-  --nyven-icon-bg: rgba(98,230,255,0.12);
-  --nyven-shadow: 0 16px 48px rgba(0,0,0,0.45);
-}
-html[data-theme="dark"] {
-  --nyven-bg: #000000;
-  --nyven-bg-secondary: #0a0a0a;
-  --nyven-surface: #121212;
-  --nyven-surface-2: #1a1a1a;
-  --nyven-text: #FFFFFF;
-  --nyven-text-secondary: #A0A0A0;
-  --nyven-border: rgba(255,255,255,0.1);
-  --nyven-cyan: #7DE8FF;
-  --nyven-violet: #A99BFF;
-  --nyven-input-bg: rgba(255,255,255,0.06);
-  color-scheme: dark;
-
-  --nyven-hover: rgba(255,255,255,0.08);
-  --nyven-overlay: rgba(0,0,0,0.7);
-  --nyven-on-accent: #000000;
-  --nyven-icon-bg: rgba(255,255,255,0.08);
-  --nyven-shadow: 0 16px 48px rgba(0,0,0,0.7);
-}
-html[data-theme="light"] {
-  --nyven-bg: #F6F4EF;
-  --nyven-bg-secondary: #EFEBE3;
-  --nyven-surface: #FAF8F4;
-  --nyven-surface-2: #F0EDE6;
-  --nyven-text: #1A1D24;
-  --nyven-text-secondary: #5C6570;
-  --nyven-border: rgba(0,0,0,0.08);
-  --nyven-cyan: #0B8FA8;
-  --nyven-violet: #6B5CE7;
-  --nyven-input-bg: rgba(0,0,0,0.04);
-  color-scheme: light;
-
-  --nyven-hover: rgba(0,0,0,0.05);
-  --nyven-overlay: rgba(0,0,0,0.4);
-  --nyven-on-accent: #071018;
-  --nyven-icon-bg: rgba(11,143,168,0.12);
-  --nyven-shadow: 0 16px 40px rgba(0,0,0,0.12);
-}
-html {
-  font-size: var(--nyven-font-scale, 16px);
-}
 body {
   background-color: var(--nyven-bg);
   color: var(--nyven-text);
-  transition: background-color 0.2s ease, color 0.2s ease;
 }
-.bg-nyven-bg { background-color: var(--nyven-bg) !important; }
-.bg-nyven-surface { background-color: var(--nyven-surface) !important; }
-.text-nyven-text { color: var(--nyven-text) !important; }
-.text-nyven-text-secondary { color: var(--nyven-text-secondary) !important; }
-.text-nyven-cyan { color: var(--nyven-cyan) !important; }
-.border-nyven-cyan\/30 { border-color: color-mix(in srgb, var(--nyven-cyan) 30%, transparent) !important; }
 
 /* Hide composer textarea scrollbar chrome */
 .nyven-composer-input {
@@ -398,7 +474,14 @@ html.nyven-theme-animating * {
 }
 ::view-transition-old(root),
 ::view-transition-new(root) {
-  animation-duration: 0.25s;
+  animation-duration: 250ms;
+  animation-timing-function: ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none;
+  }
 }
 
 /* Theme-aware logo (white assets) */
@@ -413,20 +496,6 @@ html[data-theme="dark"] .nyven-logo-adaptive {
 /* Code boxes stay pure black in all themes */
 .nyven-code-pre,
 .nyven-code-box {
-  background-color: #000 !important;
-  color: #e8eaed !important;
-}
-
-
-/* Auth / sign-in: keep classic NYVEN dark branding in every theme */
-.nyven-auth-root {
-  color-scheme: dark;
-}
-html[data-theme="light"] .nyven-auth-root {
-  /* Keep sign-in readable but brand side stays intentional dark art */
-  --nyven-auth-panel: #07090D;
-}
-html[data-theme="light"] .nyven-auth-root .nyven-auth-brand {
-  background: #07090D !important;
-  color: #F5F7FA !important;
+  background-color: #000;
+  color: #e8eaed;
 }

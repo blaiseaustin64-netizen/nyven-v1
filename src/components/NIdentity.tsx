@@ -132,7 +132,7 @@ export function NIdentity({
         animated && state === 'thinking' && !isLight && 'n-thinking-glow',
         animated && state === 'generating' && !isLight && 'n-generating-glow',
         animated && (state === 'idle' || state === 'white') && !isLight && 'n-idle-glow',
-        state === 'identity' && !isLight && 'drop-shadow-[0_0_16px_rgba(98,230,255,0.35)]',
+        state === 'identity' && !isLight && 'drop-shadow-[0_0_16px_var(--nyven-glow-strong)]',
         state === 'error' && 'opacity-70',
         state === 'completed' && 'opacity-95',
         isActive && animated && state !== 'thinking' && state !== 'generating' && !isLight && 'n-thinking-glow',

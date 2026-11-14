@@ -40,7 +40,7 @@ export function ActivityIndicator({ state, detail, className }: Props) {
           to { background-position: -100% 0; }
         }
         .nyven-shimmer {
-          background: linear-gradient(90deg, #5d667d 0%, #e8ecf5 45%, #5d667d 90%);
+          background: linear-gradient(90deg, rgb(var(--nyven-text-secondary-rgb) / 0.75) 0%, var(--nyven-text) 45%, rgb(var(--nyven-text-secondary-rgb) / 0.75) 90%);
           background-size: 220% 100%;
           -webkit-background-clip: text;
           background-clip: text;
@@ -52,7 +52,7 @@ export function ActivityIndicator({ state, detail, className }: Props) {
         @media (prefers-reduced-motion: reduce) {
           .nyven-shimmer {
             animation: none;
-            color: #7d869c;
+            color: var(--nyven-text-secondary);
             background: none;
             -webkit-background-clip: unset;
             background-clip: unset;

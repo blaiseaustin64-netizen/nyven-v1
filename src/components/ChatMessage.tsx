@@ -157,7 +157,7 @@ export function ChatMessage({
       {userSheetOpen && (
         <div className="fixed inset-0 z-[90]" role="dialog" aria-modal="true">
           <button type="button" className="absolute inset-0 bg-[var(--nyven-overlay)]" aria-label="Close" onClick={() => setUserSheetOpen(false)} />
-          <div className="absolute left-3 right-3 bottom-[max(1rem,env(safe-area-inset-bottom))] rounded-2xl border border-[var(--nyven-border)] bg-[var(--nyven-surface)]/95 backdrop-blur-xl shadow-2xl p-2">
+          <div className="absolute left-3 right-3 bottom-[max(1rem,env(safe-area-inset-bottom))] rounded-2xl border border-[var(--nyven-border)] bg-nyven-surface/95 backdrop-blur-xl shadow-2xl p-2">
             <p className="text-[12px] text-[var(--nyven-text-secondary)] px-3 py-2">{timeLabel}</p>
             <button type="button" className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-[15px] text-[var(--nyven-text)] hover:bg-[var(--nyven-surface)]" onClick={() => { void navigator.clipboard.writeText(message.content); setUserSheetOpen(false) }}>
               <Copy size={18} /> Copy
@@ -303,7 +303,7 @@ export function ChatMessage({
                 }}
                 className={`p-2 rounded-lg hover:bg-[var(--nyven-surface)] min-h-[36px] min-w-[36px] flex items-center justify-center transition-colors ${
                   isReadingAloud || isReadAloudLoading
-                    ? 'text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.35)]'
+                    ? 'text-nyven-cyan drop-shadow-[0_0_8px_var(--nyven-glow-strong)]'
                     : 'text-nyven-text-secondary hover:text-nyven-text'
                 }`}
                 aria-label={
@@ -338,7 +338,7 @@ export function ChatMessage({
       {sheetOpen && (
         <div className="fixed inset-0 z-[90] lg:hidden" role="dialog" aria-modal="true">
           <button type="button" className="absolute inset-0 bg-[var(--nyven-overlay)]" aria-label="Close" onClick={() => setSheetOpen(false)} />
-          <div className="absolute left-0 right-0 bottom-0 rounded-t-[24px] border-t border-[var(--nyven-border)] bg-[var(--nyven-surface)]/95 backdrop-blur-xl p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <div className="absolute left-0 right-0 bottom-0 rounded-t-[24px] border-t border-[var(--nyven-border)] bg-nyven-surface/95 backdrop-blur-xl p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
             <div className="w-10 h-1 rounded-full bg-[var(--nyven-surface)] mx-auto mb-4" />
             <p className="text-sm text-nyven-text-secondary mb-3 text-center">Message actions</p>
             <div className="space-y-1">
