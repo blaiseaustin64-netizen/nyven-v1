@@ -3,7 +3,7 @@
  */
 
 export type AIPreferences = {
-  responseStyle: 'concise' | 'balanced' | 'detailed'
+  responseStyle: 'balanced' | 'direct' | 'creative' | 'deep' | 'casual'
   memoryEnabled: boolean
   webSearchPreference: 'auto' | 'prefer_on' | 'prefer_off'
 }

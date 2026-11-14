@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   type BeforeInstallPromptEvent,
   dismissInstall,
@@ -70,7 +71,8 @@ export function InstallPrompt({ forceOpen = false, onClose }: { forceOpen?: bool
 
   const showGuide = guide || (!(deferred || getDeferredInstall()) && (open || forceOpen))
 
-  return (
+  return createPortal(
+    
     <div className="fixed inset-x-0 bottom-0 z-[80] p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pointer-events-none">
       <div className="pointer-events-auto mx-auto max-w-md rounded-2xl border border-[var(--nyven-border)] bg-[var(--nyven-surface)]/95 backdrop-blur-xl shadow-[0_16px_48px_rgba(0,0,0,0.4)] p-4">
         <div className="flex items-start gap-3">
@@ -114,6 +116,7 @@ export function InstallPrompt({ forceOpen = false, onClose }: { forceOpen?: bool
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

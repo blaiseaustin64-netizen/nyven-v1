@@ -6,7 +6,7 @@ export function PrivateChatIcon({
   active,
   onToggle,
   className = '',
-  size = 22,
+  size = 28,
 }: {
   active: boolean
   onToggle: () => void
@@ -28,7 +28,7 @@ export function PrivateChatIcon({
         }
         onToggle()
       }}
-      className={`w-11 h-11 grid place-items-center bg-transparent border-0 shadow-none ring-0 outline-none ${
+      className={`w-12 h-12 grid place-items-center bg-transparent border-0 shadow-none ring-0 outline-none ${
         active ? 'text-[var(--nyven-cyan)]' : 'text-[var(--nyven-text-secondary)]'
       } ${className}`}
       aria-label={active ? 'Private mode on' : 'Turn on private mode'}

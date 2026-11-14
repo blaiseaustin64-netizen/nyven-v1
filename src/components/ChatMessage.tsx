@@ -117,7 +117,7 @@ export function ChatMessage({
         <div className="max-w-[85%] sm:max-w-[75%] min-w-0">
           {message.content ? (
             <div
-              className="bg-nyven-surface border border-[var(--nyven-border)] rounded-2xl rounded-br-md px-4 py-3 text-[15px] leading-relaxed text-nyven-text break-words"
+              id={`msg-${message.id}`} className="bg-nyven-surface border border-[var(--nyven-border)] rounded-2xl rounded-br-md px-4 py-3 text-[0.9375rem] leading-relaxed text-nyven-text break-words"
               onContextMenu={(e) => { e.preventDefault(); setUserSheetOpen(true) }}
               onTouchStart={() => {
                 userLongPress.current = window.setTimeout(() => {
@@ -131,17 +131,6 @@ export function ChatMessage({
               {message.content}
             </div>
           ) : null}
-          <div className="flex justify-end gap-1 mt-1.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-            {onEdit && (
-              <button
-                onClick={onEdit}
-                className="p-2 rounded-lg text-nyven-text-secondary hover:text-nyven-text hover:bg-[var(--nyven-surface)] min-h-[36px] min-w-[36px] flex items-center justify-center"
-                aria-label="Edit message"
-              >
-                <Pencil size={14} />
-              </button>
-            )}
-          </div>
         </div>
       </div>
       {editingUser && (

@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, useRef } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   User,
   Sparkles,
+  Palette,
   Mic,
   Shield,
   BarChart3,
@@ -11,8 +12,15 @@ import {
   Bug,
   ChevronLeft,
   Loader2,
+  Archive,
+  Search,
+  Trash2,
+  RotateCcw,
 } from 'lucide-react'
 import { useAuth } from '../lib/auth/AuthContext'
+import { InstallPrompt } from '../components/InstallPrompt'
+import { isStandalone } from '../lib/pwa'
+import { useConversationHistory } from '../lib/chat/ConversationHistoryContext'
 import {
   DEFAULT_PREFERENCES,
   loadPreferences,
@@ -32,8 +40,10 @@ import { resolveFishVoiceId } from '../lib/voice/catalog'
 
 type Section =
   | 'account'
+  | 'appearance'
   | 'ai'
   | 'voice'
+  | 'conversations'
   | 'privacy'
   | 'usage'
   | 'sessions'
@@ -41,8 +51,10 @@ type Section =
 
 const sections: { id: Section; label: string; icon: typeof User }[] = [
   { id: 'account', label: 'Account', icon: User },
+  { id: 'appearance', label: 'Appearance', icon: Palette },
   { id: 'ai', label: 'AI', icon: Sparkles },
   { id: 'voice', label: 'Voice', icon: Mic },
+  { id: 'conversations', label: 'Conversations', icon: Archive },
   { id: 'privacy', label: 'Privacy & Security', icon: Shield },
   { id: 'usage', label: 'Usage', icon: BarChart3 },
   { id: 'sessions', label: 'Sessions', icon: Monitor },
@@ -67,7 +79,7 @@ export function Settings() {
   const navigate = useNavigate()
   const rawSection = (routeParams.section || params.get('section') || 'account') as string
   // Connected services temporarily removed — redirect old links to account.
-  const active = (rawSection === 'connections' || rawSection === 'appearance' ? 'account' : rawSection) as Section
+  const active = (rawSection === 'connections' ? 'account' : rawSection) as Section
   const setActive = (s: Section) => {
     // Prefer path segments so mobile Back works
     navigate(`/settings/${s}`)
@@ -79,6 +91,7 @@ export function Settings() {
   const [prefsLoading, setPrefsLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
+  const [installOpen, setInstallOpen] = useState(false)
   const [usage, setUsage] = useState<UsageSummary | null>(null)
   const [memories, setMemories] = useState<MemoryItem[]>([])
   const [displayName, setDisplayName] = useState('')
@@ -207,6 +220,8 @@ export function Settings() {
   }
 
   const sectionMeta: Record<Section, { label: string; hint: string }> = {
+    appearance: { label: 'Appearance', hint: 'Theme and text size' },
+    conversations: { label: 'Conversations', hint: 'Archived chats' },
     account: { label: 'Account', hint: 'Profile and sign-in' },
     ai: { label: 'AI', hint: 'Response style and memory' },
     voice: { label: 'Voice', hint: 'Speech and voice options' },
@@ -218,7 +233,8 @@ export function Settings() {
 
   const mobileGroups: { title: string; ids: Section[] }[] = [
     { title: 'You', ids: ['account'] },
-    { title: 'Experience', ids: ['ai', 'voice'] },
+    { title: 'Experience', ids: ['appearance', 'ai', 'voice'] },
+    { title: 'Chats', ids: ['conversations'] },
     { title: 'Data', ids: ['privacy', 'usage', 'sessions'] },
     { title: 'Help', ids: ['support'] },
   ]
@@ -345,7 +361,15 @@ export function Settings() {
             )}
 
             {/* ── Account ── */}
-{active === 'account' && (
+{active === 'appearance' && (
+              <AppearanceSettingsPanel showToast={showToast} />
+            )}
+
+            {active === 'conversations' && (
+              <ArchiveSettingsPanel />
+            )}
+
+            {active === 'account' && (
               <>
                 <SectionTitle title="Account" desc="Profile and sign-in." />
                 {!configured && (
@@ -446,6 +470,15 @@ export function Settings() {
                     >
                       Sign out
                     </button>
+                    {!isStandalone() && (
+                      <button
+                        type="button"
+                        onClick={() => setInstallOpen(true)}
+                        className="text-sm text-[var(--nyven-cyan)]"
+                      >
+                        Install Nyven
+                      </button>
+                    )}
                   </>
                 )}
               </>
@@ -460,23 +493,40 @@ export function Settings() {
                 />
                 <Card>
                   <Field label="Response style">
-                    <Select
-                      value={prefs.ai.responseStyle}
-                      onChange={(v) =>
-                        void persistPrefs({
-                          ...prefs,
-                          ai: {
-                            ...prefs.ai,
-                            responseStyle: v as AIPreferences['responseStyle'],
-                          },
-                        })
-                      }
-                      options={[
-                        { value: 'concise', label: 'Concise' },
-                        { value: 'balanced', label: 'Balanced' },
-                        { value: 'detailed', label: 'Detailed' },
-                      ]}
-                    />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {([
+                        { value: 'balanced', label: 'Balanced', hint: 'Clear, natural and helpful.' },
+                        { value: 'direct', label: 'Direct', hint: 'Straight to the point.' },
+                        { value: 'creative', label: 'Creative', hint: 'More expressive and imaginative.' },
+                        { value: 'deep', label: 'Deep', hint: 'More detailed and analytical.' },
+                        { value: 'casual', label: 'Casual', hint: 'Relaxed and conversational.' },
+                      ] as const).map((opt) => {
+                        const selected = prefs.ai.responseStyle === opt.value
+                        return (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() =>
+                              void persistPrefs({
+                                ...prefs,
+                                ai: { ...prefs.ai, responseStyle: opt.value },
+                              })
+                            }
+                            className={`text-left rounded-xl border px-3 py-3 transition ${
+                              selected
+                                ? 'border-[var(--nyven-cyan)] bg-[var(--nyven-bg-secondary)]'
+                                : 'border-[var(--nyven-border)] bg-[var(--nyven-bg)]'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-sm font-medium text-[var(--nyven-text)]">{opt.label}</span>
+                              {selected && <span className="text-[var(--nyven-cyan)] text-xs">✓</span>}
+                            </div>
+                            <p className="text-[0.75rem] text-[var(--nyven-text-secondary)] mt-1 leading-snug">{opt.hint}</p>
+                          </button>
+                        )
+                      })}
+                    </div>
                   </Field>
                   <Field label="Memory">
                     <Toggle
@@ -783,6 +833,7 @@ export function Settings() {
           </motion.div>
         </div>
       </div>
+      {installOpen && <InstallPrompt forceOpen onClose={() => setInstallOpen(false)} />}
       <Toast message={toast} />
     </div>
   )
@@ -994,5 +1045,293 @@ function BugReportCard() {
   )
 }
 
+function AppearanceSettingsPanel({ showToast }: { showToast: (m: string) => void }) {
+  const [prefs, setPrefs] = useState(() => {
+    try {
+      const raw = JSON.parse(localStorage.getItem('nyven_appearance_v1') || '{}')
+      const theme = raw.theme === 'default' ? 'nyven' : (raw.theme || 'nyven')
+      return { theme, textScale: typeof raw.textScale === 'number' ? raw.textScale : 1 }
+    } catch {
+      return { theme: 'nyven', textScale: 1 }
+    }
+  })
 
+  const apply = (next: { theme?: string; textScale?: number }) => {
+    try { navigator.vibrate?.(10) } catch { /* */ }
+    const merged = { theme: prefs.theme, textScale: prefs.textScale, ...next }
+    setPrefs(merged)
+    localStorage.setItem('nyven_appearance_v1', JSON.stringify(merged))
+    void import('../lib/appearance').then(({ applyAppearance }) => {
+      applyAppearance(merged as { theme: 'nyven' | 'system' | 'dark' | 'light'; textScale: number })
+    })
+    showToast('Appearance updated')
+  }
+
+  const options = [
+    { id: 'nyven', label: 'NYVEN', hint: 'Signature navy and cyan' },
+    { id: 'system', label: 'System', hint: 'Match your device' },
+    { id: 'dark', label: 'Dark', hint: 'True black, immersive' },
+    { id: 'light', label: 'Light', hint: 'Warm ivory' },
+  ] as const
+
+  return (
+    <>
+      <SectionTitle title="Appearance" desc="Theme for the whole NYVEN interface." />
+      <Card>
+        <div className="grid grid-cols-2 gap-3">
+          {options.map((o) => {
+            const selected = prefs.theme === o.id
+            return (
+              <button
+                key={o.id}
+                type="button"
+                onClick={() => apply({ theme: o.id })}
+                className={`relative text-left rounded-2xl border p-3 transition ${
+                  selected
+                    ? 'border-[var(--nyven-cyan)] bg-[var(--nyven-bg-secondary)]'
+                    : 'border-[var(--nyven-border)] bg-[var(--nyven-bg)]'
+                }`}
+              >
+                {selected && (
+                  <span className="absolute top-2 right-2 text-[var(--nyven-cyan)] text-xs font-bold">✓</span>
+                )}
+                <p className="text-sm font-medium text-[var(--nyven-text)]">{o.label}</p>
+                <div className="mt-2 h-8 rounded-lg overflow-hidden border border-[var(--nyven-border)] flex">
+                  {o.id === 'nyven' && (
+                    <>
+                      <span className="flex-1" style={{ background: '#07090D' }} />
+                      <span className="w-1/3" style={{ background: '#62E6FF' }} />
+                    </>
+                  )}
+                  {o.id === 'system' && (
+                    <>
+                      <span className="flex-1" style={{ background: '#F6F4EF' }} />
+                      <span className="flex-1" style={{ background: '#000' }} />
+                    </>
+                  )}
+                  {o.id === 'dark' && (
+                    <>
+                      <span className="flex-1" style={{ background: '#000' }} />
+                      <span className="w-1/4" style={{ background: '#fff' }} />
+                    </>
+                  )}
+                  {o.id === 'light' && (
+                    <>
+                      <span className="flex-1" style={{ background: '#F6F4EF' }} />
+                      <span className="w-1/3" style={{ background: '#1A1D24' }} />
+                    </>
+                  )}
+                </div>
+                <p className="text-[0.75rem] text-[var(--nyven-text-secondary)] mt-2">{o.hint}</p>
+              </button>
+            )
+          })}
+        </div>
+        <div className="mt-4 rounded-xl border border-[var(--nyven-border)] bg-[var(--nyven-bg)] p-3">
+          <p className="text-[0.75rem] text-[var(--nyven-text-secondary)] mb-2">Live preview</p>
+          <div className="rounded-2xl bg-[var(--nyven-surface)] border border-[var(--nyven-border)] px-3 py-2 text-[0.9375rem] text-[var(--nyven-text)] inline-block mb-2">
+            What can you help me with?
+          </div>
+          <p className="text-[0.9375rem] text-[var(--nyven-text)] leading-relaxed">
+            I can help you think, write, and build — ask anything.
+          </p>
+        </div>
+      </Card>
+      <Card>
+        <Field label="Text size">
+          <input
+            type="range"
+            min={0.9}
+            max={1.25}
+            step={0.05}
+            value={prefs.textScale}
+            onChange={(e) => apply({ textScale: Number(e.target.value) })}
+            className="w-full accent-[var(--nyven-cyan)]"
+          />
+        </Field>
+      </Card>
+    </>
+  )
+}
+
+const ARCHIVE_KEY = 'nyven_archived_chats_v1'
+
+function loadArchiveIds(): string[] {
+  try {
+    const raw = localStorage.getItem(ARCHIVE_KEY)
+    if (!raw) return []
+    const arr = JSON.parse(raw)
+    return Array.isArray(arr) ? arr.map(String) : []
+  } catch {
+    return []
+  }
+}
+
+function saveArchiveIds(ids: string[]) {
+  localStorage.setItem(ARCHIVE_KEY, JSON.stringify(ids))
+}
+
+function ArchiveSettingsPanel() {
+  const { conversations, deleteConversation, refresh } = useConversationHistory()
+  const [ids, setIds] = useState<string[]>(() => loadArchiveIds())
+  const [query, setQuery] = useState('')
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [selectionMode, setSelectionMode] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const longPressRef = useRef<number | null>(null)
+
+  const archived = conversations
+    .filter((c) => ids.includes(c.id))
+    .filter((c) => {
+      const q = query.trim().toLowerCase()
+      if (!q) return true
+      return (c.title || '').toLowerCase().includes(q)
+    })
+    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+
+  const restore = (idList: string[]) => {
+    const next = ids.filter((id) => !idList.includes(id))
+    setIds(next)
+    saveArchiveIds(next)
+    setSelected(new Set())
+    setSelectionMode(false)
+    setConfirmDelete(false)
+    void refresh()
+  }
+
+  const remove = (idList: string[]) => {
+    for (const id of idList) {
+      try { deleteConversation?.(id) } catch { /* */ }
+    }
+    restore(idList)
+  }
+
+  return (
+    <>
+      <SectionTitle title="Archive" desc="Archived chats are hidden from the main history until restored." />
+      <div className="relative">
+        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--nyven-text-secondary)]" />
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search archived chats"
+          className="w-full h-11 pl-9 pr-3 rounded-xl bg-[var(--nyven-surface)] border border-[var(--nyven-border)] text-sm text-[var(--nyven-text)] outline-none"
+        />
+      </div>
+      {archived.length === 0 ? (
+        <Card>
+          <p className="text-sm text-[var(--nyven-text-secondary)] text-center py-8">
+            No archived chats yet.
+          </p>
+        </Card>
+      ) : (
+        <div className="space-y-2">
+          {archived.map((c) => {
+            const isSel = selected.has(c.id)
+            const when = c.updatedAt
+              ? new Date(c.updatedAt).toLocaleString(undefined, {
+                  month: 'short',
+                  day: 'numeric',
+                  hour: 'numeric',
+                  minute: '2-digit',
+                })
+              : ''
+            return (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => {
+                  if (selectionMode) {
+                    setSelected((prev) => {
+                      const n = new Set(prev)
+                      if (n.has(c.id)) n.delete(c.id)
+                      else n.add(c.id)
+                      return n
+                    })
+                    return
+                  }
+                  window.location.assign(`/chat?c=${encodeURIComponent(c.id)}`)
+                }}
+                onTouchStart={() => {
+                  longPressRef.current = window.setTimeout(() => {
+                    try { navigator.vibrate?.(12) } catch { /* */ }
+                    setSelectionMode(true)
+                    setSelected(new Set([c.id]))
+                  }, 450)
+                }}
+                onTouchEnd={() => {
+                  if (longPressRef.current) window.clearTimeout(longPressRef.current)
+                }}
+                onTouchMove={() => {
+                  if (longPressRef.current) window.clearTimeout(longPressRef.current)
+                }}
+                className={`w-full text-left rounded-2xl border px-4 py-3 transition ${
+                  isSel
+                    ? 'border-[var(--nyven-cyan)] bg-[var(--nyven-bg-secondary)]'
+                    : 'border-[var(--nyven-border)] bg-[var(--nyven-surface)]'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-[var(--nyven-text)] truncate">{c.title || 'Chat'}</p>
+                    <p className="text-[0.75rem] text-[var(--nyven-text-secondary)] mt-0.5">{when}</p>
+                  </div>
+                  {!selectionMode && (
+                    <div className="hidden sm:flex gap-1 shrink-0">
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => { e.stopPropagation(); restore([c.id]) }}
+                        className="p-2 rounded-lg text-[var(--nyven-text-secondary)] hover:text-[var(--nyven-text)]"
+                        aria-label="Restore"
+                      >
+                        <RotateCcw size={16} />
+                      </span>
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => { e.stopPropagation(); setSelected(new Set([c.id])); setConfirmDelete(true) }}
+                        className="p-2 rounded-lg text-red-400"
+                        aria-label="Delete"
+                      >
+                        <Trash2 size={16} />
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </button>
+            )
+          })}
+        </div>
+      )}
+
+      {selectionMode && selected.size > 0 && (
+        <div className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-40 flex gap-2 px-3 py-2 rounded-2xl border border-[var(--nyven-border)] bg-[var(--nyven-surface)] shadow-xl">
+          <button type="button" className="px-4 h-11 rounded-xl text-sm text-[var(--nyven-text)]" onClick={() => { setSelectionMode(false); setSelected(new Set()) }}>Cancel</button>
+          <button type="button" className="px-4 h-11 rounded-xl text-sm text-[var(--nyven-cyan)] font-medium inline-flex items-center gap-1.5" onClick={() => restore([...selected])}>
+            <RotateCcw size={16} /> Restore
+          </button>
+          <button type="button" className="px-4 h-11 rounded-xl text-sm text-red-400 font-medium inline-flex items-center gap-1.5" onClick={() => setConfirmDelete(true)}>
+            <Trash2 size={16} /> Delete
+          </button>
+        </div>
+      )}
+
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button type="button" className="absolute inset-0 bg-[var(--nyven-overlay)]" aria-label="Close" onClick={() => setConfirmDelete(false)} />
+          <div className="relative w-full max-w-sm rounded-2xl border border-[var(--nyven-border)] bg-[var(--nyven-surface)] p-4">
+            <p className="text-sm text-[var(--nyven-text)] font-medium">Delete permanently?</p>
+            <p className="text-[0.8125rem] text-[var(--nyven-text-secondary)] mt-1">This cannot be undone.</p>
+            <div className="flex gap-2 mt-4">
+              <button type="button" className="flex-1 h-11 rounded-xl border border-[var(--nyven-border)]" onClick={() => setConfirmDelete(false)}>Cancel</button>
+              <button type="button" className="flex-1 h-11 rounded-xl bg-red-500/20 text-red-400 font-medium" onClick={() => remove([...selected])}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
 

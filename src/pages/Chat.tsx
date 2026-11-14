@@ -792,10 +792,10 @@ export function Chat() {
           <button
             type="button"
             onClick={() => window.dispatchEvent(new Event('nyven-open-menu'))}
-            className="relative p-2 rounded-lg text-nyven-text-secondary hover:text-nyven-text min-h-[44px] min-w-[44px] flex items-center justify-center"
+            className="relative p-2 rounded-lg text-nyven-text-secondary hover:text-nyven-text min-h-[48px] min-w-[48px] flex items-center justify-center"
             aria-label="Open menu"
           >
-            <Menu size={22} />
+            <Menu size={28} />
           </button>
           {messages.length > 0 && (
             <h1 className="flex-1 text-center text-[15px] font-medium truncate pr-11 text-nyven-text">
@@ -805,7 +805,7 @@ export function Chat() {
           {messages.length === 0 && (
             <>
               <div className="flex-1" />
-              <PrivateChatIcon active={privateMode} onToggle={() => setPrivateMode((v) => !v)} />
+              <PrivateChatIcon active={privateMode} onToggle={() => setPrivateMode((v) => !v)} size={34} />
             </>
           )}
         </header>

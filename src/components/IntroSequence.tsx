@@ -12,6 +12,10 @@ export function IntroSequence({ onComplete, isFirstVisit }: IntroSequenceProps) 
   const [stage, setStage] = useState(0)
 
   useEffect(() => {
+    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      onComplete()
+      return
+    }
     if (!isFirstVisit) {
       // Short returning visitor sequence
       const t1 = setTimeout(() => setStage(1), 200)
@@ -38,7 +42,7 @@ export function IntroSequence({ onComplete, isFirstVisit }: IntroSequenceProps) 
 
   if (!isFirstVisit) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-nyven-bg">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#07090D]" onClick={onComplete} role="button" tabIndex={0}>
         <AnimatePresence>
           {stage < 2 && (
             <motion.div
@@ -48,7 +52,7 @@ export function IntroSequence({ onComplete, isFirstVisit }: IntroSequenceProps) 
               exit={{ opacity: 0, scale: 1.02 }}
               transition={{ duration: 0.5, ease: 'easeOut' }}
             >
-              <NIdentity state="white" size={72} />
+              <NIdentity state="white" size={72} forceDarkAssets />
             </motion.div>
           )}
         </AnimatePresence>
@@ -57,7 +61,7 @@ export function IntroSequence({ onComplete, isFirstVisit }: IntroSequenceProps) 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-nyven-bg overflow-hidden">
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#07090D] overflow-hidden" onClick={onComplete} role="button" tabIndex={0}>
       <div className="absolute inset-0 nyven-bg" />
 
       <AnimatePresence mode="wait">
@@ -66,7 +70,7 @@ export function IntroSequence({ onComplete, isFirstVisit }: IntroSequenceProps) 
             key="wordmark"
             src={wordmark}
             alt="NYVEN"
-            className="relative z-10 h-8 sm:h-10 w-auto object-contain nyven-logo-adaptive"
+            className="relative z-10 h-8 sm:h-10 w-auto object-contain "
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
@@ -84,7 +88,7 @@ export function IntroSequence({ onComplete, isFirstVisit }: IntroSequenceProps) 
             exit={{ opacity: 0, scale: 1.05 }}
             transition={{ duration: 0.55, ease: 'easeOut' }}
           >
-            <NIdentity state="identity" size={88} />
+            <NIdentity state="identity" size={88} forceDarkAssets />
             {stage >= 4 && (
               <motion.p
                 className="font-display text-lg sm:text-xl text-nyven-text/90 tracking-wide text-center px-6"
@@ -92,7 +96,7 @@ export function IntroSequence({ onComplete, isFirstVisit }: IntroSequenceProps) 
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.1 }}
               >
-                Intelligence, built for what's next.
+                BUILD WHAT'S NEXT
               </motion.p>
             )}
           </motion.div>

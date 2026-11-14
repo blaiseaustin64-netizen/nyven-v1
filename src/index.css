@@ -275,7 +275,7 @@ input:focus-visible {
 
 
 /* ── Theme modes (Appearance) ── */
-html[data-theme="default"] {
+html[data-theme="nyven"] {
   --nyven-bg: #07090D;
   --nyven-bg-secondary: #0D1118;
   --nyven-surface: #111722;
@@ -405,7 +405,7 @@ html.nyven-theme-animating * {
 html[data-theme="light"] .nyven-logo-adaptive {
   filter: invert(1) brightness(0.15);
 }
-html[data-theme="default"] .nyven-logo-adaptive,
+html[data-theme="nyven"] .nyven-logo-adaptive,
 html[data-theme="dark"] .nyven-logo-adaptive {
   filter: none;
 }
@@ -415,4 +415,18 @@ html[data-theme="dark"] .nyven-logo-adaptive {
 .nyven-code-box {
   background-color: #000 !important;
   color: #e8eaed !important;
+}
+
+
+/* Auth / sign-in: keep classic NYVEN dark branding in every theme */
+.nyven-auth-root {
+  color-scheme: dark;
+}
+html[data-theme="light"] .nyven-auth-root {
+  /* Keep sign-in readable but brand side stays intentional dark art */
+  --nyven-auth-panel: #07090D;
+}
+html[data-theme="light"] .nyven-auth-root .nyven-auth-brand {
+  background: #07090D !important;
+  color: #F5F7FA !important;
 }

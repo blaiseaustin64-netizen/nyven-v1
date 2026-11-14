@@ -15,6 +15,8 @@ const INPUT =
 
 function EyeIcon({ off }: { off: boolean }) {
   return (
+    // Auth branding is intentionally dark in every theme
+
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z" />
       <circle cx="12" cy="12" r="3" />
@@ -241,9 +243,9 @@ export function Auth() {
 
       {/* Brand panel: desktop only */}
       <aside className="relative hidden lg:flex lg:w-[46%] xl:w-1/2 flex-col justify-between p-12 border-r border-[var(--nyven-border)]">
-        <img src={wordmark} alt="NYVEN" className="h-5 w-auto self-start opacity-90 nyven-logo-adaptive" />
+        <img src={wordmark} alt="NYVEN" className="h-5 w-auto self-start opacity-90" />
         <div className="space-y-6 max-w-md">
-          <img src={nMark} alt="" aria-hidden className="h-24 w-auto opacity-90 nyven-logo-adaptive" />
+          <img src={nMark} alt="" aria-hidden className="h-24 w-auto opacity-90" />
           <h2 className="font-display text-4xl font-medium leading-tight tracking-tight">
             Your AI workspace,
             <br />

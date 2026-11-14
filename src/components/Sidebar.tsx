@@ -1,5 +1,3 @@
-import { InstallPrompt } from './InstallPrompt'
-import { isStandalone } from '../lib/pwa'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { NavLink, useNavigate, useLocation } from 'react-router-dom'
@@ -44,6 +42,19 @@ function ArchiveIcon() {
       <path d="M3 5.5h18v2H3v-2z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
       <path d="M10 12h4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
     </svg>
+  )
+}
+
+function highlightMatch(title: string, q: string) {
+  if (!q.trim()) return title
+  const i = title.toLowerCase().indexOf(q.trim().toLowerCase())
+  if (i < 0) return title
+  return (
+    <>
+      {title.slice(0, i)}
+      <mark className="bg-[var(--nyven-cyan)]/25 text-[var(--nyven-text)] rounded px-0.5">{title.slice(i, i + q.trim().length)}</mark>
+      {title.slice(i + q.trim().length)}
+    </>
   )
 }
 
@@ -127,6 +138,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   } = useConversationHistory()
 
   const [query, setQuery] = useState('')
+  const [searchFocused, setSearchFocused] = useState(false)
   const [menuId, setMenuId] = useState<string | null>(null)
   const [menuPos, setMenuPos] = useState<'below' | 'above'>('below')
   const [renameId, setRenameId] = useState<string | null>(null)
@@ -143,9 +155,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   })
   const [pinned, setPinned] = useState<Set<string>>(() => loadPinned())
   const [archived, setArchived] = useState<Set<string>>(() => loadArchived())
-  const [showArchived, setShowArchived] = useState(false)
-  const [installOpen, setInstallOpen] = useState(false)
-  const [archiveToast, setArchiveToast] = useState<{ text: string; undoId?: string } | null>(null)
+    const [archiveToast, setArchiveToast] = useState<{ text: string; undoId?: string } | null>(null)
   const archiveToastTimer = useRef<number | null>(null)
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
   const holdRef = useRef<{ id: string; timer: number; moved: boolean } | null>(null)
@@ -166,11 +176,8 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   }, [conversations, query])
 
   const filtered = useMemo(() => {
-    const base = showArchived
-      ? filteredAll.filter((c) => archived.has(c.id))
-      : filteredAll.filter((c) => !archived.has(c.id))
-    return base
-  }, [filteredAll, archived, showArchived])
+    return filteredAll.filter((c) => !archived.has(c.id))
+  }, [filteredAll, archived])
 
   const groups = useMemo(() => {
     const pinnedItems = filtered.filter((c) => pinned.has(c.id))
@@ -401,7 +408,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
             className="shrink-0 text-[var(--nyven-text-secondary)]"
             strokeWidth={1.75}
           />
-          <span className="flex-1 text-[16px] text-[var(--nyven-text)] truncate leading-snug">
+          <span className="flex-1 text-[1rem] text-[var(--nyven-text)] truncate leading-snug">
             {c.title || 'Untitled'}
           </span>
           {pinned.has(c.id) && (
@@ -576,7 +583,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
             </p>
             <div className="relative">
               <Search
-                size={15}
+                size={16}
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--nyven-text-secondary)] pointer-events-none"
                 aria-hidden
               />
@@ -588,33 +595,25 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
                   setVisibleCount(PAGE_SIZE)
                 }}
                 placeholder="Search chats"
-                className="w-full h-10 pl-9 pr-3 rounded-xl bg-[var(--nyven-input-bg)] border border-[var(--nyven-border)] text-sm text-[var(--nyven-text)] placeholder:text-[var(--nyven-text-secondary)] outline-none focus:border-[var(--nyven-cyan)]/35"
+                onFocus={() => setSearchFocused(true)}
+                onBlur={() => setSearchFocused(false)}
+                className="w-full h-11 pl-9 pr-10 rounded-xl bg-[var(--nyven-input-bg)] border border-[var(--nyven-border)] text-sm text-[var(--nyven-text)] placeholder:text-[var(--nyven-text-secondary)] outline-none focus:border-[var(--nyven-cyan)]/35"
                 aria-label="Search chats"
               />
+              {query && (
+                <button
+                  type="button"
+                  onClick={() => { setQuery(''); setVisibleCount(PAGE_SIZE) }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full grid place-items-center text-[var(--nyven-text-secondary)] hover:text-[var(--nyven-text)]"
+                  aria-label="Clear search"
+                >
+                  ×
+                </button>
+              )}
             </div>
           </div>
         )}
-        {!collapsed && (
-          showArchived ? (
-            <button
-              type="button"
-              onClick={() => setShowArchived(false)}
-              className="mx-2 mb-1 flex items-center gap-2 px-2 min-h-[40px] text-[0.875rem] text-[var(--nyven-cyan)]"
-            >
-              ← Back to chats
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setShowArchived(true)}
-              className="mx-2 mb-2 flex items-center gap-3 px-3 min-h-[48px] rounded-xl text-left text-[var(--nyven-text)] hover:bg-[var(--nyven-surface)] border border-[var(--nyven-border)]"
-            >
-              <ArchiveIcon />
-              <span className="flex-1 text-[0.9375rem]">Archived</span>
-              <span className="text-[0.75rem] text-[var(--nyven-text-secondary)] tabular-nums">{archived.size}</span>
-            </button>
-          )
-        )}
+        
         <div
           ref={listRef}
           onScroll={onListScroll}
@@ -632,7 +631,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
           )}
           {!loading && filtered.length === 0 && !collapsed && (
             <p className="text-sm text-[var(--nyven-text-secondary)] px-3 py-6 text-center">
-              {showArchived ? 'No archived chats.' : 'No chats yet. Start a new one.'}
+              'No chats yet. Start a new one.'
             </p>
           )}
           {!collapsed &&
@@ -667,11 +666,8 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
           )}
         </div>
       )}
-
-      {installOpen && (
-        <InstallPrompt forceOpen onClose={() => setInstallOpen(false)} />
-      )}
-      {/* Footer */}
+{/* Footer — hide when search keyboard is open on mobile */}
+      <div className={searchFocused ? 'max-sm:hidden' : ''}>
       <div className="shrink-0 border-t border-[var(--nyven-border)] px-3 py-2.5 flex items-center gap-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <button
           type="button"
@@ -683,13 +679,6 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
           aria-label="Open settings"
         >
           {initial}
-        </button>
-        <button
-          type="button"
-          onClick={() => setInstallOpen(true)}
-          className="ml-auto text-[0.8125rem] text-[var(--nyven-text-secondary)] hover:text-[var(--nyven-text)] px-2 min-h-[44px]"
-        >
-          Install Nyven
         </button>
         {!collapsed && (
           <>
@@ -714,6 +703,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
             </button>
           </>
         )}
+      </div>
       </div>
 
       {/* Mobile long-press action sheet */}

@@ -1,5 +1,4 @@
-
-export type ThemeChoice = 'default' | 'system' | 'dark' | 'light'
+export type ThemeChoice = 'nyven' | 'system' | 'dark' | 'light'
 
 export type AppearancePrefs = {
   theme: ThemeChoice
@@ -9,15 +8,25 @@ export type AppearancePrefs = {
 const KEY = 'nyven_appearance_v1'
 
 export const DEFAULT_APPEARANCE: AppearancePrefs = {
-  theme: 'default',
+  theme: 'nyven',
   textScale: 1,
+}
+
+function migrateTheme(raw: string | undefined): ThemeChoice {
+  if (raw === 'default') return 'nyven'
+  if (raw === 'nyven' || raw === 'system' || raw === 'dark' || raw === 'light') return raw
+  return 'nyven'
 }
 
 export function loadAppearance(): AppearancePrefs {
   try {
     const raw = localStorage.getItem(KEY)
     if (!raw) return { ...DEFAULT_APPEARANCE }
-    return { ...DEFAULT_APPEARANCE, ...JSON.parse(raw) }
+    const parsed = JSON.parse(raw) as Partial<AppearancePrefs>
+    return {
+      theme: migrateTheme(parsed.theme as string | undefined),
+      textScale: typeof parsed.textScale === 'number' ? parsed.textScale : 1,
+    }
   } catch {
     return { ...DEFAULT_APPEARANCE }
   }
@@ -28,14 +37,15 @@ export function saveAppearance(p: AppearancePrefs) {
   applyAppearance(p)
 }
 
-export function resolveThemeAttr(choice: ThemeChoice): 'default' | 'dark' | 'light' {
+/** Resolved theme attribute on <html data-theme="..."> */
+export function resolveThemeAttr(choice: ThemeChoice): 'nyven' | 'dark' | 'light' {
   if (choice === 'light') return 'light'
   if (choice === 'dark') return 'dark'
-  if (choice === 'default') return 'default'
+  if (choice === 'nyven') return 'nyven'
   if (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: light)').matches) {
     return 'light'
   }
-  return 'default'
+  return 'nyven'
 }
 
 function applyThemeAttrs(p: AppearancePrefs) {
@@ -44,11 +54,11 @@ function applyThemeAttrs(p: AppearancePrefs) {
   document.documentElement.style.setProperty('--nyven-font-scale', `${(p.textScale || 1) * 16}px`)
   const meta = document.querySelector('meta[name="theme-color"]')
   const colors: Record<string, string> = {
-    default: '#07090D',
+    nyven: '#07090D',
     dark: '#000000',
     light: '#F6F4EF',
   }
-  if (meta) meta.setAttribute('content', colors[attr] || colors.default)
+  if (meta) meta.setAttribute('content', colors[attr] || colors.nyven)
   document.documentElement.style.colorScheme = attr === 'light' ? 'light' : 'dark'
 }
 
@@ -63,7 +73,6 @@ export function applyAppearance(p: AppearancePrefs) {
     return
   }
 
-  // View Transitions API when available
   // @ts-expect-error startViewTransition
   if (typeof document !== 'undefined' && document.startViewTransition) {
     try {
@@ -77,7 +86,6 @@ export function applyAppearance(p: AppearancePrefs) {
     }
   }
 
-  // Temporary transition class (~300ms)
   const html = document.documentElement
   html.classList.add('nyven-theme-animating')
   run()

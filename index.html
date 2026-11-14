@@ -26,7 +26,7 @@
           if (theme === 'system') {
             theme = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'default';
           }
-          if (theme !== 'light' && theme !== 'dark' && theme !== 'default') theme = 'default';
+          if (theme !== 'light' && theme !== 'dark' && theme !== 'default') theme = 'nyven';
           document.documentElement.setAttribute('data-theme', theme);
           document.documentElement.style.setProperty('--nyven-font-scale', (pref.textScale || 1) * 16 + 'px');
           var meta = document.querySelector('meta[name="theme-color"]');

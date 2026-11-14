@@ -1,13 +1,13 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import clsx from 'clsx'
 import nWhite from '../assets/nyven-n-white.png'
 import nIdentity from '../assets/nyven-n-identity.png'
 import nThinking from '../assets/nyven-n-thinking.png'
+import nLight from '../assets/nyven-n-light.png'
 
 /**
  * N visual states driven by real Core activity when possible.
- * Existing assets are reused; CSS/motion differentiates generating vs thinking.
- * Future: planning, searching, speaking, listening, etc.
+ * Light theme uses the dedicated black N mark; dark/nyven keep existing assets.
  */
 export type NState =
   | 'white'
@@ -32,6 +32,8 @@ interface NIdentityProps {
   className?: string
   alt?: string
   animated?: boolean
+  /** Force dark-theme assets (startup intro, auth). Ignores active app theme. */
+  forceDarkAssets?: boolean
 }
 
 function resolveAsset(state: NState): 'white' | 'identity' | 'thinking' {
@@ -50,7 +52,6 @@ function resolveAsset(state: NState): 'white' | 'identity' | 'thinking' {
     case 'listening':
       return 'thinking'
     case 'error':
-      return 'white'
     case 'completed':
     case 'idle':
     case 'white':
@@ -59,15 +60,42 @@ function resolveAsset(state: NState): 'white' | 'identity' | 'thinking' {
   }
 }
 
+function readIsLightTheme(): boolean {
+  if (typeof document === 'undefined') return false
+  return document.documentElement.getAttribute('data-theme') === 'light'
+}
+
 export function NIdentity({
   state = 'white',
   size = 40,
   className,
   alt = 'NYVEN',
   animated = true,
+  forceDarkAssets = false,
 }: NIdentityProps) {
+  const [isLight, setIsLight] = useState(readIsLightTheme)
+
+  useEffect(() => {
+    if (forceDarkAssets) {
+      setIsLight(false)
+      return
+    }
+    const sync = () => setIsLight(readIsLightTheme())
+    sync()
+    const obs = new MutationObserver(sync)
+    obs.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme'],
+    })
+    return () => obs.disconnect()
+  }, [forceDarkAssets])
+
   const asset = resolveAsset(state)
   const src = useMemo(() => {
+    // Light theme: dedicated black N for all states (provided asset)
+    if (isLight && !forceDarkAssets) {
+      return nLight
+    }
     switch (asset) {
       case 'identity':
         return nIdentity
@@ -76,7 +104,7 @@ export function NIdentity({
       default:
         return nWhite
     }
-  }, [asset])
+  }, [asset, isLight, forceDarkAssets])
 
   const sizeStyle =
     typeof size === 'number'
@@ -99,14 +127,15 @@ export function NIdentity({
       alt={alt}
       style={sizeStyle}
       className={clsx(
-        'nyven-logo-adaptive select-none object-contain',
-        animated && state === 'thinking' && 'n-thinking-glow',
-        animated && state === 'generating' && 'n-generating-glow',
-        animated && (state === 'idle' || state === 'white') && 'n-idle-glow',
-        state === 'identity' && 'drop-shadow-[0_0_16px_rgba(98,230,255,0.35)]',
+        // Do not use invert filter — assets are theme-correct
+        'select-none object-contain',
+        animated && state === 'thinking' && !isLight && 'n-thinking-glow',
+        animated && state === 'generating' && !isLight && 'n-generating-glow',
+        animated && (state === 'idle' || state === 'white') && !isLight && 'n-idle-glow',
+        state === 'identity' && !isLight && 'drop-shadow-[0_0_16px_rgba(98,230,255,0.35)]',
         state === 'error' && 'opacity-70',
         state === 'completed' && 'opacity-95',
-        isActive && animated && state !== 'thinking' && state !== 'generating' && 'n-thinking-glow',
+        isActive && animated && state !== 'thinking' && state !== 'generating' && !isLight && 'n-thinking-glow',
         className
       )}
       draggable={false}
