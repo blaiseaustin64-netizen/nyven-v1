@@ -1,4 +1,10 @@
-const CACHE = 'nyven-shell-v2'
+// NYVEN service worker.
+// __NYVEN_BUILD_ID__ is replaced at build time by the nyvenSwVersion plugin in
+// vite.config.ts, so every build gets its own cache and old caches are dropped.
+const BUILD_ID = '__NYVEN_BUILD_ID__'
+const CACHE_PREFIX = 'nyven-shell-'
+const CACHE = CACHE_PREFIX + BUILD_ID
+
 const SHELL = [
   '/',
   '/index.html',
@@ -10,9 +16,14 @@ const SHELL = [
   '/apple-touch-icon.png',
 ]
 
+// No skipWaiting() here: a new version waits until the person taps Refresh in
+// the update banner (which posts SKIP_WAITING), so a chat is never reloaded under them.
 self.addEventListener('install', (e) => {
   e.waitUntil(
-    caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())
+    caches
+      .open(CACHE)
+      // `reload` bypasses the HTTP cache so the shell is always fresh from the network
+      .then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: 'reload' }))))
   )
 })
 
@@ -21,14 +32,26 @@ self.addEventListener('activate', (e) => {
     caches
       .keys()
       .then((keys) =>
-        Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
+        Promise.all(
+          keys
+            .filter((k) => k.startsWith(CACHE_PREFIX) && k !== CACHE)
+            .map((k) => caches.delete(k))
+        )
       )
       .then(() => self.clients.claim())
   )
 })
 
 function isNavigation(req) {
-  return req.mode === 'navigate' || (req.method === 'GET' && req.headers.get('accept')?.includes('text/html'))
+  return (
+    req.mode === 'navigate' ||
+    (req.method === 'GET' && (req.headers.get('accept') || '').includes('text/html'))
+  )
+}
+
+function putInCache(req, res) {
+  const clone = res.clone()
+  caches.open(CACHE).then((c) => c.put(req, clone)).catch(() => {})
 }
 
 self.addEventListener('fetch', (e) => {
@@ -36,7 +59,8 @@ self.addEventListener('fetch', (e) => {
   if (req.method !== 'GET') return
   const url = new URL(req.url)
   if (url.origin !== self.location.origin) return
-  // Never cache API
+
+  // Never cache or intercept the API (auth, chat, voice, data all go straight to the network)
   if (url.pathname.startsWith('/api/')) return
 
   // Network-first for navigations and index.html
@@ -44,13 +68,15 @@ self.addEventListener('fetch', (e) => {
     e.respondWith(
       fetch(req)
         .then((res) => {
-          if (res && res.ok) {
-            const clone = res.clone()
-            caches.open(CACHE).then((c) => c.put(req, clone))
-          }
+          if (res && res.ok) putInCache(req, res)
           return res
         })
-        .catch(() => caches.match(req).then((c) => c || caches.match('/index.html')))
+        .catch(() =>
+          caches
+            .match(req)
+            .then((c) => c || caches.match('/index.html'))
+            .then((c) => c || caches.match('/'))
+        )
     )
     return
   }
@@ -61,10 +87,9 @@ self.addEventListener('fetch', (e) => {
       caches.match(req).then((cached) => {
         if (cached) return cached
         return fetch(req).then((res) => {
-          if (res && res.ok) {
-            const clone = res.clone()
-            caches.open(CACHE).then((c) => c.put(req, clone))
-          }
+          // Never cache an HTML fallback served in place of a missing asset
+          const type = (res && res.headers.get('content-type')) || ''
+          if (res && res.ok && !type.includes('text/html')) putInCache(req, res)
           return res
         })
       })
@@ -72,13 +97,12 @@ self.addEventListener('fetch', (e) => {
     return
   }
 
-  // Other static: network-first, cache fallback
+  // Other static files: network-first, cache fallback
   e.respondWith(
     fetch(req)
       .then((res) => {
         if (res && res.ok && (url.pathname.endsWith('.png') || url.pathname.endsWith('.webmanifest'))) {
-          const clone = res.clone()
-          caches.open(CACHE).then((c) => c.put(req, clone))
+          putInCache(req, res)
         }
         return res
       })

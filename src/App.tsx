@@ -16,6 +16,7 @@ import { ProjectCreate } from './pages/projects/ProjectCreate'
 import { ProjectWorkspace } from './pages/projects/ProjectWorkspace'
 import { NyvenPlus } from './pages/NyvenPlus'
 import { Settings } from './pages/Settings'
+import { Archived } from './pages/Archived'
 import { Profile } from './pages/Profile'
 import { Preview } from './pages/Preview'
 import { Agents } from './pages/Agents'
@@ -195,6 +196,7 @@ export default function App() {
             <Route path="/nyven-plus" element={<NyvenPlus />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/settings/:section" element={<Settings />} />
+            <Route path="/archived" element={<Archived />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/preview/:slug" element={<Preview />} />
           </Routes>

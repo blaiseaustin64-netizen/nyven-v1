@@ -23,6 +23,7 @@ import { useAuth } from '../lib/auth/AuthContext'
 import { useConversationHistory } from '../lib/chat/ConversationHistoryContext'
 import type { Conversation } from '../lib/types'
 import { listProjects } from '../lib/projectStore'
+import { archiveChat, unarchiveChat, useArchivedIds } from '../lib/archiveStore'
 
 const mainNav = [
   { to: '/chat', label: 'Chats', icon: MessageSquare },
@@ -31,13 +32,12 @@ const mainNav = [
 
 const GROUP_ORDER = ['Today', 'Yesterday', 'Previous 7 days', 'Older'] as const
 const PIN_KEY = 'nyven_pinned_chats_v1'
-const ARCHIVE_KEY = 'nyven_archived_chats_v1'
 const CHAT_PROJECT_KEY = 'nyven_chat_projects_v1'
 const PAGE_SIZE = 30
 
-function ArchiveIcon() {
+function ArchiveIcon({ size = 18 }: { size?: number }) {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden className="text-[var(--nyven-text-secondary)]">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden className="text-[var(--nyven-text-secondary)]">
       <path d="M4 7.5h16v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-11z" stroke="currentColor" strokeWidth="1.6" />
       <path d="M3 5.5h18v2H3v-2z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
       <path d="M10 12h4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
@@ -58,17 +58,6 @@ function highlightMatch(title: string, q: string) {
   )
 }
 
-function loadArchived(): Set<string> {
-  try {
-    const raw = localStorage.getItem(ARCHIVE_KEY)
-    if (!raw) return new Set()
-    const arr = JSON.parse(raw)
-    return new Set(Array.isArray(arr) ? arr : [])
-  } catch { return new Set() }
-}
-function saveArchived(s: Set<string>) {
-  localStorage.setItem(ARCHIVE_KEY, JSON.stringify([...s]))
-}
 function loadPinned(): Set<string> {
   try {
     const raw = localStorage.getItem(PIN_KEY)
@@ -154,8 +143,8 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
     }
   })
   const [pinned, setPinned] = useState<Set<string>>(() => loadPinned())
-  const [archived, setArchived] = useState<Set<string>>(() => loadArchived())
-    const [archiveToast, setArchiveToast] = useState<{ text: string; undoId?: string } | null>(null)
+  const archived = useArchivedIds()
+  const [archiveToast, setArchiveToast] = useState<{ text: string; undoId?: string } | null>(null)
   const archiveToastTimer = useRef<number | null>(null)
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
   const holdRef = useRef<{ id: string; timer: number; moved: boolean } | null>(null)
@@ -251,25 +240,22 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
     setMenuId(null)
   }
 
-  const toggleArchive = (id: string, opts?: { silent?: boolean }) => {
-    setArchived((prev) => {
-      const next = new Set(prev)
-      const was = next.has(id)
-      if (was) next.delete(id)
-      else next.add(id)
-      saveArchived(next)
-      if (!opts?.silent) {
-        if (archiveToastTimer.current) window.clearTimeout(archiveToastTimer.current)
-        if (was) {
-          setArchiveToast({ text: 'Chat restored' })
-        } else {
-          setArchiveToast({ text: 'Chat archived', undoId: id })
-        }
-        archiveToastTimer.current = window.setTimeout(() => setArchiveToast(null), 3000)
-      }
-      return next
-    })
+  const showArchiveToast = (toast: { text: string; undoId?: string }, ms: number) => {
+    if (archiveToastTimer.current) window.clearTimeout(archiveToastTimer.current)
+    setArchiveToast(toast)
+    archiveToastTimer.current = window.setTimeout(() => setArchiveToast(null), ms)
   }
+
+  const handleArchive = (id: string) => {
+    archiveChat(id)
+    showArchiveToast({ text: 'Chat archived', undoId: id }, 3000)
+  }
+
+  const handleUndoArchive = (id: string) => {
+    unarchiveChat(id)
+    showArchiveToast({ text: 'Chat restored' }, 2500)
+  }
+
   const togglePin = (id: string) => {
     setPinned((prev) => {
       const next = new Set(prev)
@@ -482,6 +468,18 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
                   Add to project
                 </button>
               )}
+              <button
+                type="button"
+                role="menuitem"
+                className="w-full flex items-center gap-2.5 px-3 min-h-[52px] text-sm text-[var(--nyven-text)] hover:bg-[var(--nyven-surface)]"
+                onClick={() => {
+                  handleArchive(c.id)
+                  setMenuId(null)
+                }}
+              >
+                <ArchiveIcon size={15} />
+                Archive
+              </button>
               <div className="h-px bg-[var(--nyven-hover)] my-1" />
               <button
                 type="button"
@@ -588,7 +586,12 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
                 aria-hidden
               />
               <input
-                type="search"
+                type="text"
+                inputMode="search"
+                enterKeyHint="search"
+                autoComplete="off"
+                autoCorrect="off"
+                spellCheck={false}
                 value={query}
                 onChange={(e) => {
                   setQuery(e.target.value)
@@ -597,7 +600,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
                 placeholder="Search chats"
                 onFocus={() => setSearchFocused(true)}
                 onBlur={() => setSearchFocused(false)}
-                className="w-full h-11 pl-9 pr-10 rounded-xl bg-[var(--nyven-input-bg)] border border-[var(--nyven-border)] text-sm text-[var(--nyven-text)] placeholder:text-[var(--nyven-text-secondary)] outline-none focus:border-nyven-cyan/35"
+                className="nyven-search-input w-full h-11 pl-9 pr-10 rounded-xl bg-[var(--nyven-input-bg)] border border-[var(--nyven-border)] text-sm text-[var(--nyven-text)] placeholder:text-[var(--nyven-text-secondary)] outline-none focus:border-nyven-cyan/35"
                 aria-label="Search chats"
               />
               {query && (
@@ -654,12 +657,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
             <button
               type="button"
               className="text-[0.875rem] font-medium text-[var(--nyven-cyan)] shrink-0"
-              onClick={() => {
-                toggleArchive(archiveToast.undoId!, { silent: true })
-                setArchiveToast({ text: 'Chat restored' })
-                if (archiveToastTimer.current) window.clearTimeout(archiveToastTimer.current)
-                archiveToastTimer.current = window.setTimeout(() => setArchiveToast(null), 2500)
-              }}
+              onClick={() => handleUndoArchive(archiveToast.undoId!)}
             >
               Undo
             </button>
@@ -727,8 +725,8 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
                     <FolderOpen size={18} className="text-[var(--nyven-text-secondary)]" /> Add to project
                   </button>
                 )}
-                <button type="button" className="w-full flex items-center gap-3 px-3 min-h-[52px] rounded-xl text-left text-[var(--nyven-text)] hover:bg-[var(--nyven-surface)]" onClick={() => { if (menuId) toggleArchive(menuId); setMenuId(null) }}>
-                  <FolderOpen size={18} className="text-[var(--nyven-text-secondary)]" /> {menuId && archived.has(menuId) ? 'Unarchive' : 'Archive'}
+                <button type="button" className="w-full flex items-center gap-3 px-3 min-h-[52px] rounded-xl text-left text-[var(--nyven-text)] hover:bg-[var(--nyven-surface)]" onClick={() => { if (menuId) handleArchive(menuId); setMenuId(null) }}>
+                  <ArchiveIcon /> Archive
                 </button>
                 <button type="button" className="w-full flex items-center gap-3 px-3 min-h-[52px] rounded-xl text-left text-red-400 hover:bg-red-500/10" onClick={() => { setDeleteId(menuId); setMenuId(null) }}>
                   <Trash2 size={18} /> Delete

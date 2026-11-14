@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useRef } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
@@ -13,9 +13,6 @@ import {
   ChevronLeft,
   Loader2,
   Archive,
-  Search,
-  Trash2,
-  RotateCcw,
   Smartphone,
   Moon,
   Sun,
@@ -26,6 +23,7 @@ import { InstallPrompt } from '../components/InstallPrompt'
 import { isStandalone } from '../lib/pwa'
 import { loadAppearance, saveAppearance, type ThemeChoice } from '../lib/appearance'
 import { useConversationHistory } from '../lib/chat/ConversationHistoryContext'
+import { useArchivedIds } from '../lib/archiveStore'
 import {
   DEFAULT_PREFERENCES,
   loadPreferences,
@@ -1102,184 +1100,27 @@ function AppearanceSettingsPanel({ showToast }: { showToast: (m: string) => void
   )
 }
 
-const ARCHIVE_KEY = 'nyven_archived_chats_v1'
-
-function loadArchiveIds(): string[] {
-  try {
-    const raw = localStorage.getItem(ARCHIVE_KEY)
-    if (!raw) return []
-    const arr = JSON.parse(raw)
-    return Array.isArray(arr) ? arr.map(String) : []
-  } catch {
-    return []
-  }
-}
-
-function saveArchiveIds(ids: string[]) {
-  localStorage.setItem(ARCHIVE_KEY, JSON.stringify(ids))
-}
-
 function ArchiveSettingsPanel() {
-  const { conversations, deleteConversation, refresh } = useConversationHistory()
-  const [ids, setIds] = useState<string[]>(() => loadArchiveIds())
-  const [query, setQuery] = useState('')
-  const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [selectionMode, setSelectionMode] = useState(false)
-  const [confirmDelete, setConfirmDelete] = useState(false)
-  const longPressRef = useRef<number | null>(null)
-
-  const archived = conversations
-    .filter((c) => ids.includes(c.id))
-    .filter((c) => {
-      const q = query.trim().toLowerCase()
-      if (!q) return true
-      return (c.title || '').toLowerCase().includes(q)
-    })
-    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
-
-  const restore = (idList: string[]) => {
-    const next = ids.filter((id) => !idList.includes(id))
-    setIds(next)
-    saveArchiveIds(next)
-    setSelected(new Set())
-    setSelectionMode(false)
-    setConfirmDelete(false)
-    void refresh()
-  }
-
-  const remove = (idList: string[]) => {
-    for (const id of idList) {
-      try { deleteConversation?.(id) } catch { /* */ }
-    }
-    restore(idList)
-  }
+  const { conversations } = useConversationHistory()
+  const archivedIds = useArchivedIds()
+  const count = conversations.filter((c) => archivedIds.has(c.id)).length
 
   return (
     <>
-      <SectionTitle title="Archive" desc="Archived chats are hidden from the main history until restored." />
-      <div className="relative">
-        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--nyven-text-secondary)]" />
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search archived chats"
-          className="w-full h-11 pl-9 pr-3 rounded-xl bg-[var(--nyven-surface)] border border-[var(--nyven-border)] text-sm text-[var(--nyven-text)] outline-none"
-        />
-      </div>
-      {archived.length === 0 ? (
-        <Card>
-          <p className="text-sm text-[var(--nyven-text-secondary)] text-center py-8">
-            No archived chats yet.
-          </p>
-        </Card>
-      ) : (
-        <div className="space-y-2">
-          {archived.map((c) => {
-            const isSel = selected.has(c.id)
-            const when = c.updatedAt
-              ? new Date(c.updatedAt).toLocaleString(undefined, {
-                  month: 'short',
-                  day: 'numeric',
-                  hour: 'numeric',
-                  minute: '2-digit',
-                })
-              : ''
-            return (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => {
-                  if (selectionMode) {
-                    setSelected((prev) => {
-                      const n = new Set(prev)
-                      if (n.has(c.id)) n.delete(c.id)
-                      else n.add(c.id)
-                      return n
-                    })
-                    return
-                  }
-                  window.location.assign(`/chat?c=${encodeURIComponent(c.id)}`)
-                }}
-                onTouchStart={() => {
-                  longPressRef.current = window.setTimeout(() => {
-                    try { navigator.vibrate?.(12) } catch { /* */ }
-                    setSelectionMode(true)
-                    setSelected(new Set([c.id]))
-                  }, 450)
-                }}
-                onTouchEnd={() => {
-                  if (longPressRef.current) window.clearTimeout(longPressRef.current)
-                }}
-                onTouchMove={() => {
-                  if (longPressRef.current) window.clearTimeout(longPressRef.current)
-                }}
-                className={`w-full text-left rounded-2xl border px-4 py-3 transition ${
-                  isSel
-                    ? 'border-[var(--nyven-cyan)] bg-[var(--nyven-bg-secondary)]'
-                    : 'border-[var(--nyven-border)] bg-[var(--nyven-surface)]'
-                }`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-[var(--nyven-text)] truncate">{c.title || 'Chat'}</p>
-                    <p className="text-[0.75rem] text-[var(--nyven-text-secondary)] mt-0.5">{when}</p>
-                  </div>
-                  {!selectionMode && (
-                    <div className="hidden sm:flex gap-1 shrink-0">
-                      <span
-                        role="button"
-                        tabIndex={0}
-                        onClick={(e) => { e.stopPropagation(); restore([c.id]) }}
-                        className="p-2 rounded-lg text-[var(--nyven-text-secondary)] hover:text-[var(--nyven-text)]"
-                        aria-label="Restore"
-                      >
-                        <RotateCcw size={16} />
-                      </span>
-                      <span
-                        role="button"
-                        tabIndex={0}
-                        onClick={(e) => { e.stopPropagation(); setSelected(new Set([c.id])); setConfirmDelete(true) }}
-                        className="p-2 rounded-lg text-red-400"
-                        aria-label="Delete"
-                      >
-                        <Trash2 size={16} />
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </button>
-            )
-          })}
-        </div>
-      )}
-
-      {selectionMode && selected.size > 0 && (
-        <div className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-40 flex gap-2 px-3 py-2 rounded-2xl border border-[var(--nyven-border)] bg-[var(--nyven-surface)] shadow-xl">
-          <button type="button" className="px-4 h-11 rounded-xl text-sm text-[var(--nyven-text)]" onClick={() => { setSelectionMode(false); setSelected(new Set()) }}>Cancel</button>
-          <button type="button" className="px-4 h-11 rounded-xl text-sm text-[var(--nyven-cyan)] font-medium inline-flex items-center gap-1.5" onClick={() => restore([...selected])}>
-            <RotateCcw size={16} /> Restore
-          </button>
-          <button type="button" className="px-4 h-11 rounded-xl text-sm text-red-400 font-medium inline-flex items-center gap-1.5" onClick={() => setConfirmDelete(true)}>
-            <Trash2 size={16} /> Delete
-          </button>
-        </div>
-      )}
-
-      {confirmDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <button type="button" className="absolute inset-0 bg-[var(--nyven-overlay)]" aria-label="Close" onClick={() => setConfirmDelete(false)} />
-          <div className="relative w-full max-w-sm rounded-2xl border border-[var(--nyven-border)] bg-[var(--nyven-surface)] p-4">
-            <p className="text-sm text-[var(--nyven-text)] font-medium">Delete permanently?</p>
-            <p className="text-[0.8125rem] text-[var(--nyven-text-secondary)] mt-1">This cannot be undone.</p>
-            <div className="flex gap-2 mt-4">
-              <button type="button" className="flex-1 h-11 rounded-xl border border-[var(--nyven-border)]" onClick={() => setConfirmDelete(false)}>Cancel</button>
-              <button type="button" className="flex-1 h-11 rounded-xl bg-red-500/20 text-red-400 font-medium" onClick={() => remove([...selected])}>Delete</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <SectionTitle title="Conversations" desc="Manage chats you have archived." />
+      <Link
+        to="/archived"
+        className="flex items-center gap-3 px-4 min-h-[64px] rounded-2xl border border-[var(--nyven-border)] bg-nyven-surface hover:border-nyven-cyan/35 active:bg-nyven-cyan/10 transition-colors"
+      >
+        <span className="w-10 h-10 rounded-xl bg-[var(--nyven-input-bg)] flex items-center justify-center text-nyven-text-secondary shrink-0">
+          <Archive size={18} strokeWidth={1.75} />
+        </span>
+        <span className="flex-1 min-w-0 text-[16px] text-nyven-text">Archived chats</span>
+        <span className="text-sm text-nyven-text-secondary tabular-nums shrink-0" aria-label={`${count} archived chats`}>
+          {count}
+        </span>
+        <ChevronLeft size={18} className="rotate-180 text-nyven-text-secondary/50 shrink-0" />
+      </Link>
     </>
   )
 }
-

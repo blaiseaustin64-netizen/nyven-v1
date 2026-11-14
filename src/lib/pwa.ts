@@ -36,10 +36,34 @@ export function onDeferredInstall(fn: (e: BeforeInstallPromptEvent | null) => vo
   }
 }
 
+const UPDATE_CHECK_MIN_GAP_MS = 15_000
+
+/** Ask the browser to look for a new sw.js: once on app open, and whenever the app comes back to the foreground. */
+function startUpdateChecks(reg: ServiceWorkerRegistration) {
+  let last = 0
+  const check = () => {
+    const now = Date.now()
+    if (now - last < UPDATE_CHECK_MIN_GAP_MS) return
+    last = now
+    reg.update().catch(() => {})
+  }
+  check()
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') check()
+  })
+  window.addEventListener('pageshow', (e) => {
+    if ((e as PageTransitionEvent).persisted) check()
+  })
+}
+
 export function registerServiceWorker() {
   if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {})
+    navigator.serviceWorker
+      // updateViaCache: 'none' → sw.js itself is never served from the HTTP cache
+      .register('/sw.js', { updateViaCache: 'none' })
+      .then(startUpdateChecks)
+      .catch(() => {})
   })
 }
 

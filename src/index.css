@@ -499,3 +499,14 @@ html[data-theme="dark"] .nyven-logo-adaptive {
   background-color: #000;
   color: #e8eaed;
 }
+
+/* Search boxes: the only clear button is NYVEN's own (never the browser's). */
+.nyven-search-input::-webkit-search-cancel-button,
+.nyven-search-input::-webkit-search-decoration,
+.nyven-search-input::-webkit-search-results-button,
+.nyven-search-input::-webkit-search-results-decoration,
+input[type="search"]::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+}

@@ -668,12 +668,16 @@ export function Chat() {
   handleSendRef.current = handleSend
 
   const handleEditUser = (messageId: string, newText: string) => {
-    // Drop the edited user message and everything after; resend
-    setMessages((prev) => {
-      const idx = prev.findIndex((m) => m.id === messageId)
-      if (idx < 0) return prev
-      return prev.slice(0, idx)
-    })
+    if (isGeneratingRef.current) return
+    // Drop the edited user message and everything after; resend.
+    // Update messagesRef right away so handleSend builds its history from the
+    // trimmed list (the ref is otherwise only refreshed on the next render).
+    const prev = messagesRef.current
+    const idx = prev.findIndex((m) => m.id === messageId)
+    if (idx < 0) return
+    const trimmed = prev.slice(0, idx)
+    messagesRef.current = trimmed
+    setMessages(trimmed)
     void handleSend({ text: newText, attachments: [] })
   }
 

@@ -1,4 +1,6 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
+import { AnimatePresence, motion } from 'framer-motion'
 import {
   Copy,
   Check,
@@ -66,6 +68,38 @@ async function shareText(text: string): Promise<'shared' | 'copied' | 'failed'> 
   }
 }
 
+/** "Select text" icon: text lines with a caret bar (no extra icon dependency). */
+function SelectTextIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0">
+      <path d="M4 6h10M4 12h7M4 18h10" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+      <path d="M18 5v14M16 5h4M16 19h4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function UserMenuItem({
+  icon,
+  label,
+  onClick,
+}: {
+  icon: ReactNode
+  label: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onClick={onClick}
+      className="w-full flex items-center gap-3 px-3 min-h-[48px] rounded-xl text-left text-[15px] text-[var(--nyven-text)] hover:bg-[var(--nyven-hover)] active:bg-[var(--nyven-hover)] transition-colors"
+    >
+      <span className="text-[var(--nyven-text-secondary)] grid place-items-center w-5 shrink-0">{icon}</span>
+      {label}
+    </button>
+  )
+}
+
 export function ChatMessage({
   message,
   onRegenerate,
@@ -83,11 +117,15 @@ export function ChatMessage({
   const [shareHint, setShareHint] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<'positive' | 'negative' | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
-  const [userSheetOpen, setUserSheetOpen] = useState(false)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [userMenuPos, setUserMenuPos] = useState<{ top: number; right: number; origin: 'top' | 'bottom' } | null>(null)
+  const [selectMode, setSelectMode] = useState(false)
   const [editingUser, setEditingUser] = useState(false)
   const [editDraft, setEditDraft] = useState('')
 
   const userLongPress = useRef<number | null>(null)
+  const bubbleRef = useRef<HTMLDivElement>(null)
+  const userMenuRef = useRef<HTMLDivElement>(null)
   const longPressTimer = useRef<number | null>(null)
   const isUser = message.role === 'user'
   const active = Boolean(message.isThinking || message.isStreaming)
@@ -107,6 +145,90 @@ export function ChatMessage({
     setTimeout(() => setShareHint(null), 2000)
   }
 
+  const openUserMenu = () => {
+    if (userMenuOpen || selectMode || !bubbleRef.current) return
+    try { navigator.vibrate?.(15) } catch { /* */ }
+    setUserMenuPos(null)
+    setUserMenuOpen(true)
+  }
+
+  const closeUserMenu = () => setUserMenuOpen(false)
+
+  // Anchor the menu directly under the bubble, right-aligned; flip above only when there is no room below.
+  useLayoutEffect(() => {
+    if (!userMenuOpen) return
+    const bubble = bubbleRef.current
+    const menu = userMenuRef.current
+    if (!bubble || !menu) return
+    const r = bubble.getBoundingClientRect()
+    const vw = window.innerWidth
+    const vh = window.innerHeight
+    const h = menu.offsetHeight
+    const gap = 8
+    const edge = 12
+    const fitsBelow = r.bottom + gap + h <= vh - edge
+    let top = fitsBelow ? r.bottom + gap : r.top - gap - h
+    top = Math.min(Math.max(top, edge), Math.max(edge, vh - h - edge))
+    setUserMenuPos({ top, right: Math.max(edge, vw - r.right), origin: fitsBelow ? 'top' : 'bottom' })
+  }, [userMenuOpen])
+
+  useEffect(() => {
+    if (!userMenuOpen) return
+    const close = () => setUserMenuOpen(false)
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') close()
+    }
+    window.addEventListener('resize', close)
+    window.addEventListener('scroll', close, true)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('resize', close)
+      window.removeEventListener('scroll', close, true)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [userMenuOpen])
+
+  // "Select text": make the bubble selectable, select it, and leave on tap outside / Escape.
+  useEffect(() => {
+    if (!selectMode) return
+    const el = bubbleRef.current
+    if (el) {
+      try {
+        const sel = window.getSelection()
+        if (sel) {
+          const range = document.createRange()
+          range.selectNodeContents(el)
+          sel.removeAllRanges()
+          sel.addRange(range)
+        }
+      } catch { /* */ }
+    }
+    const exit = () => {
+      setSelectMode(false)
+      try {
+        const sel = window.getSelection()
+        if (sel && el && sel.anchorNode && el.contains(sel.anchorNode)) sel.removeAllRanges()
+      } catch { /* */ }
+    }
+    const onDown = (e: Event) => {
+      if (!el || !el.contains(e.target as Node)) exit()
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') exit()
+    }
+    document.addEventListener('pointerdown', onDown, true)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('pointerdown', onDown, true)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [selectMode])
+
+  const copyUserText = async () => {
+    closeUserMenu()
+    try { await navigator.clipboard.writeText(message.content) } catch { /* */ }
+  }
+
   if (isUser) {
     // Attachments render once in ChatThread above this bubble — not inside it.
     const ts = new Date(message.timestamp || Date.now())
@@ -117,61 +239,126 @@ export function ChatMessage({
         <div className="max-w-[85%] sm:max-w-[75%] min-w-0">
           {message.content ? (
             <div
-              id={`msg-${message.id}`} className="bg-nyven-surface border border-[var(--nyven-border)] rounded-2xl rounded-br-md px-4 py-3 text-[0.9375rem] leading-relaxed text-nyven-text break-words"
-              onContextMenu={(e) => { e.preventDefault(); setUserSheetOpen(true) }}
+              ref={bubbleRef}
+              id={`msg-${message.id}`}
+              className={`bg-nyven-surface border rounded-2xl rounded-br-md px-4 py-3 text-[0.9375rem] leading-relaxed text-nyven-text break-words transition-[transform,box-shadow,border-color] duration-150 ${
+                selectMode
+                  ? 'select-text border-[var(--nyven-border)]'
+                  : '[@media(pointer:coarse)]:select-none [@media(pointer:coarse)]:[-webkit-touch-callout:none] border-[var(--nyven-border)]'
+              } ${userMenuOpen ? 'ring-2 ring-nyven-cyan/40 scale-[0.985]' : ''}`}
+              onContextMenu={(e) => {
+                if (selectMode) return
+                e.preventDefault()
+                openUserMenu()
+              }}
               onTouchStart={() => {
-                userLongPress.current = window.setTimeout(() => {
-                  try { navigator.vibrate?.(15) } catch {}
-                  setUserSheetOpen(true)
-                }, 450)
+                if (selectMode) return
+                if (userLongPress.current) window.clearTimeout(userLongPress.current)
+                userLongPress.current = window.setTimeout(openUserMenu, 450)
               }}
               onTouchEnd={() => { if (userLongPress.current) window.clearTimeout(userLongPress.current) }}
               onTouchMove={() => { if (userLongPress.current) window.clearTimeout(userLongPress.current) }}
+              onTouchCancel={() => { if (userLongPress.current) window.clearTimeout(userLongPress.current) }}
             >
               {message.content}
             </div>
           ) : null}
         </div>
       </div>
+
+      {typeof document !== 'undefined' &&
+        createPortal(
+          <>
+            {userMenuOpen && (
+              <button
+                type="button"
+                className="fixed inset-0 z-[90] cursor-default"
+                aria-label="Close menu"
+                onClick={closeUserMenu}
+              />
+            )}
+            <AnimatePresence>
+              {userMenuOpen && (
+                <motion.div
+                  key="user-msg-menu"
+                  ref={userMenuRef}
+                  role="menu"
+                  aria-label="Message actions"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.94 }}
+                  transition={{ duration: 0.16, ease: [0.2, 0.8, 0.2, 1] }}
+                  style={{
+                    position: 'fixed',
+                    top: userMenuPos?.top ?? 0,
+                    right: userMenuPos?.right ?? 12,
+                    transformOrigin: userMenuPos?.origin === 'bottom' ? 'bottom right' : 'top right',
+                  }}
+                  className="z-[91] w-[232px] max-w-[calc(100vw-24px)] rounded-2xl border border-[var(--nyven-border)] bg-nyven-surface/95 backdrop-blur-xl shadow-lg shadow-nyven-shade/60 p-1.5"
+                >
+                  <p className="px-3 pt-1.5 pb-2 text-[12px] text-[var(--nyven-text-secondary)] border-b border-[var(--nyven-border)] mb-1">
+                    {timeLabel}
+                  </p>
+                  <UserMenuItem icon={<Copy size={18} />} label="Copy" onClick={() => void copyUserText()} />
+                  <UserMenuItem
+                    icon={<SelectTextIcon />}
+                    label="Select text"
+                    onClick={() => {
+                      closeUserMenu()
+                      setSelectMode(true)
+                    }}
+                  />
+                  <UserMenuItem
+                    icon={<Pencil size={18} />}
+                    label="Edit message"
+                    onClick={() => {
+                      closeUserMenu()
+                      setEditDraft(message.content)
+                      setEditingUser(true)
+                    }}
+                  />
+                  <UserMenuItem
+                    icon={<Share2 size={18} />}
+                    label="Share prompt"
+                    onClick={() => {
+                      closeUserMenu()
+                      void handleShare()
+                    }}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </>,
+          document.body
+        )}
+
       {editingUser && (
-        <div className="fixed inset-0 z-[91] flex items-end sm:items-center justify-center p-3" role="dialog" aria-modal="true">
+        <div className="fixed inset-0 z-[91] flex items-end sm:items-center justify-center p-3" role="dialog" aria-modal="true" aria-label="Edit message">
           <button type="button" className="absolute inset-0 bg-[var(--nyven-overlay)]" aria-label="Close" onClick={() => setEditingUser(false)} />
           <div className="relative w-full max-w-md rounded-2xl border border-[var(--nyven-border)] bg-[var(--nyven-surface)] p-4 shadow-2xl">
-            <p className="text-sm text-[var(--nyven-text-secondary)] mb-2">Edit text</p>
+            <p className="text-sm text-[var(--nyven-text-secondary)] mb-2">Edit message</p>
             <textarea
               value={editDraft}
               onChange={(e) => setEditDraft(e.target.value)}
-              className="w-full min-h-[120px] rounded-xl bg-[var(--nyven-bg)] border border-[var(--nyven-border)] text-[var(--nyven-text)] p-3 text-[0.9375rem] outline-none resize-y"
+              className="w-full min-h-[120px] rounded-xl bg-[var(--nyven-bg)] border border-[var(--nyven-border)] text-[var(--nyven-text)] p-3 text-[0.9375rem] outline-none focus:border-nyven-cyan/40 resize-y"
               autoFocus
             />
             <div className="flex gap-2 mt-3">
               <button type="button" className="flex-1 h-11 rounded-xl border border-[var(--nyven-border)] text-[var(--nyven-text-secondary)]" onClick={() => setEditingUser(false)}>Cancel</button>
-              <button type="button" className="flex-1 h-11 rounded-xl bg-[var(--nyven-cyan)] text-[var(--nyven-on-accent)] font-semibold" onClick={() => {
-                setEditingUser(false)
-                onEdit?.(editDraft.trim())
-              }}>Send</button>
+              <button
+                type="button"
+                disabled={!editDraft.trim()}
+                className="flex-1 h-11 rounded-xl bg-[var(--nyven-cyan)] text-[var(--nyven-on-accent)] font-semibold disabled:opacity-50"
+                onClick={() => {
+                  const text = editDraft.trim()
+                  if (!text) return
+                  setEditingUser(false)
+                  onEdit?.(text)
+                }}
+              >
+                Send
+              </button>
             </div>
-          </div>
-        </div>
-      )}
-      {userSheetOpen && (
-        <div className="fixed inset-0 z-[90]" role="dialog" aria-modal="true">
-          <button type="button" className="absolute inset-0 bg-[var(--nyven-overlay)]" aria-label="Close" onClick={() => setUserSheetOpen(false)} />
-          <div className="absolute left-3 right-3 bottom-[max(1rem,env(safe-area-inset-bottom))] rounded-2xl border border-[var(--nyven-border)] bg-nyven-surface/95 backdrop-blur-xl shadow-2xl p-2">
-            <p className="text-[12px] text-[var(--nyven-text-secondary)] px-3 py-2">{timeLabel}</p>
-            <button type="button" className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-[15px] text-[var(--nyven-text)] hover:bg-[var(--nyven-surface)]" onClick={() => { void navigator.clipboard.writeText(message.content); setUserSheetOpen(false) }}>
-              <Copy size={18} /> Copy
-            </button>
-            <button type="button" className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-[15px] text-[var(--nyven-text)] hover:bg-[var(--nyven-surface)]" onClick={() => {
-              setEditDraft(message.content)
-              setEditingUser(true)
-              setUserSheetOpen(false)
-            }}>
-              <Pencil size={18} /> Edit text
-            </button>
-            <button type="button" className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-[15px] text-[var(--nyven-text)] hover:bg-[var(--nyven-surface)]" onClick={() => { void handleShare(); setUserSheetOpen(false) }}>
-              <Share2 size={18} /> Share prompt
-            </button>
           </div>
         </div>
       )}
