@@ -912,6 +912,7 @@ export function Chat() {
             onOpenVoiceChat={() => {
               setVoiceChatOpen(true)
               voiceChatOpenRef.current = true
+              voiceRef.current?.setAutoStopOnSilence(true)
             }}
           />
           <p className="text-center text-[11px] text-nyven-text-secondary/80 mt-2 px-2 leading-snug">
@@ -925,6 +926,7 @@ export function Chat() {
         onClose={() => {
           setVoiceChatOpen(false)
           voiceChatOpenRef.current = false
+          voiceRef.current?.setAutoStopOnSilence(false)
           voiceRef.current?.stopAll()
         }}
         voicePhase={voicePhase}
