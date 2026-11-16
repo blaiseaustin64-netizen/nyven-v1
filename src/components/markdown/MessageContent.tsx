@@ -346,26 +346,9 @@ export function MessageContent({ content, isStreaming, className }: Props) {
     <div
       className={clsx(
         'nyven-md min-w-0 max-w-full text-[16px] leading-[1.65] text-nyven-text [&_p]:[overflow-wrap:anywhere]',
-        isStreaming ? 'nyven-streaming-answer' : 'nyven-streaming-answer-done',
         className
       )}
     >
-      <style>{`
-        @keyframes nyven-answer-settle {
-          from { opacity: 0.72; transform: translateY(1px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .nyven-streaming-answer {
-          animation: nyven-answer-settle 0.32s ease-out both;
-        }
-        .nyven-streaming-answer > * {
-          transition: opacity 0.22s ease, transform 0.22s ease;
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .nyven-streaming-answer { animation: none; }
-          .nyven-streaming-answer > * { transition: none; }
-        }
-      `}</style>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkBreaks]}
         rehypePlugins={[rehypeSanitize]}
@@ -374,7 +357,10 @@ export function MessageContent({ content, isStreaming, className }: Props) {
         {content || ''}
       </ReactMarkdown>
       {isStreaming && (
-        <span className="inline-block ml-1 align-middle w-1.5 h-1.5 rounded-full bg-nyven-cyan/70 animate-pulse" aria-hidden />
+        <span
+          className="inline-block w-1.5 h-4 ml-0.5 align-middle bg-nyven-cyan/80 animate-pulse rounded-sm"
+          aria-hidden
+        />
       )}
     </div>
   )

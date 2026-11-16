@@ -74,9 +74,7 @@ export function StreamingRevealText({ content, isStreaming, className }: Props) 
     }
   }, [content, isStreaming])
 
-  // Split for a subtle fade on only the newest streamed word. No extra typing
-  // indicator is rendered: the normal NYVEN activity state remains responsible
-  // for the thinking/generating feedback before and during the response.
+  // Split for soft fade on the newest word only
   const tokens = visible.split(/(\s+)/).filter((t) => t.length > 0)
   let wordIndex = 0
   const lastWordIdx = (() => {
@@ -113,7 +111,7 @@ export function StreamingRevealText({ content, isStreaming, className }: Props) 
           </span>
         )
       })}
-
+      {isStreaming && <span className="nyven-typing-dot" aria-hidden />}
     </div>
   )
 }

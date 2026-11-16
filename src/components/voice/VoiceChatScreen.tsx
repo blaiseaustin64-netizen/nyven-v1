@@ -148,20 +148,20 @@ export function VoiceChatScreen({
         <button
           type="button"
           onClick={onToggleListen}
-          disabled={muted || isProcessing}
+          disabled={muted || isProcessing || isSpeaking}
           className={clsx(
             'h-14 w-14 rounded-full flex items-center justify-center transition-all duration-200',
             voicePhase === 'listening'
               ? 'bg-[var(--nyven-surface)] text-[var(--nyven-text)]'
               : 'bg-[var(--nyven-input-bg)] text-[var(--nyven-text-secondary)] hover:text-[var(--nyven-text)] hover:bg-[var(--nyven-surface)]',
-            (muted || isProcessing) && 'opacity-40 cursor-not-allowed'
+            (muted || isProcessing || isSpeaking) && 'opacity-40 cursor-not-allowed'
           )}
           aria-label={voicePhase === 'listening' ? 'Stop listening' : 'Start listening'}
         >
           <Mic size={22} />
         </button>
         <p className="mt-3 text-[12px]" style={{ color: 'var(--nyven-text-secondary)' }}>
-          {voicePhase === 'listening' ? 'Listening… pause to send' : voicePhase === 'speaking' ? 'Tap to interrupt & speak' : 'Tap to speak'}
+          {voicePhase === 'listening' ? 'Tap to finish' : 'Tap to speak'}
         </p>
       </div>
     </div>

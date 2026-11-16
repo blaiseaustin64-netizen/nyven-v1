@@ -33,7 +33,6 @@ export class VoiceController {
   private listenMode = false
   private sttInFlight = false
   private lastTranscriptAt = 0
-  private autoStopOnSilence = false
 
   constructor() {
     this.recorder.setHandlers({
@@ -65,10 +64,6 @@ export class VoiceController {
     this.handlers = h
   }
 
-  setAutoStopOnSilence(enabled: boolean): void {
-    this.autoStopOnSilence = enabled
-  }
-
   getPhase(): VoicePhase {
     return this.phase
   }
@@ -88,19 +83,7 @@ export class VoiceController {
       return
     }
     if (this.phase === 'speaking') {
-      // Allow natural barge-in: stop the current TTS immediately and begin a new
-      // listening turn instead of forcing the user to wait for playback to end.
       this.stopSpeaking()
-      if (!this.listenMode) {
-        this.listenMode = true
-        this.setPhase('requesting_permission')
-        try {
-          await this.recorder.start({ autoStopOnSilence: this.autoStopOnSilence })
-        } catch {
-          this.listenMode = false
-          this.setPhase('idle')
-        }
-      }
       return
     }
     if (this.phase !== 'idle' && this.phase !== 'error') return
@@ -114,7 +97,7 @@ export class VoiceController {
     this.listenMode = true
     this.setPhase('requesting_permission')
     try {
-      await this.recorder.start({ autoStopOnSilence: this.autoStopOnSilence })
+      await this.recorder.start()
     } catch {
       this.listenMode = false
       this.setPhase('idle')

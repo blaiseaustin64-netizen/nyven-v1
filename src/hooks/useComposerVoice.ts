@@ -30,7 +30,6 @@ export function useComposerVoice(options?: {
   const voiceMutedRef = useRef(false)
   const fromVoiceRef = useRef(false)
   const voiceSubmitInFlightRef = useRef(false)
-  const voiceTurnRef = useRef(0)
   const isGeneratingRef = useRef(isGenerating)
   isGeneratingRef.current = isGenerating
 
@@ -53,7 +52,6 @@ export function useComposerVoice(options?: {
       onTranscript: (text) => {
         if (!text.trim()) return
         if (voiceSubmitInFlightRef.current || isGeneratingRef.current) return
-        voiceTurnRef.current += 1
         fromVoiceRef.current = true
         voiceSubmitInFlightRef.current = true
         setFromVoice(true)
@@ -79,36 +77,29 @@ export function useComposerVoice(options?: {
 
   const speakReply = useCallback(async (text: string) => {
     setLastVoiceReply(text)
-    const replyTurn = voiceTurnRef.current
     if (fromVoiceRef.current || voiceChatOpenRef.current) {
       try {
         await voiceRef.current?.speak(text, { force: true })
       } catch {
-        // An interrupted reply is expected during natural barge-in.
+        /* */
       }
-      // If the user started another turn while this reply was speaking, do not
-      // overwrite the new turn's state or start a second recorder.
-      if (voiceTurnRef.current === replyTurn && voiceChatOpenRef.current && !voiceMutedRef.current) {
+      if (voiceChatOpenRef.current && !voiceMutedRef.current) {
         void voiceRef.current?.toggleListen()
       }
     }
-    if (voiceTurnRef.current === replyTurn) {
-      fromVoiceRef.current = false
-      setFromVoice(false)
-      voiceSubmitInFlightRef.current = false
-    }
+    fromVoiceRef.current = false
+    setFromVoice(false)
+    voiceSubmitInFlightRef.current = false
   }, [])
 
   const openVoiceChat = useCallback(() => {
     voiceChatOpenRef.current = true
-    voiceRef.current?.setAutoStopOnSilence(true)
     setVoiceChatOpen(true)
   }, [])
 
   const closeVoiceChat = useCallback(() => {
     voiceChatOpenRef.current = false
     setVoiceChatOpen(false)
-    voiceRef.current?.setAutoStopOnSilence(false)
     voiceRef.current?.stopAll()
   }, [])
 

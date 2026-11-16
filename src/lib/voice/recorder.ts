@@ -26,10 +26,6 @@ export class MicRecorder {
   private analyser: AnalyserNode | null = null
   private audioCtx: AudioContext | null = null
   private raf = 0
-  private speechDetected = false
-  private lastSpeechAt = 0
-  private silenceStopTimer: ReturnType<typeof setTimeout> | null = null
-  private autoStopOnSilence = false
   private handlers: RecorderHandlers = {}
 
   static isSupported(): boolean {
@@ -44,7 +40,7 @@ export class MicRecorder {
     this.handlers = h
   }
 
-  async start(options?: { autoStopOnSilence?: boolean }): Promise<void> {
+  async start(): Promise<void> {
     if (!MicRecorder.isSupported()) {
       this.handlers.onError?.('unsupported', 'Voice input is not supported in this browser.')
       throw new Error('unsupported')
@@ -82,14 +78,7 @@ export class MicRecorder {
       this.recorder = new MediaRecorder(this.stream)
     }
 
-    this.autoStopOnSilence = Boolean(options?.autoStopOnSilence)
     this.chunks = []
-    this.speechDetected = false
-    this.lastSpeechAt = 0
-    if (this.silenceStopTimer) {
-      clearTimeout(this.silenceStopTimer)
-      this.silenceStopTimer = null
-    }
     this.recorder.ondataavailable = (e) => {
       if (e.data.size > 0) this.chunks.push(e.data)
     }
@@ -114,10 +103,6 @@ export class MicRecorder {
       clearTimeout(this.maxTimer)
       this.maxTimer = null
     }
-    if (this.silenceStopTimer) {
-      clearTimeout(this.silenceStopTimer)
-      this.silenceStopTimer = null
-    }
     this.stopLevelMeter()
     if (this.recorder && this.recorder.state !== 'inactive') {
       this.recorder.stop()
@@ -130,10 +115,6 @@ export class MicRecorder {
     if (this.maxTimer) {
       clearTimeout(this.maxTimer)
       this.maxTimer = null
-    }
-    if (this.silenceStopTimer) {
-      clearTimeout(this.silenceStopTimer)
-      this.silenceStopTimer = null
     }
     this.stopLevelMeter()
     this.chunks = []
@@ -171,24 +152,7 @@ export class MicRecorder {
           sum += v * v
         }
         const rms = Math.sqrt(sum / data.length)
-        const level = Math.min(1, rms * 3)
-        this.handlers.onLevel?.(level)
-
-        // Natural turn-taking for full-screen voice chat: once speech is detected,
-        // a short quiet pause ends the turn so STT can start immediately.
-        // Keep this conservative so normal pauses inside a sentence are preserved.
-        const now = performance.now()
-        if (this.autoStopOnSilence && level >= 0.045) {
-          this.speechDetected = true
-          this.lastSpeechAt = now
-        } else if (this.autoStopOnSilence && this.speechDetected && this.lastSpeechAt && now - this.lastSpeechAt >= 1100) {
-          if (!this.silenceStopTimer) {
-            this.silenceStopTimer = setTimeout(() => {
-              this.silenceStopTimer = null
-              void this.stop()
-            }, 40)
-          }
-        }
+        this.handlers.onLevel?.(Math.min(1, rms * 3))
         this.raf = requestAnimationFrame(tick)
       }
       this.raf = requestAnimationFrame(tick)
